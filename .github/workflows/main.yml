@@ -1,6 +1,17 @@
 name: Basic CI
 
 on:
+  workflow_dispatch:
+    inputs:
+      name:
+        description: 'Name of the person to greet'
+        required: true
+        default: 'World'
+      greeting:
+        type: boolean
+        description: 'Whether to greet or not'
+        required: true
+
   push:
     branches: [ main ]
   pull_request:
@@ -11,7 +22,9 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-    - uses: actions/checkout@v4
+    - name: Checkout code
+      # This action checks out your repository under $GITHUB_WORKSPACE, so your workflow can access it.
+      uses: actions/checkout@v4
 
     - name: Run a one-line script
       run: echo Hello, world!
