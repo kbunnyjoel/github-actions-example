@@ -25,9 +25,9 @@ jobs:
     - name: Print greeting
       run: echo "Hello ${{ github.event.inputs.name }}!"
       if: ${{ github.event.inputs.greeting == 'true' }}
-    - name: Print greeting
+    - name: Print greeting event name
       run: echo "Hello ${{ github.event.inputs.name }}!"
-      if: ${{ github.event_name == 'push' || github.event_name == 'pull_request' }}
+      if: ${{ github.event_name == 'merged' || github.event_name == 'push' }}
     - name: Checkout code
       # This action checks out your repository under $GITHUB_WORKSPACE, so your workflow can access it.
       uses: actions/checkout@v4
