@@ -1,9 +1,8 @@
 name: Publish Node.js psackage to GitHub Packages
 
 on:
-  push:
-    tags:
-      - 'v*.*.*'  # Trigger only on version tags like v1.0.0
+  pull_request:
+    branches: ['feature/*' ]
 
 jobs:
   publish:
