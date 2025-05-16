@@ -44,12 +44,20 @@ jobs:
     - name: Run tests and collect coverage
       run: npm test # This will now run 'jest --coverage'
 
+    - name: Debug input values
+      run: |
+        echo "NUMBER1=${NUMBER1}"
+        echo "NUMBER2=${NUMBER2}"
+      env:
+        NUMBER1: ${{ github.event.inputs.number1 }}
+        NUMBER2: ${{ github.event.inputs.number2 }}
+        
     - name: Run npm start with inputs
       run: npm start
       env:
         INPUT_NUMBER1: ${{ github.event.inputs.number1 }}
         INPUT_NUMBER2: ${{ github.event.inputs.number2 }}
-        
+
     - name: Upload coverage reports
       uses: actions/upload-artifact@v4
       with:
