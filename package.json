@@ -1,6 +1,9 @@
 {
-  "name": "my-node-app",
+  "name": "@kbunnyjoel/github-actions-example",
   "version": "1.0.0",
+  "publishConfig": {
+    "registry": "https://npm.pkg.github.com/"
+  },
   "description": "",
   "main": "math.js",
   "scripts": {
