@@ -1,4 +1,7 @@
 const math = require('./math');
 
-const result = math.add(5, 7); // You can change these numbers
-console.log('Result:', result);
+const num1 = Number(process.env.INPUT_NUMBER1 || 0);
+const num2 = Number(process.env.INPUT_NUMBER2 || 0);
+
+console.log(`Adding ${num1} and ${num2}`);
+console.log('Result:', num1 + num2);
