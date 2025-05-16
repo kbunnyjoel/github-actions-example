@@ -3,8 +3,12 @@ name: Publish Node.js psackage to GitHub Packages
 on:
 
   workflow_dispatch:
+  push:
+    tags:
+      - 'v*.*.*'
+    branches: [ main ]
   pull_request:
-    branches: ['feature/*' ]
+    branches: [ main, 'feature/*' ]
 
 jobs:
   publish:
