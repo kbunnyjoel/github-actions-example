@@ -57,10 +57,12 @@ jobs:
         NUMBER2: ${{ github.event.inputs.number2 }}
 
     - name: Start Node server in background
+      # run: |
+      #   nohup npm start > server.log 2>&1 &
+      #   sleep 5
+      #   curl --fail http://localhost:3000/status || (echo "Server failed to start" && exit 1)
       run: |
-        nohup npm start > server.log 2>&1 &
-        sleep 5
-        curl --fail http://localhost:3000/status || (echo "Server failed to start" && exit 1)
+        npm start &
       env:
         INPUT_NUMBER1: ${{ github.event.inputs.number1 }}
         INPUT_NUMBER2: ${{ github.event.inputs.number2 }}
@@ -95,11 +97,11 @@ jobs:
         with:
           context: .
           push: false
-          tags: ${{ secrets.DOCKER_USERNAME }}/my-node-app:${{ github.sha }}
-          # tags: ${{ secrets.DOCKER_USERNAME }}/my-node-app:${{ steps.vars.outputs.sha_short }}
+          # tags: ${{ secrets.DOCKER_USERNAME }}/my-node-app:${{ github.sha }}
+          tags: ${{ secrets.DOCKER_USERNAME }}/my-node-app:${{ steps.vars.outputs.sha_short }}
       
       - name: Run Docker container in background
-        run: docker run -d -p 3000:3000 --name live-app ${{ secrets.DOCKER_USERNAME }}/my-node-app:${{ github.sha }}
+        run: docker run -d -p 3000:3000 --name live-app ${{ secrets.DOCKER_USERNAME }}/my-node-app:${{ steps.vars.outputs.sha_short }}
 
       - name: Wait for app to be ready
         run: |
