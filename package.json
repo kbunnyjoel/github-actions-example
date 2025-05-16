@@ -22,5 +22,8 @@
       "clover"
     ],
     "coverageDirectory": "coverage"
+  },
+  "dependencies": {
+    "express": "^5.1.0"
   }
 }
