@@ -45,6 +45,8 @@ jobs:
     - name: Run tests and collect coverage
       run: npm test # This will now run 'jest --coverage'
 
+    - name: Run npm start
+      run: npm start
     - name: Upload coverage reports
       uses: actions/upload-artifact@v4
       with:
