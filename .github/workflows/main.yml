@@ -92,5 +92,6 @@ jobs:
         with:
           context: .
           push: false
-          tags: ${{ secrets.DOCKER_USERNAME }}/your-image-name:${{ steps.vars.outputs.sha_short }}
+          tags: ${{ secrets.DOCKER_USERNAME }}/my-node-app:${{ github.sha }}
+          # tags: ${{ secrets.DOCKER_USERNAME }}/my-node-app:${{ steps.vars.outputs.sha_short }}
     
