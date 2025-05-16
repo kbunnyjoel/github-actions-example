@@ -77,6 +77,8 @@ jobs:
   docker:
     name: Build and push Docker image
     runs-on: ubuntu-latest
+    permissions:
+      packages: write
     needs: buil-and-test
     steps:
       - name: Checkout code
