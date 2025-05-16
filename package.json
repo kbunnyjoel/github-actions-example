@@ -4,6 +4,8 @@
   "description": "",
   "main": "math.js",
   "scripts": {
+    "install": "npm install",
+    "start": "node math.js",
     "test": "jest --coverage"
   },
   "keywords": [],
