@@ -99,7 +99,7 @@ jobs:
           # tags: ${{ secrets.DOCKER_USERNAME }}/my-node-app:${{ steps.vars.outputs.sha_short }}
       
       - name: Run Docker container in background
-        run: docker run -d -p 3000:3000 --name live-app ${{ secrets.DOCKER_USERNAME }}/my-node-app:${{ steps.vars.outputs.sha_short }}
+        run: docker run -d -p 3000:3000 --name live-app ${{ secrets.DOCKER_USERNAME }}/my-node-app:${{ github.sha }}
 
       - name: Wait for app to be ready
         run: |
