@@ -4,7 +4,7 @@
   "description": "",
   "main": "math.js",
   "scripts": {
-    "start": "node math.js",
+    "start": "node index.js",
     "test": "jest --coverage"
   },
   "keywords": [],
