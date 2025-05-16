@@ -3,15 +3,14 @@ name: Nodejs CI with code coverage
 on:
   workflow_dispatch:
     inputs:
-      name:
-        description: 'Name of the person to greet'
+      number1:
+        description: 'First number to add'
         required: true
-        default: 'World from workflow_dispatch'
-        type: string
-      greeting:
-        type: boolean
-        description: 'Whether to greet or not'
+        type: number
+      number2:
+        description: 'Second number to add'
         required: true
+        type: number
 
   push:
     branches: [ main ]
@@ -45,8 +44,12 @@ jobs:
     - name: Run tests and collect coverage
       run: npm test # This will now run 'jest --coverage'
 
-    - name: Run npm start
+    - name: Run npm start with inputs
       run: npm start
+      env:
+        INPUT_NUMBER1: ${{ github.event.inputs.number1 }}
+        INPUT_NUMBER2: ${{ github.event.inputs.number2 }}
+        
     - name: Upload coverage reports
       uses: actions/upload-artifact@v4
       with:
