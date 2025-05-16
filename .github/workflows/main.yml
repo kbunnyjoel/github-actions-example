@@ -1,4 +1,4 @@
-name: Basic CI
+name: Nodejs CI with code coverage
 
 on:
   workflow_dispatch:
@@ -19,19 +19,34 @@ on:
     branches: [ main ]
 
 jobs:
-  build:
+  buil-and-test:
     runs-on: ubuntu-latest
 
+    strategy:
+      matrix:
+        node-version: [18.x, 20.x] # Test on multiple Node.js versions
+
     steps:
-    - name: Print greeting
-      run: echo "Hello ${{ github.event.inputs.name }}!"
-      if: ${{ github.event.inputs.greeting == 'true' }}
-    - name: Print greeting event name
-      run: echo "Hello ${{ github.event.inputs.name }}!"
-      if: ${{ github.event_name == 'pull_request' || github.event_name == 'push' }}
-    - name: Checkout code
-      # This action checks out your repository under $GITHUB_WORKSPACE, so your workflow can access it.
+    
+    - name: Checkout repository
       uses: actions/checkout@v4
 
-    - name: Run a one-line script
-      run: echo Hello, world!
+    - name: List files in workspace
+      run: ls -l
+    - name: Use Node.js ${{ matrix.node-version }}
+      uses: actions/setup-node@v4
+      with:
+        node-version: ${{ matrix.node-version }}
+        # cache: 'npm' # Cache npm dependencies
+
+    - name: Install dependencies
+      run: npm install # Use ci for cleaner installs from package-lock.json
+
+    - name: Run tests and collect coverage
+      run: npm test # This will now run 'jest --coverage'
+
+    - name: Upload coverage reports
+      uses: actions/upload-artifact@v4
+      with:
+        name: coverage-report-node-${{ matrix.node-version }}
+        path: coverage/ # Upload the entire coverage directory
