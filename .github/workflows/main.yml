@@ -34,7 +34,7 @@ jobs:
         cache: 'npm' # Cache npm dependencies
 
     - name: Install dependencies
-      run: npm ci # Use ci for cleaner installs from package-lock.json
+      run: npm install # Use ci for cleaner installs from package-lock.json
 
     - name: Run tests and collect coverage
       run: npm test # This will now run 'jest --coverage'
