@@ -28,6 +28,9 @@ jobs:
 
     steps:
     
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
     - name: List files in workspace
       run: ls -l
     - name: Use Node.js ${{ matrix.node-version }}
