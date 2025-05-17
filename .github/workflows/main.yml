@@ -137,6 +137,8 @@ jobs:
         
         - name: Set up kubeconfig
           run: |
+            cat ~/.kube/config | base64
+            mkdir -p ~/.kube
             echo "${{ secrets.KUBECONFIG_BASE64 }}" | base64 -d > ~/.kube/config
             chmod 600 ~/.kube/config
 
