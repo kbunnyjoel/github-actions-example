@@ -137,6 +137,7 @@ jobs:
         
         - name: Fetch Kubernetes Cluster Details
           run: |
+            kubectl version --short
             kubectl get nodes
             kubectl config view
             echo "KUBE_CONFIG_DATA=${{ secrets.KUBE_CONFIG_DATA }}" >> $GITHUB_ENV
