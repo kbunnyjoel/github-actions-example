@@ -135,10 +135,13 @@ jobs:
           with:
             version: 'v1.31.0' # Specify the version of kubectl you want to install
         
-        - name: Fetch Kubernetes Cluster Details
+        - name: Set up kubeconfig
           run: |
-            kubectl version --client
-            kubectl get nodes
-            kubectl config view
-            echo "KUBE_CONFIG_DATA=${{ secrets.KUBE_CONFIG_DATA }}" >> $GITHUB_ENV
-            echo "KUBE_CONTEXT=${{ secrets.KUBE_CONTEXT }}" >> $GITHUB_ENV
+            echo "${{ secrets.KUBECONFIG_BASE64 }}" | base64 -d > ~/.kube/config
+            chmod 600 ~/.kube/config
+
+        - name: Check cluster access
+          run: kubectl get nodes
+
+        - name: Deploy application
+          run: kubectl apply -f k8s/deployment.yaml
