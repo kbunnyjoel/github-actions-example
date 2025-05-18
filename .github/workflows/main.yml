@@ -163,3 +163,9 @@ jobs:
 
         - name: Verify cluster
           run: kubectl get nodes
+        
+        - name: Deploy test app to KinD
+          run: kubectl apply -f k8s/deployment.yaml
+
+        - name: Verify service
+          run: kubectl get svc test-service
