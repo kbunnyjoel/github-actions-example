@@ -8,7 +8,7 @@ data "aws_caller_identity" "current" {}
 
 locals {
     # Use the AWS account ID to create a unique bucket name
-    bucket_name = "my-eks-terraform-state-${data.aws_caller_identity.current.account_id}"
+    bucket_name = "my-eks-terraform-state-806210429052"
 }
 
 terraform {
