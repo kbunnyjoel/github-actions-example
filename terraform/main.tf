@@ -9,7 +9,7 @@ terraform {
     bucket        = "my-eks-terraform-state"
     key           = "eks/terraform.tfstate"
     region        = "ap-southeast-2"
-    lock_file = true # NEW in v1.3+
+    lockfile = true # NEW in v1.3+
     encrypt       = true
   }
 }
