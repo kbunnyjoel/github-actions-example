@@ -4,9 +4,11 @@ provider "aws" {
   region = var.aws_region
 }
 
+data "aws_caller_identity" "current" {}
+
 terraform {
   backend "s3" {
-    bucket        = "my-eks-terraform-state"
+    bucket        = "my-eks-terraform-state-${data.aws_caller_identity.current.account_id}"
     key           = "eks/terraform.tfstate"
     region        = "ap-southeast-2"
     use_lockfile  = true # NEW in v1.3+
