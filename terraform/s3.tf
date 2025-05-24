@@ -1,9 +1,5 @@
 # Terraform module to create an S3 bucket for remote backend
 
-provider "aws" {
-  region = "ap-southeast-2" # Sydney region
-}
-
 resource "aws_s3_bucket" "terraform_state" {
   bucket = "my-eks-terraform-state${data.aws_caller_identity.current.account_id}"
   
