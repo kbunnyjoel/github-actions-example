@@ -13,7 +13,7 @@ locals {
 
 terraform {
   backend "s3" {
-    bucket        = "my-eks-terraform-state-${local.bucket_name}"
+    bucket        = "my-eks-terraform-state-806210429052"
     key           = "eks/terraform.tfstate"
     region        = "ap-southeast-2"
     use_lockfile  = true # NEW in v1.3+
