@@ -183,4 +183,3 @@ jobs:
 
           echo "Listing kube-system pods..."
           kubectl get pods -n kube-system
-    

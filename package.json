@@ -1,10 +1,13 @@
 {
-  "name": "my-node-app",
-  "version": "1.0.0",
+  "name": "@kbunnyjoel/github-actions-example",
+  "version": "1.0.1",
+  "publishConfig": {
+    "registry": "https://npm.pkg.github.com/"
+  },
   "description": "",
   "main": "math.js",
   "scripts": {
-    "start": "node math.js",
+    "start": "node index.js",
     "test": "jest --coverage"
   },
   "keywords": [],
@@ -22,5 +25,8 @@
       "clover"
     ],
     "coverageDirectory": "coverage"
+  },
+  "dependencies": {
+    "express": "^5.1.0"
   }
 }
