@@ -8,7 +8,7 @@ on:
         required: false
         default: 'false'
       run_terraform:
-        description: 'Run tests? (true/false)'
+        description: 'Run Terraform? (true/false)'
         required: false
         default: 'true'
 
