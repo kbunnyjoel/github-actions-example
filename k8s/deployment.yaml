@@ -14,7 +14,7 @@ spec:
     spec:
       containers:
         - name: test-container
-          image: nginx:alpine  # you can replace with your own image
+          image: ${{ secrets.DOCKER_USERNAME }}/my-node-app:__BUILD_SHA__
           ports:
             - containerPort: 80
 ---
