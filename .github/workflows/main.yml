@@ -127,7 +127,7 @@ jobs:
           echo "App did not become ready" && exit 1
   
   terraform-eks:
-    if: ${{ github.event.inputs.deploy == 'true' }}
+    if: ${{ github.event.inputs.run_terraform == 'true' }}
     runs-on: ubuntu-latest
 
     defaults:
