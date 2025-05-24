@@ -1,37 +1,37 @@
-name: Publish Node.js psackage to GitHub Packages
+# name: Publish Node.js psackage to GitHub Packages
 
-on:
+# on:
 
-  workflow_dispatch:
-  push:
-    tags:
-      - 'v*.*.*'
-    branches: [ main ]
-  pull_request:
-    branches: [ main, 'feature/*' ]
+#   workflow_dispatch:
+#   push:
+#     tags:
+#       - 'v*.*.*'
+#     branches: [ main ]
+#   pull_request:
+#     branches: [ main, 'feature/*' ]
 
-jobs:
-  publish:
-    runs-on: ubuntu-latest
+# jobs:
+#   publish:
+#     runs-on: ubuntu-latest
 
-    permissions:
-      contents: read
-      packages: write
+#     permissions:
+#       contents: read
+#       packages: write
 
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+#     steps:
+#       - name: Checkout code
+#         uses: actions/checkout@v4
 
-      - name: Set up Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: 20.x
-          registry-url: https://npm.pkg.github.com/
+#       - name: Set up Node.js
+#         uses: actions/setup-node@v4
+#         with:
+#           node-version: 20.x
+#           registry-url: https://npm.pkg.github.com/
 
-      - name: Install dependencies
-        run: npm install
+#       - name: Install dependencies
+#         run: npm install
 
-      - name: Publish to GitHub Packages
-        run: npm publish
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+#       - name: Publish to GitHub Packages
+#         run: npm publish
+#         env:
+#           NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
