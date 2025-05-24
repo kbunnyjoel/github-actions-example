@@ -129,6 +129,7 @@ jobs:
   terraform-eks:
     if: ${{ github.event.inputs.run_terraform == 'true' }}
     runs-on: ubuntu-latest
+    needs: docker
 
     defaults:
       run:
@@ -137,6 +138,9 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+
+      - name: Terraform Init
+        run: terraform init
 
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v3

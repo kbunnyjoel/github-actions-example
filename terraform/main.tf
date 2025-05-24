@@ -4,6 +4,16 @@ provider "aws" {
   region = var.aws_region
 }
 
+terraform {
+  backend "s3" {
+    bucket        = "my-eks-terraform-state"
+    key           = "eks/terraform.tfstate"
+    region        = "ap-southeast-2"
+    use_lock_file = true # NEW in v1.3+
+    encrypt       = true
+  }
+}
+
 module "vpc" {
   source  = "terraform-aws-modules/vpc/aws"
   version = "5.1.0"
@@ -11,11 +21,12 @@ module "vpc" {
   name = "eks-vpc"
   cidr = "10.0.0.0/16"
 
-  azs             = ["${var.aws_region}a", "${var.aws_region}b"]
-  public_subnets  = ["10.0.1.0/24", "10.0.2.0/24"]
+  azs            = ["${var.aws_region}a", "${var.aws_region}b"]
+  public_subnets = ["10.0.1.0/24", "10.0.2.0/24"]
 
-  enable_dns_hostnames = true
-  enable_dns_support   = true
+  enable_dns_hostnames    = true
+  enable_dns_support      = true
+  map_public_ip_on_launch = true
 }
 
 module "eks" {
@@ -40,50 +51,3 @@ module "eks" {
 
   enable_irsa = true
 }
-
-
-
-
-# .github/workflows/eks-terraform.yml
-# ------------------------------------
-# name: Provision EKS with Terraform
-
-# on:
-#   push:
-#     paths:
-#       - 'terraform/**'
-#     branches: [main]
-#   workflow_dispatch:
-
-# jobs:
-#   terraform-eks:
-#     runs-on: ubuntu-latest
-
-#     defaults:
-#       run:
-#         working-directory: terraform
-
-#     steps:
-#       - name: Checkout repository
-#         uses: actions/checkout@v4
-
-#       - name: Configure AWS credentials
-#         uses: aws-actions/configure-aws-credentials@v3
-#         with:
-#           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-#           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-#           aws-region: ap-southeast-2
-
-#       - name: Install Terraform
-#         uses: hashicorp/setup-terraform@v3
-#         with:
-#           terraform_version: 1.6.6
-
-#       - name: Terraform Init
-#         run: terraform init
-
-#       - name: Terraform Plan
-#         run: terraform plan
-
-#       - name: Terraform Apply (Auto-Approve)
-#         run: terraform apply -auto-approve
