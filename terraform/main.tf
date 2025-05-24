@@ -6,9 +6,14 @@ provider "aws" {
 
 data "aws_caller_identity" "current" {}
 
+locals {
+    # Use the AWS account ID to create a unique bucket name
+    bucket_name = "my-eks-terraform-state-${data.aws_caller_identity.current.account_id}"
+}
+
 terraform {
   backend "s3" {
-    bucket        = "my-eks-terraform-state-${data.aws_caller_identity.current.account_id}"
+    bucket        = "my-eks-terraform-state-${local.bucket_name}"
     key           = "eks/terraform.tfstate"
     region        = "ap-southeast-2"
     use_lockfile  = true # NEW in v1.3+
