@@ -16,5 +16,7 @@ RUN npm install
 # Copy the rest of your application's code into the container
 COPY . .
 
+EXPOSE 3000
+
 # Command to run your tests when the container starts
-CMD [ "npm", "test" ]
+CMD [ "npm", "start" ]
