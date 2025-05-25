@@ -163,11 +163,7 @@ jobs:
         if: github.event.inputs.destroy != 'true'
         run: |
           set -e
-          VERSION=$(curl -fsSL https://dl.k8s.io/release/stable.txt)
-          if [ -z "$VERSION" ]; then
-            echo "Failed to fetch latest kubectl version" >&2
-            exit 1
-          fi
+          VERSION=v1.29.2
           echo "Installing kubectl version: $VERSION"
           curl -fsSL -o kubectl "https://dl.k8s.io/release/${VERSION}/bin/linux/amd64/kubectl"
           chmod +x kubectl && sudo mv kubectl /usr/local/bin/
