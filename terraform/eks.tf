@@ -43,6 +43,15 @@ module "eks" {
   # API access settings
   cluster_endpoint_public_access  = true  # or true to enable public API access
   cluster_endpoint_private_access = true
+  
+  manage_aws_auth_config = true
+  aws_auth_users = [
+    {
+      userarn  = "arn:aws:iam::806210429052:user/admin-user"
+      username = "admin-user"
+      groups   = ["system:masters"]
+    }
+  ]
 
   eks_managed_node_groups = {
     spot-nodes = {
