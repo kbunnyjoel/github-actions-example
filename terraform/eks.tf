@@ -41,13 +41,23 @@ module "eks" {
   subnet_ids      = module.vpc.public_subnets
   vpc_id          = module.vpc.vpc_id
 
-  eks_managed_node_groups = {
-    spot-nodes = {
+  # eks_managed_node_groups = {
+  #   spot-nodes = {
+  #   desired_size   = 1
+  #   min_size       = 0
+  #   max_size       = 2
+  #   instance_types = ["t3.small", "t3.medium", "t3a.small"]
+  #   capacity_type  = "SPOT"
+  #   }
+  # }
+  
+    eks_managed_node_groups = {
+    default-on-demand = {
     desired_size   = 1
-    min_size       = 0
+    min_size       = 1
     max_size       = 2
-    instance_types = ["t3.small", "t3.medium", "t3a.small"]
-    capacity_type  = "SPOT"
+    instance_types = ["t3.medium"]
+    capacity_type  = "ON_DEMAND"
     }
   }
 
