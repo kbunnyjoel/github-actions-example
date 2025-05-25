@@ -105,3 +105,4 @@ output "eks_vpc_flow_logs_enabled" {
 output "eks_vpc_flow_logs_bucket" {
   description = "S3 bucket for VPC Flow Logs"
   value       = module.vpc.vpc_flow_logs_bucket
+}

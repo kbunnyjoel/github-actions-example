@@ -2,7 +2,7 @@
 
 resource "aws_s3_bucket" "terraform_state" {
   bucket = "my-eks-terraform-state${data.aws_caller_identity.current.account_id}"
-  
+
 
   tags = {
     Name        = "TerraformState"
