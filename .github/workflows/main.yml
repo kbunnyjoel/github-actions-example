@@ -184,6 +184,12 @@ jobs:
           echo "Listing kube-system pods..."
           kubectl get pods -n kube-system
 
+  deploy-argocd:
+    needs: terraform-eks
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
       - name: Install cert-manager
         run: |
           kubectl apply -f https://github.com/cert-manager/cert-manager/releases/latest/download/cert-manager.yaml
