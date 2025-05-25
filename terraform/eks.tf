@@ -44,7 +44,7 @@ module "eks" {
   cluster_endpoint_public_access  = true  # or true to enable public API access
   cluster_endpoint_private_access = true
   
-  manage_aws_auth_config = true
+  manage_aws_auth = true
   aws_auth_users = [
     {
       userarn  = "arn:aws:iam::806210429052:user/admin-user"
