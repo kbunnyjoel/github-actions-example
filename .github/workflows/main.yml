@@ -163,9 +163,13 @@ jobs:
         if: github.event.inputs.destroy != 'true'
         run: |
           set -e
-          VERSION=$(curl -s https://dl.k8s.io/release/stable.txt)
+          VERSION=$(curl -fsSL https://dl.k8s.io/release/stable.txt)
+          if [ -z "$VERSION" ]; then
+            echo "Failed to fetch latest kubectl version" >&2
+            exit 1
+          fi
           echo "Installing kubectl version: $VERSION"
-          curl -LO "https://dl.k8s.io/release/${VERSION}/bin/linux/amd64/kubectl"
+          curl -fsSL -o kubectl "https://dl.k8s.io/release/${VERSION}/bin/linux/amd64/kubectl"
           chmod +x kubectl && sudo mv kubectl /usr/local/bin/
 
           aws eks update-kubeconfig --region ap-southeast-2 --name github-actions-eks
