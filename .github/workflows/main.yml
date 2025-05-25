@@ -172,7 +172,7 @@ jobs:
           curl -fsSL -o kubectl "https://dl.k8s.io/release/${VERSION}/bin/linux/amd64/kubectl"
           chmod +x kubectl && sudo mv kubectl /usr/local/bin/
 
-          aws eks update-kubeconfig --region ap-southeast-2 --name github-actions-eks
+          aws eks update-kubeconfig --region ap-southeast-2 --name github-actions-eks-example
 
           echo "Checking Kubernetes nodes..."
           kubectl get nodes
