@@ -146,9 +146,6 @@ jobs:
       - name: Terraform Init
         run: terraform init
       
-      - name: Force unlock Terraform state
-        run: terraform force-unlock -force ec91c084-6875-7773-e3f3-a4caa0c18170
-      
       - name: Terraform Plan
         run: terraform plan
 
@@ -166,7 +163,7 @@ jobs:
         if: github.event.inputs.destroy != 'true'
         run: |
           set -e
-          VERSION=v1.29.2
+          VERSION=v1.33.1
           echo "Installing kubectl version: $VERSION"
           curl -fsSL -o kubectl "https://dl.k8s.io/release/${VERSION}/bin/linux/amd64/kubectl"
           chmod +x kubectl && sudo mv kubectl /usr/local/bin/
