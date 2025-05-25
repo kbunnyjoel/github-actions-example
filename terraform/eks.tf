@@ -37,7 +37,7 @@ module "eks" {
   version = "20.8.4"
 
   cluster_name    = var.cluster_name
-  cluster_version = "1.30" # Use the latest stable version of EKS
+  cluster_version = "1.31" # Use the latest stable version of EKS
   subnet_ids      = module.vpc.public_subnets
   vpc_id          = module.vpc.vpc_id
   # API access settings
