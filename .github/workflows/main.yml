@@ -194,7 +194,7 @@ jobs:
       - name: Install cert-manager
         run: |
           kubectl apply -f https://github.com/cert-manager/cert-manager/releases/latest/download/cert-manager.yaml
-          kubectl ro`llout status deployment/cert-manager -n cert-manager --timeout=180s
+          kubectl rollout status deployment/cert-manager -n cert-manager --timeout=180s
       
       - name: Wait for cert-manager readiness
         run: |
