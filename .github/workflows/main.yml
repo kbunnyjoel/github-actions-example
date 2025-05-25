@@ -183,3 +183,19 @@ jobs:
 
           echo "Listing kube-system pods..."
           kubectl get pods -n kube-system
+
+      - name: Install cert-manager
+        run: |
+          kubectl apply -f https://github.com/cert-manager/cert-manager/releases/latest/download/cert-manager.yaml
+          kubectl rollout status deployment/cert-manager -n cert-manager --timeout=180s
+
+      - name: Install Argo CD
+        run: |
+          kubectl create namespace argocd || true
+          kubectl apply -n argocd -f https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/install.yaml
+    
+      - name: Apply ClusterIssuer
+        run: kubectl apply -f k8s/argocd-certissuer.yaml
+      - name: Apply Argo CD Ingress
+        run: |
+          kubectl apply -f k8s/argocd-ingress.yaml
