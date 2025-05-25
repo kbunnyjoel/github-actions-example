@@ -19,7 +19,7 @@ terraform {
 
 module "vpc" {
   source  = "terraform-aws-modules/vpc/aws"
-  version = "5.1.0"
+  version = ">= 5.21.0"
 
   name = "eks-vpc"
   cidr = "10.0.0.0/16"
@@ -34,7 +34,7 @@ module "vpc" {
 
 module "eks" {
   source  = "terraform-aws-modules/eks/aws"
-  version = "20.8.4"
+  version = ">=20.35.0"
 
   cluster_name    = var.cluster_name
   cluster_version = "1.31" # Use the latest stable version of EKS
@@ -43,15 +43,6 @@ module "eks" {
   # API access settings
   cluster_endpoint_public_access  = true  # or true to enable public API access
   cluster_endpoint_private_access = true
-  
-  manage_aws_auth = true
-  aws_auth_users = [
-    {
-      userarn  = "arn:aws:iam::806210429052:user/admin-user"
-      username = "admin-user"
-      groups   = ["system:masters"]
-    }
-  ]
 
   eks_managed_node_groups = {
     spot-nodes = {
@@ -74,4 +65,5 @@ module "eks" {
   # }
 
   enable_irsa = true
+  enable_cluster_creator_admin_permissions = true
 }
