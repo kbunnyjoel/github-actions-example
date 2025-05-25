@@ -41,7 +41,7 @@ module "eks" {
   subnet_ids      = module.vpc.public_subnets
   vpc_id          = module.vpc.vpc_id
   # API access settings
-  cluster_endpoint_public_access  = false  # or true to enable public API access
+  cluster_endpoint_public_access  = true  # or true to enable public API access
   cluster_endpoint_private_access = true
 
   eks_managed_node_groups = {
