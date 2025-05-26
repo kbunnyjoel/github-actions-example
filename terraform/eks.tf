@@ -53,22 +53,22 @@ module "eks" {
     capacity_type  = "SPOT"
     }
   }
-  access_entries = {
-    # One access entry with a policy associated
-    example = {
-      principal_arn = "arn:aws:iam::806210429052:user/admin-user"
+  # access_entries = {
+  #   # One access entry with a policy associated
+  #   example = {
+  #     principal_arn = "arn:aws:iam::806210429052:user/admin-user"
 
-      policy_associations = {
-        example = {
-          policy_arn = "arn:aws:eks::aws:cluster-access-policy/AmazonEKSViewPolicy"
-          access_scope = {
-            namespaces = ["default"]
-            type       = "namespace"
-          }
-        }
-      }
-    }
-  }
+  #     policy_associations = {
+  #       example = {
+  #         policy_arn = "arn:aws:eks::aws:cluster-access-policy/AmazonEKSClusterAdminPolicy"
+  #         access_scope = {
+  #           namespaces = ["default"]
+  #           type       = "namespace"
+  #         }
+  #       }
+  #     }
+  #   }
+  # }
   authentication_mode = "API_AND_CONFIG_MAP"
   enable_irsa = true
 }
