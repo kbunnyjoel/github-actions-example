@@ -148,16 +148,7 @@ jobs:
       
       - name: Terraform Plan
         run: terraform plan
-
-      - name: Apply or Destroy Terraform
-        run: |
-          if [[ "${{ github.event.inputs.destroy }}" == "true" ]]; then
-            echo "Destroying infrastructure..."
-            terraform destroy -auto-approve
-          else
-            echo "Applying infrastructure..."
-            terraform apply -auto-approve
-          fi
+          
   #  aws eks update-kubeconfig --region ap-southeast-2 --name github-actions-eks-example
       - name: Install kubectl and check EKS status
         if: github.event.inputs.destroy != 'true'
@@ -191,6 +182,16 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
+      - name: Wait for EKS API and nodes to be ready
+        run: |
+          echo "Waiting for Kubernetes API..."
+          for i in {1..30}; do
+            kubectl version --short && break || sleep 10
+          done
+          echo "Waiting for at least one node to be Ready..."
+          for i in {1..30}; do
+            kubectl get nodes | grep -q ' Ready ' && break || sleep 10
+          done
       - name: Install cert-manager
         run: |
           echo "Installing cert-manager..."
