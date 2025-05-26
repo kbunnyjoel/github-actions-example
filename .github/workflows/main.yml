@@ -218,4 +218,10 @@ jobs:
       - name: Apply Argo CD Ingress
         run: |
           kubectl apply -f k8s/argocd-ingress.yaml
-          kubectl get svc argocd-server -n argocd -o jsonpath="{.status.loadBalancer.ingress[0].ip}"
+      
+      - name: Get ArgoCD External IP and save output
+        id: get-ip
+        run: |
+          IP=$(kubectl get svc argocd-server -n argocd -o jsonpath="{.status.loadBalancer.ingress[0].ip}")
+          echo "ArgoCD IP: $IP"
+          echo "argocd_ip=$IP" >> $GITHUB_OUTPUT
