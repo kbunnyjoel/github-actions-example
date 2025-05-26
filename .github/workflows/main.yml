@@ -216,4 +216,6 @@ jobs:
         run: kubectl apply -f k8s/argocd-certissuer.yaml
 
       - name: Apply Argo CD Ingress
-        run: kubectl apply -f k8s/argocd-ingress.yaml
+        run: |
+          kubectl apply -f k8s/argocd-ingress.yaml
+          kubectl get svc argocd-server -n argocd -o jsonpath="{.status.loadBalancer.ingress[0].ip}"
