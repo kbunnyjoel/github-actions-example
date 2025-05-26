@@ -6,3 +6,7 @@ output "eks_cluster_name" {
   description = "EKS Cluster name"
   value       = module.eks.cluster_id
 }
+
+output "argocd_ip" {
+  value = data.external.argocd_ip.result["argocd_ip"]
+}

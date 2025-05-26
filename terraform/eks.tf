@@ -6,6 +6,15 @@ provider "aws" {
 
 data "aws_caller_identity" "current" {}
 
+data "aws_route53_zone" "argocd" {
+  name         = "joel.cloud"
+  private_zone = false
+}
+
+data "external" "argocd_ip" {
+  program = ["bash", "${path.module}/get-argocd-ip.sh"]
+}
+
 
 terraform {
   backend "s3" {
@@ -57,4 +66,12 @@ module "eks" {
   enable_cluster_creator_admin_permissions = true
   authentication_mode = "API_AND_CONFIG_MAP"
   enable_irsa = true
+}
+
+resource "aws_route53_record" "argocd" {
+  zone_id = data.aws_route53_zone.argocd.zone_id
+  name    = "argocd.example.com"
+  type    = "A"
+  records = [data.external.argocd_ip.result["argocd_ip"]]
+  ttl     = 300
 }
