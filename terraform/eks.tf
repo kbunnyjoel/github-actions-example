@@ -60,7 +60,7 @@ module "eks" {
 
       policy_associations = {
         example = {
-          policy_arn = "arn:aws:eks::aws:cluster-access-policy/AmazonEKSViewPolicy""
+          policy_arn = "arn:aws:eks::aws:cluster-access-policy/AmazonEKSViewPolicy"
           access_scope = {
             namespaces = ["default"]
             type       = "namespace"
@@ -68,7 +68,7 @@ module "eks" {
         }
       }
     }
-  }
+
   authentication_mode = "API_AND_CONFIG_MAP"
   enable_irsa = true
 }
