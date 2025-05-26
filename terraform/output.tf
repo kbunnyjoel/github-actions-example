@@ -7,11 +7,11 @@ output "eks_cluster_name" {
   value       = module.eks.cluster_id
 }
 
-# output "argocd_ip" {
-#   value = data.external.argocd_ip.result["argocd_ip"]
-# }
+output "argocd_ip" {
+  value = data.external.argocd_ip.result["argocd_ip"]
+}
 
 # Output bastion IP
-output "bastion_public_ip" {
-  value = aws_instance.bastion.public_ip
-}
+# output "bastion_public_ip" {
+#   value = aws_instance.bastion.public_ip
+# }
