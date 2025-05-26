@@ -37,7 +37,7 @@ module "eks" {
   version = ">=20.35.0"
 
   cluster_name    = var.cluster_name
-  cluster_version = "1.31" # Use the latest stable version of EKS
+  cluster_version = "1.32" # Use the latest stable version of EKS
   subnet_ids      = module.vpc.public_subnets
   vpc_id          = module.vpc.vpc_id
   # API access settings
@@ -53,16 +53,6 @@ module "eks" {
     capacity_type  = "SPOT"
     }
   }
-  
-  #   eks_managed_node_groups = {
-  #   default-on-demand = {
-  #   desired_size   = 1
-  #   min_size       = 1
-  #   max_size       = 2
-  #   instance_types = ["t3.medium"]
-  #   capacity_type  = "ON_DEMAND"
-  #   }
-  # }
 
   enable_irsa = true
 }
