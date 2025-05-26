@@ -1,6 +1,6 @@
 # Get your public IP dynamically
 data "http" "my_ip" {
-  url = "https://ifconfig.me"
+  url = "https://ipv4.icanhazip.com"
 }
 
 # Use Amazon Linux 2 AMI
