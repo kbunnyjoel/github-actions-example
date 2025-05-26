@@ -68,7 +68,7 @@ module "eks" {
         }
       }
     }
-
+  }
   authentication_mode = "API_AND_CONFIG_MAP"
   enable_irsa = true
 }
