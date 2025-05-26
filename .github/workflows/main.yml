@@ -176,6 +176,9 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
+      - name: Configure kubectl for EKS
+        run: |
+          aws eks update-kubeconfig --region ap-southeast-2 --name github-actions-eks-example
       - name: Wait for EKS API and nodes to be ready
         run: |
           echo "Waiting for Kubernetes API..."
