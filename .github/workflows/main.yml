@@ -158,7 +158,7 @@ jobs:
             echo "Applying infrastructure..."
             terraform apply -auto-approve
           fi
-
+  #  aws eks update-kubeconfig --region ap-southeast-2 --name github-actions-eks-example
       - name: Install kubectl and check EKS status
         if: github.event.inputs.destroy != 'true'
         run: |
@@ -187,7 +187,7 @@ jobs:
 
       - name: Install cert-manager
         run: |
-          kubectl apply -f https://github.com/cert-manager/cert-manager/releases/latest/download/cert-manager.yaml
+          kubectl apply -f --validate=false https://github.com/cert-manager/cert-manager/releases/latest/download/cert-manager.yaml
           kubectl rollout status deployment/cert-manager -n cert-manager --timeout=180s
 
       - name: Wait for cert-manager readiness
