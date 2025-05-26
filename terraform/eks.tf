@@ -53,6 +53,6 @@ module "eks" {
     capacity_type  = "SPOT"
     }
   }
-
+  authentication_mode = "CONFIG_MAP"
   enable_irsa = true
 }
