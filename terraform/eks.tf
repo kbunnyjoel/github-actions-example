@@ -35,10 +35,13 @@ module "vpc" {
 
   azs            = ["${var.aws_region}a", "${var.aws_region}b"]
   public_subnets = ["10.0.1.0/24", "10.0.2.0/24"]
+  private_subnets = ["10.0.11.0/24", "10.0.12.0/24"]
 
   enable_dns_hostnames    = true
   enable_dns_support      = true
   map_public_ip_on_launch = true
+  enable_nat_gateway = true
+  single_nat_gateway = true
 }
 
 module "eks" {
@@ -47,7 +50,9 @@ module "eks" {
 
   cluster_name    = var.cluster_name
   cluster_version = "1.32" # Use the latest stable version of EKS
-  subnet_ids      = module.vpc.public_subnets
+  # subnet_ids      = module.vpc.public_subnets
+  subnet_ids      = module.vpc.private_subnets
+
   vpc_id          = module.vpc.vpc_id
   # API access settings
   cluster_endpoint_public_access  = true  # or true to enable public API access
