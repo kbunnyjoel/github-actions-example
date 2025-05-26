@@ -69,6 +69,7 @@ module "eks" {
   #     }
   #   }
   # }
+  enable_cluster_creator_admin_permissions = true
   authentication_mode = "API_AND_CONFIG_MAP"
   enable_irsa = true
 }
