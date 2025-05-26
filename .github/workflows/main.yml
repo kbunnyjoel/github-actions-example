@@ -176,6 +176,12 @@ jobs:
           kubectl get componentstatuses
           echo "Listing kube-system pods..."
           kubectl get pods -n kube-system
+      
+      - name: Wait for EKS nodes to be ready
+        run: |
+          for i in {1..30}; do
+            kubectl get nodes && break || sleep 10
+          done
 
   deploy-argocd:
     if: github.event.inputs.run_terraform == 'true' && github.event.inputs.destroy != 'true'
@@ -188,7 +194,7 @@ jobs:
       - name: Install cert-manager
         run: |
           echo "Installing cert-manager..."
-          kubectl apply -f https://github.com/cert-manager/cert-manager/releases/latest/download/cert-manager.yaml
+          kubectl apply  --validate=false -f https://github.com/cert-manager/cert-manager/releases/latest/download/cert-manager.yaml
           kubectl rollout status deployment/cert-manager -n cert-manager --timeout=180s
 
       - name: Wait for cert-manager readiness
