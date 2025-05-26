@@ -148,6 +148,9 @@ jobs:
       
       - name: Terraform Plan
         run: terraform plan
+
+      - name: Terraform Apply
+        run: terraform apply -auto-approve
           
   #  aws eks update-kubeconfig --region ap-southeast-2 --name github-actions-eks-example
       - name: Install kubectl and check EKS status
