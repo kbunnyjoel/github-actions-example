@@ -22,7 +22,7 @@ data "aws_ami" "amazon_linux" {
 # Upload your local SSH public key
 resource "aws_key_pair" "eks_ssh" {
   key_name   = "eks-ssh-key"
-  public_key = file("~/.ssh/id_rsa.pub")
+  public_key = file("${path.module}/keys/eks-ssh.pub")
 }
 
 # Bastion security group (allow SSH from your IP)
