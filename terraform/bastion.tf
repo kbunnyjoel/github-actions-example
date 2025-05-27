@@ -62,7 +62,7 @@ resource "aws_instance" "bastion" {
   instance_type          = "t3.micro"
   subnet_id              = module.vpc.public_subnets[0]
   vpc_security_group_ids = [aws_security_group.bastion_sg.id]
-  key_name               = aws_key_pair.eks_ssh.key_name
+  key_name               = aws_key_pair.deployment_key.key_name
 
   tags = {
     Name = "bastion-host"
