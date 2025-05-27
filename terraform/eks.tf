@@ -65,7 +65,7 @@ module "eks" {
       max_size       = 2
       instance_types = ["t3.small", "t3.medium", "t3a.small"]
       capacity_type  = "SPOT"
-      key_name       = aws_key_pair.eks_ssh.key_name
+      key_name       = aws_key_pair.deployment_key.key_name
 
       additional_security_group_ids = [aws_security_group.bastion_sg.id]
     }
