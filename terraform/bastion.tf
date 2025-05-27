@@ -19,21 +19,19 @@ data "aws_ami" "amazon_linux" {
   }
 }
 
-resource "tls_private_key" "ssh_key" {
+resource "tls_private_key" "deployment_key" {
   algorithm = "RSA"
   rsa_bits  = 4096
 }
 
-# Upload your local SSH public key
-resource "aws_key_pair" "eks_ssh" {
-  key_name   = "eks-ssh-key-bastion"
-  public_key = tls_private_key.ssh_key.public_key_openssh
+resource "aws_key_pair" "deployment_key" {
+  key_name   = "deployment-key"
+  public_key = tls_private_key.deployment_key.public_key_openssh
 }
 
-# Save the private key to your local machine
-resource "local_file" "private_key" {
-  content         = tls_private_key.ssh_key.private_key_pem
-  filename        = "${path.module}/deployer-key.pem"
+resource "local_file" "private_key_pem" {
+  content         = tls_private_key.deployment_key.private_key_pem
+  filename        = "${path.module}/deployment_key.pem"
   file_permission = "0400"
 }
 
