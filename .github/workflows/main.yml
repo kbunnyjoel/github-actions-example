@@ -232,6 +232,11 @@ jobs:
       - name: Get ArgoCD External IP and save output
         id: get-ip
         run: |
-          IP=$(kubectl get svc argocd-server -n argocd -o jsonpath="{.status.loadBalancer.ingress[0].ip}")
-          echo "ArgoCD IP: $IP"
+          IP=$(kubectl get svc argocd-server -n argocd -o jsonpath="{.spec.ClusterIP}")
+          if [ -z "$IP" ]; then
+            echo "ArgoCD service IP not found. Exiting."
+            exit 1
+          fi
+          echo "ArgoCD service IP: $IP"
+          # Save the IP to GitHub Actions output
           echo "argocd_ip=$IP" >> $GITHUB_OUTPUT
