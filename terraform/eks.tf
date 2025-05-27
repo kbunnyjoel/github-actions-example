@@ -11,10 +11,6 @@ data "aws_route53_zone" "argocd" {
   private_zone = false
 }
 
-data "external" "argocd_ip" {
-  program = ["bash", "${path.module}/get-argocd-ip.sh"]
-}
-
 
 terraform {
   backend "s3" {
@@ -77,10 +73,9 @@ module "eks" {
 }
 
 resource "aws_route53_record" "argocd" {
-  count   = try(data.external.argocd_ip.result["argocd_ip"], "") != "" ? 1 : 0
   zone_id = data.aws_route53_zone.argocd.zone_id
   name    = "argocd"
   type    = "A"
   ttl     = 300
-  records = [data.external.argocd_ip.result["argocd_ip"]]
+  records = ["16.176.140.188"]
 }
