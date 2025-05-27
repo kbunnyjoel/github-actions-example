@@ -19,10 +19,22 @@ data "aws_ami" "amazon_linux" {
   }
 }
 
+resource "tls_private_key" "ssh_key" {
+  algorithm = "RSA"
+  rsa_bits  = 4096
+}
+
 # Upload your local SSH public key
 resource "aws_key_pair" "eks_ssh" {
   key_name   = "eks-ssh-key"
-  public_key = file("${path.module}/keys/eks-ssh.pub")
+  public_key = tls_private_key.ssh_key.public_key_openssh
+}
+
+# Save the private key to your local machine
+resource "local_file" "private_key" {
+  content  = tls_private_key.ssh_key.private_key_pem
+  filename = "${path.module}/deployer-key.pem"
+  file_permission = "0400"
 }
 
 # Bastion security group (allow SSH from your IP)
