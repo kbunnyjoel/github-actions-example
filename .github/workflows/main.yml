@@ -142,9 +142,16 @@ jobs:
         uses: hashicorp/setup-terraform@v3
         with:
           terraform_version: 1.11.0
-
+      
+      - name: Terraform Unlock
+        run: terraform force-unlock 17e8de4f-d48a-dd7a-825a-b76d390468d0
       - name: Terraform Init
         run: terraform init
+
+      - name: Terraform Validate
+        run: terraform validate
+      - name: Terraform Format
+        run: terraform fmt -check
       
       - name: Terraform Plan
         run: terraform plan
