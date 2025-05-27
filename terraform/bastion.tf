@@ -26,7 +26,7 @@ resource "tls_private_key" "ssh_key" {
 
 # Upload your local SSH public key
 resource "aws_key_pair" "eks_ssh" {
-  key_name   = "eks-ssh-key"
+  key_name   = "eks-ssh-key-bastion"
   public_key = tls_private_key.ssh_key.public_key_openssh
 }
 
