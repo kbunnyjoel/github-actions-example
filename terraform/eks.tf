@@ -77,7 +77,7 @@ module "eks" {
 }
 
 resource "aws_route53_record" "argocd" {
-  count   = data.external.argocd_ip.result["argocd_ip"] != "" ? 1 : 0
+  count = try(data.external.argocd_ip.result["argocd_ip"], "") != "" ? 1 : 0
   zone_id = data.aws_route53_zone.argocd.zone_id
   name    = "argocd"
   type    = "A"

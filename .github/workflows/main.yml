@@ -227,6 +227,8 @@ jobs:
         run: |
           kubectl apply -f k8s/argocd-ingress.yaml
       
+      - name: Get Ingress SVC
+        run: kubectl get svc -n argocd
       - name: Get ArgoCD External IP and save output
         id: get-ip
         run: |
