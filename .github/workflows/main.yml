@@ -143,10 +143,11 @@ jobs:
         with:
           terraform_version: 1.11.0
       
-      - name: Terraform Unlock
-        run: terraform force-unlock 17e8de4f-d48a-dd7a-825a-b76d390468d0
       - name: Terraform Init
         run: terraform init
+
+      - name: Terraform Unlock
+        run: terraform force-unlock 17e8de4f-d48a-dd7a-825a-b76d390468d0
 
       - name: Terraform Validate
         run: terraform validate
