@@ -240,7 +240,7 @@ jobs:
       - name: Get ArgoCD External IP and save output
         id: get-ip
         run: |
-          IP=$(kubectl get svc argocd-server -n argocd -o jsonpath="{.spec.ClusterIP}")
+          IP=$(kubectl get svc argocd-server -n argocd -o jsonpath="{.spec.clusterIP}")
           if [ -z "$IP" ]; then
             echo "ArgoCD service IP not found. Exiting."
             exit 1
