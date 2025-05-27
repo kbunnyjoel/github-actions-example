@@ -32,8 +32,8 @@ resource "aws_key_pair" "eks_ssh" {
 
 # Save the private key to your local machine
 resource "local_file" "private_key" {
-  content  = tls_private_key.ssh_key.private_key_pem
-  filename = "${path.module}/deployer-key.pem"
+  content         = tls_private_key.ssh_key.private_key_pem
+  filename        = "${path.module}/deployer-key.pem"
   file_permission = "0400"
 }
 
