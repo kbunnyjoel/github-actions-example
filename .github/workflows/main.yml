@@ -199,6 +199,10 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+        run: |
+          echo "Checking out code..."
+          ls -l
+          echo "Current directory: $(pwd)"
 
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v3
