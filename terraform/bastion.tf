@@ -20,7 +20,7 @@ data "aws_ami" "amazon_linux" {
 }
 
 data "aws_route53_zone" "main" {
-  name         = "example.com."
+  name         = "joel.cloud."
   private_zone = false
 }
 
@@ -50,7 +50,7 @@ resource "aws_security_group" "bastion_sg" {
     from_port   = 22
     to_port     = 22
     protocol    = "tcp"
-    cidr_blocks = ["103.224.52.138/32"]
+    cidr_blocks = [format("%s/32", chomp(data.http.my_ip.response_body))]
   }
 
   egress {
@@ -75,8 +75,8 @@ resource "aws_instance" "bastion" {
 }
 
 resource "aws_route53_record" "bastion_dns" {
-  zone_id = data.aws_route53_zone.argocd.zone_id # Replace with your Hosted Zone ID
-  name    = "bastion.example.com"                # Your desired DNS name
+  zone_id = data.aws_route53_zone.main.zone_id
+  name    = "bastion.example.com"
   type    = "A"
   ttl     = 300
   records = [aws_instance.bastion.public_ip]
