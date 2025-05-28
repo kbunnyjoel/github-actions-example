@@ -7,7 +7,7 @@ provider "aws" {
 data "aws_caller_identity" "current" {}
 
 data "aws_route53_zone" "argocd" {
-  name         = "joel.cloud"
+  name         = "joel.cloud."
   private_zone = false
 }
 
@@ -43,7 +43,7 @@ module "vpc" {
 module "eks" {
   source  = "terraform-aws-modules/eks/aws"
   version = ">=20.35.0"
-
+    # Ensure this version is a currently supported EKS version. "1.32" is likely incorrect.
   cluster_name    = var.cluster_name
   cluster_version = "1.32" # Use the latest stable version of EKS
   # subnet_ids      = module.vpc.public_subnets
@@ -60,10 +60,9 @@ module "eks" {
       min_size       = 0
       max_size       = 2
       instance_types = ["t3.small", "t3.medium", "t3a.small"]
-      capacity_type  = "SPOT"
-      key_name       = aws_key_pair.deployment_key.key_name
-
-      additional_security_group_ids = [aws_security_group.bastion_sg.id]
+      capacity_type  = "SPOT" # Consider if ON_DEMAND is needed for critical workloads
+      key_name       = aws_key_pair.deployment_key.key_name # Correct for SSH access if needed via bastion
+      # additional_security_group_ids = [aws_security_group.bastion_sg.id] # This is likely not needed and potentially incorrect for worker nodes.
     }
   }
 

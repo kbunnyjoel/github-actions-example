@@ -7,11 +7,12 @@ output "eks_cluster_name" {
   value       = module.eks.cluster_id
 }
 
-# Output bastion IP
-output "bastion_public_ip" {
-  value = aws_instance.bastion.public_ip
-}
-
 output "bastion_dns_name" {
   value = aws_route53_record.bastion_dns.fqdn
+}
+
+# Output bastion Elastic IP
+output "bastion_public_ip" {
+  description = "The static Elastic IP address of the bastion host."
+  value = aws_eip.bastion_eip.public_ip
 }
