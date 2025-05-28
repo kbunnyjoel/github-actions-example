@@ -74,10 +74,23 @@ resource "aws_instance" "bastion" {
   }
 }
 
+
+# Allocate and associate an Elastic IP for the bastion
+resource "aws_eip" "bastion_eip" {
+  instance = aws_instance.bastion.id
+  vpc      = true
+  lifecycle {
+    prevent_destroy = true
+  }
+  tags = {
+    Name = "bastion-eip"
+  }
+}
+
 resource "aws_route53_record" "bastion_dns" {
   zone_id = data.aws_route53_zone.main.zone_id
   name    = "bastion"
   type    = "A"
   ttl     = 300
-  records = [aws_instance.bastion.public_ip]
+  records = [aws_eip.bastion_eip.public_ip]
 }

@@ -11,3 +11,7 @@ output "eks_cluster_name" {
 output "bastion_public_ip" {
   value = aws_instance.bastion.public_ip
 }
+
+output "bastion_dns_name" {
+  value = aws_route53_record.bastion_dns.fqdn
+}
