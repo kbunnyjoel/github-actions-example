@@ -76,7 +76,7 @@ resource "aws_instance" "bastion" {
 
 resource "aws_route53_record" "bastion_dns" {
   zone_id = data.aws_route53_zone.main.zone_id
-  name    = "bastion.example.com"
+  name    = "bastion"
   type    = "A"
   ttl     = 300
   records = [aws_instance.bastion.public_ip]
