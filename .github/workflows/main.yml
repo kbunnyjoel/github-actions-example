@@ -199,12 +199,6 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-        
-      - name: Repository information
-        run: |
-          echo "Checking out code..."
-          ls -l
-          echo "Current directory: $(pwd)"
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v3
         with:
@@ -227,7 +221,7 @@ jobs:
       - name: Install cert-manager
         run: |
           echo "Installing cert-manager..."
-          kubectl apply --validate=false -f k8s/cert-manager/cert-manager.yaml
+          kubectl apply --validate=false -f k8s/argocd/cert-manager.yaml
           kubectl rollout status deployment/cert-manager -n cert-manager --timeout=180s
 
       - name: Wait for cert-manager readiness
