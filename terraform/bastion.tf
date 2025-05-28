@@ -75,8 +75,8 @@ resource "aws_instance" "bastion" {
 }
 
 resource "aws_route53_record" "bastion_dns" {
-  zone_id = data.aws_route53_zone.argocd.zone_id  # Replace with your Hosted Zone ID
-  name    = "bastion.example.com"           # Your desired DNS name
+  zone_id = data.aws_route53_zone.argocd.zone_id # Replace with your Hosted Zone ID
+  name    = "bastion.example.com"                # Your desired DNS name
   type    = "A"
   ttl     = 300
   records = [aws_instance.bastion.public_ip]
