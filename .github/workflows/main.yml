@@ -110,7 +110,7 @@ jobs:
 
       - name: Replace image tag with Git SHA
         run: |
-          sed -i "s|__BUILD_SHA__|${{ github.sha }}|g" k8s/deployment.yaml
+          sed -i "s|__BUILD_SHA__|${{ github.sha }}|g" k8s/deployment/deployment.yaml
 
       - name: Wait for app to be ready
         run: |
