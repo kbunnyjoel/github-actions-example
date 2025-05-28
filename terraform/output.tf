@@ -14,5 +14,5 @@ output "bastion_dns_name" {
 # Output bastion Elastic IP
 output "bastion_public_ip" {
   description = "The static Elastic IP address of the bastion host."
-  value = aws_eip.bastion_eip.public_ip
+  value       = aws_eip.bastion_eip.public_ip
 }

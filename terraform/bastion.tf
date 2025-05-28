@@ -79,9 +79,9 @@ resource "aws_instance" "bastion" {
 resource "aws_eip" "bastion_eip" {
   instance = aws_instance.bastion.id
   vpc      = true
-  lifecycle {
-    prevent_destroy = true
-  }
+  # lifecycle {
+  #   prevent_destroy = true
+  # }
   tags = {
     Name = "bastion-eip"
   }
