@@ -222,7 +222,7 @@ jobs:
       - name: Install cert-manager
         run: |
           echo "Installing cert-manager..."
-          kubectl apply --validate=false -f ./k8s/cert-manager/cert-manager.yaml
+          kubectl apply --validate=false -f k8s/cert-manager/cert-manager.yaml
           kubectl rollout status deployment/cert-manager -n cert-manager --timeout=180s
 
       - name: Wait for cert-manager readiness
