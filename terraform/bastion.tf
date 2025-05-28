@@ -19,6 +19,11 @@ data "aws_ami" "amazon_linux" {
   }
 }
 
+data "aws_route53_zone" "main" {
+  name         = "example.com."
+  private_zone = false
+}
+
 resource "tls_private_key" "deployment_key" {
   algorithm = "RSA"
   rsa_bits  = 4096
@@ -67,4 +72,12 @@ resource "aws_instance" "bastion" {
   tags = {
     Name = "bastion-host"
   }
+}
+
+resource "aws_route53_record" "bastion_dns" {
+  zone_id = data.aws_route53_zone.argocd.zone_id  # Replace with your Hosted Zone ID
+  name    = "bastion.example.com"           # Your desired DNS name
+  type    = "A"
+  ttl     = 300
+  records = [aws_instance.bastion.public_ip]
 }
