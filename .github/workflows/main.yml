@@ -222,7 +222,7 @@ jobs:
       - name: Install cert-manager
         run: |
           echo "Installing cert-manager..."
-          kubectl apply  --validate=false -f https://github.com/cert-manager/cert-manager/releases/latest/download/cert-manager.yaml
+          kubectl apply --validate=false -f ./k8s/cert-manager/cert-manager.yaml
           kubectl rollout status deployment/cert-manager -n cert-manager --timeout=180s
 
       - name: Wait for cert-manager readiness
@@ -237,11 +237,11 @@ jobs:
           kubectl apply -n argocd -f https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/install.yaml
 
       - name: Apply ClusterIssuer
-        run: kubectl apply -f k8s/argocd-certissuer.yaml
+        run: kubectl apply -f k8s/argocd/argocd-certissuer.yaml
 
       - name: Apply Argo CD Ingress
         run: |
-          kubectl apply -f k8s/argocd-ingress.yaml
+          kubectl apply -f k8s/argocd/argocd-ingress.yaml
       
       - name: Get Ingress SVC
         run: kubectl get svc -n argocd argocd-server -o yaml
