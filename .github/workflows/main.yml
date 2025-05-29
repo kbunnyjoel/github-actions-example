@@ -332,3 +332,26 @@ jobs:
           else
             echo "No security group found for LoadBalancer"
           fi
+
+      - name: Check EKS node security groups
+        run: |
+          echo "Checking EKS node security groups..."
+          NODE_GROUP=$(kubectl get nodes -o jsonpath='{.items[0].metadata.name}')
+          INSTANCE_ID=$(aws ec2 describe-instances --filters "Name=private-dns-name,Values=$NODE_GROUP" --query "Reservations[0].Instances[0].InstanceId" --output text)
+          SG_IDS=$(aws ec2 describe-instances --instance-ids $INSTANCE_ID --query "Reservations[0].Instances[0].SecurityGroups[*].GroupId" --output text)
+          
+          echo "Node instance ID: $INSTANCE_ID"
+          echo "Security groups: $SG_IDS"
+          
+          for SG_ID in $SG_IDS; do
+            echo "Security group $SG_ID rules:"
+            aws ec2 describe-security-groups --group-ids $SG_ID --query "SecurityGroups[0].IpPermissions"
+          done
+
+      - name: Test ArgoCD LoadBalancer access
+        run: |
+          LB_HOSTNAME=$(kubectl get svc argocd-server-lb -n argocd -o jsonpath='{.status.loadBalancer.ingress[0].hostname}')
+          echo "Testing HTTP access to $LB_HOSTNAME..."
+          curl -v http://$LB_HOSTNAME || echo "HTTP access failed"
+          echo "Testing HTTPS access to $LB_HOSTNAME..."
+          curl -v -k https://$LB_HOSTNAME || echo "HTTPS access failed"
