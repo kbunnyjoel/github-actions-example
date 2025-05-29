@@ -8,6 +8,9 @@ metadata:
     service.beta.kubernetes.io/aws-load-balancer-internal: "false"
 spec:
   ports:
+  - name: http
+    port: 80
+    targetPort: 8080
   - name: https
     port: 443
     targetPort: 8080
