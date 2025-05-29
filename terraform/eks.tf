@@ -55,12 +55,23 @@ module "eks" {
       desired_size   = 2
       min_size       = 1
       max_size       = 3
-      instance_types = ["t3.large", "t3.medium"]            # Adjust based on workload requirements
-      capacity_type  = "SPOT"                               # Consider if ON_DEMAND is needed for critical workloads
-      key_name       = aws_key_pair.deployment_key.key_name # Correct for SSH access if needed via bastion
-      # additional_security_group_ids = [aws_security_group.bastion_sg.id] # This is likely not needed and potentially incorrect for worker nodes.
+      instance_types = ["t3.large", "t3.medium"]            # Larger instance types for better pod capacity
+      capacity_type  = "SPOT"                               # Cost-efficient for non-critical workloads
+      key_name       = aws_key_pair.deployment_key.key_name # For SSH access via bastion
+      
+      # Add labels to identify these nodes
+      labels = {
+        role = "worker"
+        type = "spot"
+      }
+      
+      # Add tags specific to this node group
+      tags = {
+        "k8s.io/cluster-autoscaler/enabled" = "true"
+        "k8s.io/cluster-autoscaler/${var.cluster_name}" = "owned"
+        "NodeGroup" = "spot-nodes"
+      }
     }
-
   }
   tags = {
     Environment = "dev"
