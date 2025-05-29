@@ -323,7 +323,23 @@ jobs:
       - name: Check target group health
         run: |
           echo "Checking target group health..."
-          LB_ARN=$(aws elbv2 describe-load-balancers --query "LoadBalancers[?contains(DNSName, 'argocd')].LoadBalancerArn" --output text)
+          LB_HOSTNAME=$(kubectl get svc argocd-server-lb -n argocd -o jsonpath='{.status.loadBalancer.ingress[0].hostname}')
+          echo "LoadBalancer hostname: $LB_HOSTNAME"
+          
+          # Extract the LoadBalancer name from the hostname
+          LB_NAME=$(echo $LB_HOSTNAME | cut -d- -f1)
+          echo "LoadBalancer name: $LB_NAME"
+          
+          # Get the LoadBalancer ARN
+          LB_ARN=$(aws elbv2 describe-load-balancers --names $LB_NAME --query "LoadBalancers[0].LoadBalancerArn" --output text)
+          echo "LoadBalancer ARN: $LB_ARN"
+          
+          if [ -z "$LB_ARN" ] || [ "$LB_ARN" == "None" ]; then
+            echo "LoadBalancer ARN not found"
+            exit 1
+          fi
+          
+          # Get target groups
           TARGET_GROUPS=$(aws elbv2 describe-target-groups --load-balancer-arn $LB_ARN --query "TargetGroups[*].TargetGroupArn" --output text)
           
           for TG in $TARGET_GROUPS; do
@@ -331,6 +347,7 @@ jobs:
             echo "Target health:"
             aws elbv2 describe-target-health --target-group-arn $TG
           done
+
 
       - name: Check DNS record
         run: |
