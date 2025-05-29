@@ -6,10 +6,7 @@ provider "aws" {
 
 data "aws_caller_identity" "current" {}
 
-data "aws_route53_zone" "argocd" {
-  name         = "joel.cloud."
-  private_zone = false
-}
+# Using the main Route53 zone defined in bastion.tf
 
 
 terraform {
@@ -74,12 +71,4 @@ module "eks" {
   enable_cluster_creator_admin_permissions = true
   authentication_mode                      = "API_AND_CONFIG_MAP"
   enable_irsa                              = true
-}
-
-resource "aws_route53_record" "argocd" {
-  zone_id = data.aws_route53_zone.argocd.zone_id
-  name    = "argocd"
-  type    = "A"
-  ttl     = 60
-  records = ["16.176.140.188"] # Replace with your ArgoCD service IP or load balancer IP
 }
