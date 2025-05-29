@@ -167,7 +167,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: deployment-key
-          path: terraform/deployment_key.pem
+          path: terraform/keys/deployment_key.pem
 
       - name: Terraform Destroy
         if: github.event.inputs.destroy == 'true'
@@ -242,7 +242,7 @@ jobs:
             sleep 5
           done
 
-      - name: Install cert-manager with Helm
+      - name: Install cert-manager with Helm (no wait)
         run: |
           helm repo add jetstack https://charts.jetstack.io
           helm repo update
@@ -251,7 +251,14 @@ jobs:
             --create-namespace \
             --version v1.12.0 \
             --set installCRDs=true \
-            --wait --timeout 5m
+            --timeout 10m
+          
+      - name: Wait for cert-manager deployments
+        run: |
+          echo "Waiting for cert-manager deployments..."
+          kubectl -n cert-manager wait --for=condition=available deployment --all --timeout=5m
+          echo "Checking cert-manager pod status..."
+          kubectl get pods -n cert-manager
           
       - name: Debug cert-manager status
         if: failure()
