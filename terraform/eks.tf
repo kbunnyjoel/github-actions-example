@@ -63,11 +63,13 @@ module "eks" {
       key_name       = aws_key_pair.deployment_key.key_name # Correct for SSH access if needed via bastion
       # additional_security_group_ids = [aws_security_group.bastion_sg.id] # This is likely not needed and potentially incorrect for worker nodes.
     }
-    tags = {
-      Environment = "dev"
-      Project     = "github-actions-example"
-    }
+  
   }
+  tags = {
+        Environment = "dev"
+        Project     = "github-actions-example"
+      }
+
 
   enable_cluster_creator_admin_permissions = true
   authentication_mode                      = "API_AND_CONFIG_MAP"

@@ -36,7 +36,7 @@ resource "aws_key_pair" "deployment_key" {
 
 resource "local_file" "private_key_pem" {
   content         = tls_private_key.deployment_key.private_key_pem
-  filename        = "${path.module}/deployment_key.pem"
+  filename        = "${path.module}/keys/deployment_key.pem"
   file_permission = "0400"
 }
 
