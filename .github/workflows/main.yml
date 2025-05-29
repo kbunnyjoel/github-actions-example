@@ -289,19 +289,6 @@ jobs:
           }'
           
           echo "DNS record updated for argocd.joel.cloud -> $LB_IP"
-    
-      - name: Verify DNS record
-        run: |
-          echo "Verifying DNS record for argocd.joel.cloud..."
-          for i in {1..10}; do
-            IP=$(dig +short argocd.joel.cloud)
-            if [ ! -z "$IP" ]; then
-              echo "DNS record found: argocd.joel.cloud -> $IP"
-              break
-            fi
-            echo "Waiting for DNS propagation... (attempt $i/10)"
-            sleep 30
-          done
           
       - name: Check ArgoCD server status
         run: |
@@ -312,46 +299,6 @@ jobs:
           echo "ArgoCD admin password:"
           kubectl -n argocd get secret argocd-initial-admin-secret -o jsonpath="{.data.password}" | base64 -d
           echo ""
-          
-      - name: Check LoadBalancer security group
-        run: |
-          LB_HOSTNAME=$(kubectl get svc argocd-server-lb -n argocd -o jsonpath='{.status.loadBalancer.ingress[0].hostname}')
-          echo "LoadBalancer hostname: $LB_HOSTNAME"
-          
-          # Try to get security group from NLB
-          SG_ID=$(aws elbv2 describe-load-balancers --query "LoadBalancers[?DNSName=='$LB_HOSTNAME'].SecurityGroups[0]" --output text)
-          
-          if [ "$SG_ID" == "None" ]; then
-            echo "No security group found for NLB, checking classic ELB..."
-            SG_ID=$(aws elb describe-load-balancers --query "LoadBalancerDescriptions[?DNSName=='$LB_HOSTNAME'].SecurityGroups[0]" --output text)
-          fi
-          
-          if [ ! -z "$SG_ID" ] && [ "$SG_ID" != "None" ]; then
-            echo "LoadBalancer security group: $SG_ID"
-            aws ec2 describe-security-groups --group-ids $SG_ID
-          else
-            echo "No security group found for LoadBalancer"
-          fi
-
-      - name: Check and update EKS node security group
-        run: |
-          SG_ID="sg-0b8ab3f7f818243fd"
-          echo "Checking if security group allows inbound traffic on port 8080..."
-          
-          # Check if the rule exists
-          RULE_EXISTS=$(aws ec2 describe-security-groups --group-ids $SG_ID --query "SecurityGroups[0].IpPermissions[?FromPort==\`8080\` && ToPort==\`8080\` && IpProtocol==\`tcp\`]" --output text)
-          
-          if [ -z "$RULE_EXISTS" ]; then
-            echo "Adding rule to allow inbound traffic on port 8080..."
-            aws ec2 authorize-security-group-ingress \
-              --group-id $SG_ID \
-              --protocol tcp \
-              --port 8080 \
-              --cidr 0.0.0.0/0
-            echo "Rule added successfully"
-          else
-            echo "Rule already exists"
-          fi
 
       - name: Test ArgoCD LoadBalancer access
         run: |
@@ -361,29 +308,29 @@ jobs:
           echo "Testing HTTPS access to $LB_HOSTNAME..."
           curl -v -k --max-time 10 https://$LB_HOSTNAME || echo "HTTPS access failed"
 
-      - name: Check EKS cluster network configuration
+      - name: Check LoadBalancer target groups and health checks
         run: |
-          echo "Checking EKS cluster network configuration..."
+          echo "Checking LoadBalancer target groups..."
+          LB_ARN=$(aws elbv2 describe-load-balancers --names a849b5dcf385d4e6d91b6e79d503b86d --query "LoadBalancers[0].LoadBalancerArn" --output text)
           
-          # Get the VPC ID
-          VPC_ID=$(aws eks describe-cluster --name github-actions-eks-example --query "cluster.resourcesVpcConfig.vpcId" --output text)
-          echo "VPC ID: $VPC_ID"
+          # Get target groups
+          TARGET_GROUPS=$(aws elbv2 describe-target-groups --load-balancer-arn $LB_ARN --query "TargetGroups[*].TargetGroupArn" --output text)
           
-          # Get the security groups
-          echo "Checking cluster security group..."
-          CLUSTER_SG=$(aws eks describe-cluster --name github-actions-eks-example --query "cluster.resourcesVpcConfig.clusterSecurityGroupId" --output text)
-          echo "Cluster security group: $CLUSTER_SG"
+          for TG in $TARGET_GROUPS; do
+            echo "Target group: $TG"
+            echo "Target health:"
+            aws elbv2 describe-target-health --target-group-arn $TG
+          done
           
-          # Check if the security group allows inbound traffic on port 80 and 443
-          echo "Checking if cluster security group allows inbound traffic on ports 80 and 443..."
-          aws ec2 describe-security-groups --group-ids $CLUSTER_SG
+          # Check if the ArgoCD server is listening on the correct port
+          echo "Checking if ArgoCD server is listening on port 8080..."
+          kubectl get pods -n argocd -l app.kubernetes.io/name=argocd-server -o wide
           
-          # Check if the node security group allows outbound traffic
-          echo "Checking if node security group allows outbound traffic..."
-          aws ec2 describe-security-groups --group-ids sg-0b8ab3f7f818243fd --query "SecurityGroups[0].IpPermissionsEgress"
-          
-          # Check if the LoadBalancer is in a public subnet
-          echo "Checking if LoadBalancer is in a public subnet..."
-          LB_HOSTNAME=$(kubectl get svc argocd-server-lb -n argocd -o jsonpath='{.status.loadBalancer.ingress[0].hostname}')
-          LB_NAME=$(echo $LB_HOSTNAME | cut -d- -f1)
-          aws elbv2 describe-load-balancers --names $LB_NAME || echo "LoadBalancer not found with name $LB_NAME"
+          # Check ArgoCD server logs
+          echo "Checking ArgoCD server logs..."
+          ARGOCD_POD=$(kubectl get pods -n argocd -l app.kubernetes.io/name=argocd-server -o name | head -n 1)
+          if [ ! -z "$ARGOCD_POD" ]; then
+            kubectl logs -n argocd $ARGOCD_POD --tail=50
+          else
+            echo "ArgoCD server pod not found"
+          fi
