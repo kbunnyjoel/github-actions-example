@@ -173,7 +173,6 @@ jobs:
         if: github.event.inputs.destroy == 'true'
         run: terraform destroy -auto-approve
           
-  #  aws eks update-kubeconfig --region ap-southeast-2 --name github-actions-eks-example
       - name: Install kubectl and check EKS status
         if: github.event.inputs.destroy != 'true'
         run: |
@@ -228,20 +227,6 @@ jobs:
           kubectl get pods -n argocd
           
           echo "Proceeding without waiting for ArgoCD server to be ready"
-      
-      - name: Get Ingress SVC
-        run: kubectl get svc -n argocd argocd-server -o yaml
-      - name: Get ArgoCD External IP and save output
-        id: get-ip
-        run: |
-          IP=$(kubectl get svc argocd-server -n argocd -o jsonpath="{.spec.clusterIP}")
-          if [ -z "$IP" ]; then
-            echo "ArgoCD service IP not found. Exiting."
-            exit 1
-          fi
-          echo "ArgoCD service IP: $IP"
-          # Save the IP to GitHub Actions output
-          echo "argocd_ip=$IP" >> $GITHUB_OUTPUT
       
       - name: Apply ArgoCD LoadBalancer Service
         run: kubectl apply -f k8s/argocd/argocd-svc.yaml
