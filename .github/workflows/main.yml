@@ -217,7 +217,7 @@ jobs:
           for i in {1..30}; do
             kubectl get nodes | grep -q ' Ready ' && break || sleep 10
           done
-      - name: Install Argo CD
+            - name: Install Argo CD
         run: |
           echo "Installing ArgoCD..."
           kubectl create namespace argocd || true
@@ -309,54 +309,3 @@ jobs:
           else
             echo "Rule already exists"
           fi
-
-      
-      - name: Check ArgoCD service configuration
-        run: |
-          echo "Checking ArgoCD service configuration..."
-          kubectl get svc argocd-server-lb -n argocd -o yaml
-          
-          echo "Checking if ArgoCD server is listening on port 8080..."
-          ARGOCD_POD=$(kubectl get pods -n argocd -l app.kubernetes.io/name=argocd-server -o name | head -n 1)
-          kubectl exec -n argocd $ARGOCD_POD -- netstat -tulpn | grep 8080 || echo "ArgoCD server is not listening on port 8080"
-
-      - name: Check target group health
-        run: |
-          echo "Checking target group health..."
-          LB_HOSTNAME=$(kubectl get svc argocd-server-lb -n argocd -o jsonpath='{.status.loadBalancer.ingress[0].hostname}')
-          echo "LoadBalancer hostname: $LB_HOSTNAME"
-          
-          # Extract the LoadBalancer name from the hostname
-          LB_NAME=$(echo $LB_HOSTNAME | cut -d- -f1)
-          echo "LoadBalancer name: $LB_NAME"
-          
-          # Get the LoadBalancer ARN
-          LB_ARN=$(aws elbv2 describe-load-balancers --names $LB_NAME --query "LoadBalancers[0].LoadBalancerArn" --output text)
-          echo "LoadBalancer ARN: $LB_ARN"
-          
-          if [ -z "$LB_ARN" ] || [ "$LB_ARN" == "None" ]; then
-            echo "LoadBalancer ARN not found"
-            exit 1
-          fi
-          
-          # Get target groups
-          TARGET_GROUPS=$(aws elbv2 describe-target-groups --load-balancer-arn $LB_ARN --query "TargetGroups[*].TargetGroupArn" --output text)
-          
-          for TG in $TARGET_GROUPS; do
-            echo "Target group: $TG"
-            echo "Target health:"
-            aws elbv2 describe-target-health --target-group-arn $TG
-          done
-
-
-      - name: Check DNS record
-        run: |
-          echo "Checking DNS record for argocd.joel.cloud..."
-          dig argocd.joel.cloud
-          
-          echo "Checking LoadBalancer hostname..."
-          LB_HOSTNAME=$(kubectl get svc argocd-server-lb -n argocd -o jsonpath='{.status.loadBalancer.ingress[0].hostname}')
-          echo "LoadBalancer hostname: $LB_HOSTNAME"
-          
-          echo "Resolving LoadBalancer hostname..."
-          dig $LB_HOSTNAME
