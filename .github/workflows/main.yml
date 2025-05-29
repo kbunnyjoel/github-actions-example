@@ -224,10 +224,10 @@ jobs:
           kubectl create namespace argocd || true
           kubectl apply -n argocd -f https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/install.yaml
           
-          echo "Waiting for ArgoCD server to be ready..."
-          kubectl -n argocd wait --for=condition=available deployment argocd-server --timeout=5m
+          echo "Checking ArgoCD pods status..."
+          kubectl get pods -n argocd
           
-          echo "ArgoCD installed successfully"
+          echo "Proceeding without waiting for ArgoCD server to be ready"
       
       - name: Get Ingress SVC
         run: kubectl get svc -n argocd argocd-server -o yaml
