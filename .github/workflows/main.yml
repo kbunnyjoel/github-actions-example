@@ -235,9 +235,10 @@ jobs:
 
       - name: Wait for cert-manager readiness
         run: |
-          kubectl wait --for=condition=Available --timeout=180s deployment/cert-manager -n cert-manager
-          kubectl wait --for=condition=Available --timeout=180s deployment/cert-manager-webhook -n cert-manager
-          kubectl wait --for=condition=Available --timeout=180s deployment/cert-manager-cainjector -n cert-manager
+          kubectl wait --for=condition=Available --timeout=300s deployment/cert-manager -n cert-manager
+          kubectl wait --for=condition=Available --timeout=300s deployment/cert-manager-webhook -n cert-manager
+          kubectl wait --for=condition=Available --timeout=300s deployment/cert-manager-cainjector -n cert-manager
+
 
       - name: Install Argo CD
         run: |
