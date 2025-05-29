@@ -5,7 +5,7 @@ resource "aws_security_group_rule" "bastion_to_eks" {
   to_port           = 443
   protocol          = "tcp"
   security_group_id = aws_security_group.bastion_sg.id
-  cidr_blocks       = ["10.0.0.0/16"]  # VPC CIDR block
+  cidr_blocks       = ["10.0.0.0/16"] # VPC CIDR block
   description       = "Allow bastion to communicate with EKS API"
 }
 
