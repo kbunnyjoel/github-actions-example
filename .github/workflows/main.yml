@@ -263,16 +263,6 @@ jobs:
           
           echo "ArgoCD LoadBalancer hostname: $LB_HOSTNAME"
           
-          # Resolve the LoadBalancer hostname to an IP
-          LB_IP=$(dig +short $LB_HOSTNAME | head -n 1)
-          
-          if [ -z "$LB_IP" ]; then
-            echo "Error: Could not resolve LoadBalancer hostname to IP"
-            exit 1
-          fi
-          
-          echo "ArgoCD LoadBalancer IP: $LB_IP"
-          
           # Get the Route53 hosted zone ID
           ZONE_ID=$(aws route53 list-hosted-zones --query "HostedZones[?Name=='joel.cloud.'].Id" --output text | sed 's/\/hostedzone\///')
           
@@ -283,11 +273,11 @@ jobs:
                 "Action": "UPSERT",
                 "ResourceRecordSet": {
                   "Name": "argocd.joel.cloud",
-                  "Type": "A",
+                  "Type": "CNAME",
                   "TTL": 60,
                   "ResourceRecords": [
                     {
-                      "Value": "'$LB_IP'"
+                      "Value": "'$LB_HOSTNAME'"
                     }
                   ]
                 }
@@ -295,7 +285,7 @@ jobs:
             ]
           }'
           
-          echo "DNS record updated for argocd.joel.cloud -> $LB_IP"
+          echo "DNS record updated for argocd.joel.cloud -> $LB_HOSTNAME"
           
       - name: Check and update EKS node security group
         run: |
