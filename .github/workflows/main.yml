@@ -222,7 +222,16 @@ jobs:
         run: |
           echo "Installing cert-manager..."
           kubectl apply --validate=false -f k8s/argocd/cert-manager.yaml
-          kubectl rollout status deployment/cert-manager -n cert-manager --timeout=180s
+          echo "Waiting for cert-manager deployment to be ready..."
+          kubectl rollout status deployment/cert-manager -n cert-manager --timeout=300s
+
+      - name: Debug cert-manager status
+        if: failure()
+        run: |
+          echo "Checking cert-manager pods..."
+          kubectl get pods -n cert-manager
+          echo "Checking cert-manager events..."
+          kubectl get events -n cert-manager --sort-by='.lastTimestamp'
 
       - name: Wait for cert-manager readiness
         run: |
