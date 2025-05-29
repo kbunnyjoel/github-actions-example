@@ -217,7 +217,8 @@ jobs:
           for i in {1..30}; do
             kubectl get nodes | grep -q ' Ready ' && break || sleep 10
           done
-            - name: Install Argo CD
+          
+      - name: Install Argo CD
         run: |
           echo "Installing ArgoCD..."
           kubectl create namespace argocd || true
