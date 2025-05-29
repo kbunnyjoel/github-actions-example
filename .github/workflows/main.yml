@@ -293,13 +293,23 @@ jobs:
       - name: Check and update EKS node security group
         run: |
           SG_ID="sg-0b8ab3f7f818243fd"  # Your EKS node security group ID
-          echo "Adding rule to allow inbound traffic on port 8080..."
-          aws ec2 authorize-security-group-ingress \
-            --group-id $SG_ID \
-            --protocol tcp \
-            --port 8080 \
-            --cidr 0.0.0.0/0
-          echo "Rule added successfully"
+          echo "Checking if security group allows inbound traffic on port 8080..."
+          
+          # Check if the rule exists
+          RULE_EXISTS=$(aws ec2 describe-security-groups --group-ids $SG_ID --query "SecurityGroups[0].IpPermissions[?FromPort==\`8080\` && ToPort==\`8080\` && IpProtocol==\`tcp\`]" --output text)
+          
+          if [ -z "$RULE_EXISTS" ]; then
+            echo "Adding rule to allow inbound traffic on port 8080..."
+            aws ec2 authorize-security-group-ingress \
+              --group-id $SG_ID \
+              --protocol tcp \
+              --port 8080 \
+              --cidr 0.0.0.0/0
+            echo "Rule added successfully"
+          else
+            echo "Rule already exists"
+          fi
+
       
       - name: Check ArgoCD service configuration
         run: |
