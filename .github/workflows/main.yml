@@ -360,3 +360,30 @@ jobs:
           curl -v --max-time 10 http://$LB_HOSTNAME || echo "HTTP access failed"
           echo "Testing HTTPS access to $LB_HOSTNAME..."
           curl -v -k --max-time 10 https://$LB_HOSTNAME || echo "HTTPS access failed"
+
+      - name: Check EKS cluster network configuration
+        run: |
+          echo "Checking EKS cluster network configuration..."
+          
+          # Get the VPC ID
+          VPC_ID=$(aws eks describe-cluster --name github-actions-eks-example --query "cluster.resourcesVpcConfig.vpcId" --output text)
+          echo "VPC ID: $VPC_ID"
+          
+          # Get the security groups
+          echo "Checking cluster security group..."
+          CLUSTER_SG=$(aws eks describe-cluster --name github-actions-eks-example --query "cluster.resourcesVpcConfig.clusterSecurityGroupId" --output text)
+          echo "Cluster security group: $CLUSTER_SG"
+          
+          # Check if the security group allows inbound traffic on port 80 and 443
+          echo "Checking if cluster security group allows inbound traffic on ports 80 and 443..."
+          aws ec2 describe-security-groups --group-ids $CLUSTER_SG
+          
+          # Check if the node security group allows outbound traffic
+          echo "Checking if node security group allows outbound traffic..."
+          aws ec2 describe-security-groups --group-ids sg-0b8ab3f7f818243fd --query "SecurityGroups[0].IpPermissionsEgress"
+          
+          # Check if the LoadBalancer is in a public subnet
+          echo "Checking if LoadBalancer is in a public subnet..."
+          LB_HOSTNAME=$(kubectl get svc argocd-server-lb -n argocd -o jsonpath='{.status.loadBalancer.ingress[0].hostname}')
+          LB_NAME=$(echo $LB_HOSTNAME | cut -d- -f1)
+          aws elbv2 describe-load-balancers --names $LB_NAME || echo "LoadBalancer not found with name $LB_NAME"
