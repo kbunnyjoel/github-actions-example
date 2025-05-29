@@ -221,7 +221,7 @@ jobs:
       - name: Apply aws-auth ConfigMap for bastion access
         run: |
           echo "Applying aws-auth ConfigMap for bastion access..."
-          kubectl apply -f k8s/aws-auth.yaml
+          kubectl apply -f k8s/aws-auth-patch.yaml
           echo "aws-auth ConfigMap applied"
 
       - name: Install Argo CD
