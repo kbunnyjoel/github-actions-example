@@ -52,8 +52,8 @@ resource "aws_security_group" "bastion_sg" {
     protocol    = "tcp"
     cidr_blocks = [
       format("%s/32", chomp(data.http.my_ip.response_body)),
-      "103.224.52.138/32",  # Your current IP
-      "0.0.0.0/0"           # Allow from any IP (remove this in production)
+      "103.224.52.138/32", # Your current IP
+      "0.0.0.0/0"          # Allow from any IP (remove this in production)
     ]
   }
 
@@ -72,6 +72,12 @@ resource "aws_instance" "bastion" {
   subnet_id              = module.vpc.public_subnets[0]
   vpc_security_group_ids = [aws_security_group.bastion_sg.id]
   key_name               = aws_key_pair.deployment_key.key_name
+  iam_instance_profile   = aws_iam_instance_profile.bastion_profile.name
+
+  user_data = templatefile("${path.module}/bastion_user_data.sh", {
+    aws_region   = "ap-southeast-2",            # Replace with your region
+    cluster_name = "github-actions-eks-example" # Replace with your EKS cluster name
+  })
 
   tags = {
     Name = "bastion-host"
@@ -95,6 +101,6 @@ resource "aws_route53_record" "bastion_dns" {
   zone_id = data.aws_route53_zone.main.zone_id
   name    = "bastion"
   type    = "A"
-  ttl     = 300
+  ttl     = 60 # Reduced TTL for faster propagation
   records = [aws_eip.bastion_eip.public_ip]
 }

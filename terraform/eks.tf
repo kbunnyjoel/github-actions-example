@@ -63,6 +63,10 @@ module "eks" {
       key_name       = aws_key_pair.deployment_key.key_name # Correct for SSH access if needed via bastion
       # additional_security_group_ids = [aws_security_group.bastion_sg.id] # This is likely not needed and potentially incorrect for worker nodes.
     }
+    tags = {
+      Environment = "dev"
+      Project     = "github-actions-example"
+    }
   }
 
   enable_cluster_creator_admin_permissions = true
@@ -74,6 +78,6 @@ resource "aws_route53_record" "argocd" {
   zone_id = data.aws_route53_zone.argocd.zone_id
   name    = "argocd"
   type    = "A"
-  ttl     = 300
-  records = ["16.176.140.188"]
+  ttl     = 60
+  records = ["16.176.140.188"] # Replace with your ArgoCD service IP or load balancer IP
 }
