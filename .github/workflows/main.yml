@@ -222,6 +222,26 @@ jobs:
         run: |
           curl https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
 
+      - name: Clean up existing cert-manager resources
+        run: |
+          echo "Removing existing cert-manager resources..."
+          kubectl delete namespace cert-manager --ignore-not-found=true
+          kubectl delete crd certificaterequests.cert-manager.io --ignore-not-found=true
+          kubectl delete crd certificates.cert-manager.io --ignore-not-found=true
+          kubectl delete crd challenges.acme.cert-manager.io --ignore-not-found=true
+          kubectl delete crd clusterissuers.cert-manager.io --ignore-not-found=true
+          kubectl delete crd issuers.cert-manager.io --ignore-not-found=true
+          kubectl delete crd orders.acme.cert-manager.io --ignore-not-found=true
+          echo "Waiting for namespace termination..."
+          for i in {1..30}; do
+            if ! kubectl get namespace cert-manager &> /dev/null; then
+              echo "Namespace cert-manager deleted successfully"
+              break
+            fi
+            echo "Waiting for namespace cert-manager to be deleted... (attempt $i/30)"
+            sleep 5
+          done
+
       - name: Install cert-manager with Helm
         run: |
           helm repo add jetstack https://charts.jetstack.io
