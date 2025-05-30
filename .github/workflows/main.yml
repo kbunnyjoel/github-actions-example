@@ -250,23 +250,23 @@ jobs:
           echo "Waiting for Ingress LoadBalancer IP from ingress-nginx-controller..."
 
           for i in {1..30}; do
-            ELB_IP=$(kubectl get svc ingress-nginx-controller -n ingress-nginx -o jsonpath='{.status.loadBalancer.ingress[0].ip}')
-            if [ -z "$ELB_IP" ]; then
-              echo "ELB IP not available yet... retrying ($i/30)"
+            ELB_HOSTNAME=$(kubectl get svc ingress-nginx-controller -n ingress-nginx -o jsonpath='{.status.loadBalancer.ingress[0].hostname}')
+            if [ -z "$ELB_HOSTNAME" ]; then
+              echo "ELB Hostname not available yet... retrying ($i/30)"
               sleep 20
             else
-              echo "Found ELB IP: $ELB_IP"
+              echo "Found ELB Hostname: $ELB_HOSTNAME"
               break
             fi
           done
 
-          if [ -z "$ELB_IP" ]; then
-            echo "❌ Error: Could not fetch ELB IP after timeout."
+          if [ -z "$ELB_HOSTNAME" ]; then
+            echo "❌ Error: Could not fetch ELB Hostname after timeout."
             kubectl get svc ingress-nginx-controller -n ingress-nginx -o yaml
             exit 1
           fi
 
-          INGRESS_DOMAIN="argocd.${ELB_IP}.sslip.io"
+          INGRESS_DOMAIN="argocd.bunnycloud.xyz"
           echo "Ingress domain: $INGRESS_DOMAIN"
 
           sed "s|host: .*|host: ${INGRESS_DOMAIN}|" k8s/argocd/argocd-ingress.yaml > k8s/argocd/argocd-ingress-patched.yaml
