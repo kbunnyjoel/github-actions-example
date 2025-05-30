@@ -252,6 +252,9 @@ jobs:
           kubectl apply -f k8s/argocd/argocd-ingress.yaml
           echo "ArgoCD Ingress applied."
 
+      - name: Apply ArgoCD LoadBalancer Service
+        run: kubectl apply -f k8s/argocd/argocd-svc.yaml
+        
       - name: Wait for Ingress LoadBalancer
         run: |
           echo "Waiting for Ingress LoadBalancer to be provisioned for argocd-server-ingress..."
@@ -271,9 +274,6 @@ jobs:
             echo "Error: Ingress LoadBalancer for argocd-server-ingress not found after timeout."
             kubectl get ingress argocd-server-ingress -n argocd -o yaml # For debugging
             kubectl describe ingress argocd-server-ingress -n argocd # For debugging
-            # Check events for your Ingress controller (e.g., Nginx or AWS LBC)
-            # kubectl get pods -n <ingress-controller-namespace>
-            # kubectl logs <ingress-controller-pod> -n <ingress-controller-namespace>
             exit 1
           fi
 
