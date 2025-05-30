@@ -269,9 +269,9 @@ jobs:
           INGRESS_DOMAIN="argocd.${ELB_IP}.sslip.io"
           echo "Ingress domain: $INGRESS_DOMAIN"
 
-    sed "s|host: .*|host: ${INGRESS_DOMAIN}|" k8s/argocd/argocd-ingress.yaml > k8s/argocd/argocd-ingress-patched.yaml
-    kubectl apply -f k8s/argocd/argocd-ingress-patched.yaml
-    echo "✅ Patched Ingress applied successfully."
+          sed "s|host: .*|host: ${INGRESS_DOMAIN}|" k8s/argocd/argocd-ingress.yaml > k8s/argocd/argocd-ingress-patched.yaml
+          kubectl apply -f k8s/argocd/argocd-ingress-patched.yaml
+          echo "✅ Patched Ingress applied successfully."
 
       - name: Apply ArgoCD LoadBalancer Service
         run: kubectl apply -f k8s/argocd/argocd-svc.yaml
