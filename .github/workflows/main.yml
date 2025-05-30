@@ -250,14 +250,13 @@ jobs:
           echo "Waiting for Ingress LoadBalancer IP from ingress-nginx-controller..."
 
           for i in {1..30}; do
-            ELB_HOSTNAME=$(kubectl get svc ingress-nginx-controller -n ingress-nginx -o jsonpath='{.status.loadBalancer.ingress[0].hostname}')
-            if [ -z "$ELB_HOSTNAME" ]; then
-              echo "ELB Hostname not available yet... retrying ($i/30)"
-              sleep 20
-            else
+            ELB_HOSTNAME=$(kubectl get svc ingress-nginx-controller -n ingress-nginx -o jsonpath='{.status.loadBalancer.ingress[0].hostname}' 2>/dev/null)
+            if [ ! -z "$ELB_HOSTNAME" ]; then
               echo "Found ELB Hostname: $ELB_HOSTNAME"
               break
             fi
+            echo "ELB Hostname not available yet... retrying ($i/30)"
+            sleep 20
           done
 
           if [ -z "$ELB_HOSTNAME" ]; then
@@ -269,7 +268,8 @@ jobs:
           INGRESS_DOMAIN="argocd.bunnycloud.xyz"
           echo "Ingress domain: $INGRESS_DOMAIN"
 
-          sed "s|host: .*|host: ${INGRESS_DOMAIN}|" k8s/argocd/argocd-ingress.yaml > k8s/argocd/argocd-ingress-patched.yaml
+          cp k8s/argocd/argocd-ingress.yaml k8s/argocd/argocd-ingress-patched.yaml
+          yq eval ".spec.rules[0].host = \"${INGRESS_DOMAIN}\"" -i k8s/argocd/argocd-ingress-patched.yaml
           kubectl apply -f k8s/argocd/argocd-ingress-patched.yaml
           echo "✅ Patched Ingress applied successfully."
 
