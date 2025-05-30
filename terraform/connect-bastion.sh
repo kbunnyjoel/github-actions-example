@@ -32,3 +32,5 @@ fi
 
 echo "Connecting to bastion host at $BASTION_IP..."
 ssh -i "$KEY_PATH" ec2-user@bastion.bunnycloud.xyz
+
+aws eks update-kubeconfig --region ap-southeast-2 --name github-actions-eks-example
