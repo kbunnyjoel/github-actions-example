@@ -31,4 +31,4 @@ else
 fi
 
 echo "Connecting to bastion host at $BASTION_IP..."
-ssh -i "$KEY_PATH" ec2-user@$BASTION_IP
+ssh -i "$KEY_PATH" ec2-user@bastion.bunnycloud.xyz
