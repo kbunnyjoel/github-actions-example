@@ -20,7 +20,7 @@ spec:
   #   - argocd.bunny970077.com
   #   secretName: argocd-joel-cloud-tls
   rules:
-    - host: argocd.bunny970077.com
+    - host: argocd.bunny970077.infinityfreeapp.com
       http:
         paths:
           - path: /
