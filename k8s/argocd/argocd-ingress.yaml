@@ -11,7 +11,7 @@ metadata:
     # nginx.ingress.kubernetes.io/ssl-redirect: "true"
     # nginx.ingress.kubernetes.io/ssl-passthrough: "true"
     # cert-manager.io/cluster-issuer: letsencrypt
-    # nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/force-ssl-redirect: "false"
 spec:
   ingressClassName: nginx
   # TLS section is commented out
