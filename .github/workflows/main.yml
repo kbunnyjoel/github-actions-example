@@ -334,8 +334,8 @@ jobs:
             sleep 30
           done
           
-          echo "Testing HTTP access to argocd.joel.cloud..."
-          curl -v --max-time 10 http://argocd.joel.cloud || echo "HTTP access failed"
+          echo "Testing HTTPS access to argocd.joel.cloud..."
+          curl -vL --max-time 20 https://argocd.joel.cloud || echo "HTTPS access failed"
 
       - name: Check Route53 record
         run: |

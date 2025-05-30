@@ -10,7 +10,7 @@ metadata:
     cert-manager.io/cluster-issuer: letsencrypt # replace this with your cluster issuer if different
 spec:
   rules:
-    - host: argocd.example.com # replace this!
+    - host: argocd.joel.cloud # replace this!
       http:
         paths:
           - path: /
