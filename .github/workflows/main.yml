@@ -229,6 +229,26 @@ jobs:
             sleep 10
           done
 
+      - name: Delete existing ArgoCD DNS record (if exists)
+        run: |
+          ZONE_ID=$(aws route53 list-hosted-zones --query "HostedZones[?Name=='joel.cloud.'].Id" --output text | sed 's/\/hostedzone\///')
+          
+          echo "Checking for existing A or CNAME record..."
+          RECORD=$(aws route53 list-resource-record-sets \
+            --hosted-zone-id $ZONE_ID \
+            --query "ResourceRecordSets[?Name=='argocd.joel.cloud.'] | [?Type=='A' || Type=='CNAME']" \
+            --output json)
+          
+          if [[ "$RECORD" != "[]" ]]; then
+            echo "$RECORD" > existing_record.json
+            cat existing_record.json | jq '{Changes: [{Action: "DELETE", ResourceRecordSet: .[0]}]}' > delete-change-batch.json
+            
+            echo "Deleting existing record..."
+            aws route53 change-resource-record-sets --hosted-zone-id $ZONE_ID --change-batch file://delete-change-batch.json || echo "Delete failed (possibly due to mismatch)"
+          else
+            echo "No existing A or CNAME record found."
+          fi
+
       - name: Update ArgoCD DNS record
         run: |
           # Get the LoadBalancer hostname
