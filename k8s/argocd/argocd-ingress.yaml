@@ -20,7 +20,7 @@ spec:
   #   - argocd.bunny970077.com
   #   secretName: argocd-joel-cloud-tls
   rules:
-    - host: argocd.bunny970077.infinityfreeapp.com
+    - host: aad910c5a054a4773bd7a8330ee35421-6fd9ff86ae2ae1eb.elb.ap-southeast-2.amazonaws.com.sslip.io
       http:
         paths:
           - path: /
