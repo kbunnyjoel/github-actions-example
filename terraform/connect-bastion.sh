@@ -1,5 +1,5 @@
 #!/bin/bash
-BASTION_HOST="bastion.bunny970077.com"
+BASTION_HOST="bastion.bunnycloud.xyz"
 KEY_PATH="/Users/bunnykocharla/Repositories/Github actions/github-actions-example/terraform/keys/deployment_key.pem"
 
 # Check if the key file exists

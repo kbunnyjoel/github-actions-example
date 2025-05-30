@@ -17,10 +17,10 @@ spec:
   # TLS section is commented out
   # tls:
   # - hosts:
-  #   - argocd.bunny970077.com
+  #   - argocd.bunnycloud.xyz
   #   secretName: argocd-joel-cloud-tls
   rules:
-    - host: aad910c5a054a4773bd7a8330ee35421-6fd9ff86ae2ae1eb.elb.ap-southeast-2.amazonaws.com.sslip.io
+    - host: argocd.bunnycloud.xyz
       http:
         paths:
           - path: /

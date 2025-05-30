@@ -247,10 +247,21 @@ jobs:
 
       - name: Apply ArgoCD Ingress
         run: |
-          echo "Applying ArgoCD Ingress..."
-          # This assumes your k8s/argocd/argocd-ingress.yaml is updated as suggested
-          kubectl apply -f k8s/argocd/argocd-ingress.yaml
-          echo "ArgoCD Ingress applied."
+          echo "Patching Ingress with ELB IP and applying..."
+          ELB_IP=$(kubectl get svc ingress-nginx-controller -n ingress-nginx -o jsonpath='{.status.loadBalancer.ingress[0].ip}')
+          if [ -z "$ELB_IP" ]; then
+            echo "Error: Could not fetch ELB IP"
+            exit 1
+          fi
+          echo "Using ELB IP: $ELB_IP"
+          INGRESS_DOMAIN="argocd.${ELB_IP}.sslip.io"
+          echo "Ingress domain: $INGRESS_DOMAIN"
+
+          # Create a patched version of the ingress YAML
+          sed "s|host: .*|host: ${INGRESS_DOMAIN}|" k8s/argocd/argocd-ingress.yaml > k8s/argocd/argocd-ingress-patched.yaml
+
+          kubectl apply -f k8s/argocd/argocd-ingress-patched.yaml
+          echo "Patched Ingress applied successfully."
 
       - name: Apply ArgoCD LoadBalancer Service
         run: kubectl apply -f k8s/argocd/argocd-svc.yaml
@@ -279,12 +290,12 @@ jobs:
 
       - name: Delete existing ArgoCD DNS record (if exists)
         run: |
-          ZONE_ID=$(aws route53 list-hosted-zones --query "HostedZones[?Name=='bunny970077.com.'].Id" --output text | sed 's/\/hostedzone\///')
+          ZONE_ID=$(aws route53 list-hosted-zones --query "HostedZones[?Name=='bunnycloud.xyz.'].Id" --output text | sed 's/\/hostedzone\///')
           
           echo "Checking for existing A or CNAME record..."
           RECORD=$(aws route53 list-resource-record-sets \
             --hosted-zone-id $ZONE_ID \
-            --query "ResourceRecordSets[?Name=='argocd.bunny970077.com.'] | [?Type=='A' || Type=='CNAME']" \
+            --query "ResourceRecordSets[?Name=='argocd.bunnycloud.xyz.'] | [?Type=='A' || Type=='CNAME']" \
             --output json)
           
           if [[ "$RECORD" != "[]" ]]; then
@@ -310,7 +321,7 @@ jobs:
           echo "ArgoCD LoadBalancer hostname: $LB_HOSTNAME"
           
           # Get the Route53 hosted zone ID
-          ZONE_ID=$(aws route53 list-hosted-zones --query "HostedZones[?Name=='bunny970077.com.'].Id" --output text | sed 's/\/hostedzone\///')
+          ZONE_ID=$(aws route53 list-hosted-zones --query "HostedZones[?Name=='bunnycloud.xyz.'].Id" --output text | sed 's/\/hostedzone\///')
           echo "Route53 zone ID: $ZONE_ID"
           
           # Get the LoadBalancer's hosted zone ID
@@ -329,7 +340,7 @@ jobs:
               {
                 "Action": "UPSERT",
                 "ResourceRecordSet": {
-                  "Name": "argocd.bunny970077.com",
+                  "Name": "argocd.bunnycloud.xyz",
                   "Type": "A",
                   "AliasTarget": {
                     "HostedZoneId": "'$LB_ZONE_ID'",
@@ -345,18 +356,18 @@ jobs:
           CHANGE_RESULT=$(aws route53 change-resource-record-sets --hosted-zone-id $ZONE_ID --change-batch "$CHANGE_BATCH")
           echo "Change result: $CHANGE_RESULT"
           
-          echo "DNS record updated for argocd.bunny970077.com -> $LB_HOSTNAME"
+          echo "DNS record updated for argocd.bunnycloud.xyz -> $LB_HOSTNAME"
           
           # Test the record using AWS nameservers
           echo "Testing DNS record using AWS nameservers..."
-          aws route53 list-resource-record-sets --hosted-zone-id $ZONE_ID --query "ResourceRecordSets[?Name=='argocd.bunny970077.com.']"
-          dig @ns-94.awsdns-11.com argocd.bunny970077.com
+          aws route53 list-resource-record-sets --hosted-zone-id $ZONE_ID --query "ResourceRecordSets[?Name=='argocd.bunnycloud.xyz.']"
+          dig @ns-94.awsdns-11.com argocd.bunnycloud.xyz
 
 
 
       # - name: Wait for SSL Certificate
       #   run: |
-      #     echo "Waiting for SSL certificate for argocd.bunny970077.com..."
+      #     echo "Waiting for SSL certificate for argocd.bunnycloud.xyz..."
       #     # The secretName comes from your Ingress's tls section
       #     CERT_SECRET_NAME="argocd-joel-cloud-tls" 
       #     for i in {1..20}; do # ~10 minutes total
@@ -398,16 +409,16 @@ jobs:
           
       - name: Check domain nameserver delegation
         run: |
-          echo "Checking nameserver delegation for bunny970077.com..."
+          echo "Checking nameserver delegation for bunnycloud.xyz..."
           
           # Get AWS Route53 nameservers for the zone
-          ZONE_ID=$(aws route53 list-hosted-zones --query "HostedZones[?Name=='bunny970077.com.'].Id" --output text | sed 's/\/hostedzone\///')
+          ZONE_ID=$(aws route53 list-hosted-zones --query "HostedZones[?Name=='bunnycloud.xyz.'].Id" --output text | sed 's/\/hostedzone\///')
           AWS_NS=$(aws route53 get-hosted-zone --id $ZONE_ID --query "DelegationSet.NameServers" --output text)
-          echo "AWS Route53 nameservers for bunny970077.com: $AWS_NS"
+          echo "AWS Route53 nameservers for bunnycloud.xyz: $AWS_NS"
           
           # Get actual nameservers from public DNS
-          ACTUAL_NS=$(dig +short NS bunny970077.com)
-          echo "Actual nameservers for bunny970077.com: $ACTUAL_NS"
+          ACTUAL_NS=$(dig +short NS bunnycloud.xyz)
+          echo "Actual nameservers for bunnycloud.xyz: $ACTUAL_NS"
           
           # Check if they match
           for NS in $AWS_NS; do
@@ -419,26 +430,26 @@ jobs:
           echo "To fix this issue, update the nameservers at your domain registrar (Strato) to use the AWS Route53 nameservers listed above."
       - name: Test DNS record
         run: |
-          echo "Testing DNS record for argocd.bunny970077.com..."
-          dig argocd.bunny970077.com
+          echo "Testing DNS record for argocd.bunnycloud.xyz..."
+          dig argocd.bunnycloud.xyz
           
           echo "Waiting for DNS propagation..."
           for i in {1..10}; do
-            IP=$(dig +short argocd.bunny970077.com)
+            IP=$(dig +short argocd.bunnycloud.xyz)
             if [ ! -z "$IP" ]; then
-              echo "DNS record found: argocd.bunny970077.com -> $IP"
+              echo "DNS record found: argocd.bunnycloud.xyz -> $IP"
               break
             fi
             echo "Waiting for DNS propagation... (attempt $i/10)"
             sleep 30
           done
           
-          # echo "Testing HTTPS access to argocd.bunny970077.com..."
-          # curl -vL --max-time 20 https://argocd.bunny970077.com || echo "HTTPS access failed"
+          # echo "Testing HTTPS access to argocd.bunnycloud.xyz..."
+          # curl -vL --max-time 20 https://argocd.bunnycloud.xyz || echo "HTTPS access failed"
 
       - name: Check Route53 record
         run: |
-          echo "Checking Route53 record for argocd.bunny970077.com..."
-          # ZONE_ID=$(aws route53 list-hosted-zones --query "HostedZones[?Name=='bunny970077.com.'].Id" --output text | sed 's/\/hostedzone\///')
-          ZONE_ID=$(aws route53 list-hosted-zones --query "HostedZones[?Name=='bunny970077.com.'].Id" --output text | sed 's/\/hostedzone\///')
-          aws route53 list-resource-record-sets --hosted-zone-id $ZONE_ID --query "ResourceRecordSets[?Name=='argocd.bunny970077.com.']"
+          echo "Checking Route53 record for argocd.bunnycloud.xyz..."
+          # ZONE_ID=$(aws route53 list-hosted-zones --query "HostedZones[?Name=='bunnycloud.xyz.'].Id" --output text | sed 's/\/hostedzone\///')
+          ZONE_ID=$(aws route53 list-hosted-zones --query "HostedZones[?Name=='bunnycloud.xyz.'].Id" --output text | sed 's/\/hostedzone\///')
+          aws route53 list-resource-record-sets --hosted-zone-id $ZONE_ID --query "ResourceRecordSets[?Name=='argocd.bunnycloud.xyz.']"
