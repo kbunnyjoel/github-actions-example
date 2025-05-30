@@ -17,10 +17,10 @@ spec:
   # TLS section is commented out
   # tls:
   # - hosts:
-  #   - argocd.joel.cloud
+  #   - argocd.bunny970077.com
   #   secretName: argocd-joel-cloud-tls
   rules:
-    - host: argocd.joel.cloud
+    - host: argocd.bunny970077.com
       http:
         paths:
           - path: /

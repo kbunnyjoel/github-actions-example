@@ -20,7 +20,7 @@ data "aws_ami" "amazon_linux" {
 }
 
 data "aws_route53_zone" "main" {
-  name         = "joel.cloud."
+  name         = "bunny970077.com."
   private_zone = false
 }
 
