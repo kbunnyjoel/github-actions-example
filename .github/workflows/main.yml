@@ -202,6 +202,13 @@ jobs:
           kubectl apply -f k8s/argocd/aws-auth-patch.yaml
           echo "aws-auth ConfigMap applied"
 
+      - name: Install NGINX Ingress Controller
+        run: |
+          echo "Installing NGINX Ingress Controller for AWS..."
+          kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/controller-v1.10.1/deploy/static/provider/aws/deploy.yaml
+          echo "Waiting for ingress-nginx controller pod to be ready..."
+          kubectl rollout status deployment ingress-nginx-controller -n ingress-nginx --timeout=5m
+
       # - name: Install Cert-Manager
       #   run: |
       #     echo "Installing Cert-Manager..."
