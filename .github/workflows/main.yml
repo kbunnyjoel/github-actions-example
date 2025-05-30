@@ -404,5 +404,6 @@ jobs:
       - name: Check Route53 record
         run: |
           echo "Checking Route53 record for argocd.joel.cloud..."
+          # ZONE_ID=$(aws route53 list-hosted-zones --query "HostedZones[?Name=='joel.cloud.'].Id" --output text | sed 's/\/hostedzone\///')
           ZONE_ID=$(aws route53 list-hosted-zones --query "HostedZones[?Name=='joel.cloud.'].Id" --output text | sed 's/\/hostedzone\///')
           aws route53 list-resource-record-sets --hosted-zone-id $ZONE_ID --query "ResourceRecordSets[?Name=='argocd.joel.cloud.']"
