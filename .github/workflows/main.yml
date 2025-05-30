@@ -396,6 +396,27 @@ jobs:
             echo "Rule already exists"
           fi
           
+      - name: Check domain nameserver delegation
+        run: |
+          echo "Checking nameserver delegation for joel.cloud..."
+          
+          # Get AWS Route53 nameservers for the zone
+          ZONE_ID=$(aws route53 list-hosted-zones --query "HostedZones[?Name=='joel.cloud.'].Id" --output text | sed 's/\/hostedzone\///')
+          AWS_NS=$(aws route53 get-hosted-zone --id $ZONE_ID --query "DelegationSet.NameServers" --output text)
+          echo "AWS Route53 nameservers for joel.cloud: $AWS_NS"
+          
+          # Get actual nameservers from public DNS
+          ACTUAL_NS=$(dig +short NS joel.cloud)
+          echo "Actual nameservers for joel.cloud: $ACTUAL_NS"
+          
+          # Check if they match
+          for NS in $AWS_NS; do
+            if ! echo "$ACTUAL_NS" | grep -q "$NS"; then
+              echo "⚠️ WARNING: AWS nameserver $NS not found in actual nameservers"
+            fi
+          done
+          
+          echo "To fix this issue, update the nameservers at your domain registrar (Strato) to use the AWS Route53 nameservers listed above."
       - name: Test DNS record
         run: |
           echo "Testing DNS record for argocd.joel.cloud..."
