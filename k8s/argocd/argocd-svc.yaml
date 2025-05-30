@@ -12,9 +12,9 @@ spec:
     port: 80
     targetPort: 8080
   # HTTPS port is commented out
-  # - name: https
-  #   port: 443
-  #   targetPort: 8080
+  - name: https
+    port: 443
+    targetPort: 8080
   selector:
     app.kubernetes.io/name: argocd-server
   type: LoadBalancer

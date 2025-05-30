@@ -14,11 +14,11 @@ metadata:
     nginx.ingress.kubernetes.io/force-ssl-redirect: "false"
 spec:
   ingressClassName: nginx
-  # TLS section is commented out
-  # tls:
-  # - hosts:
-  #   - argocd.bunnycloud.xyz
-  #   secretName: argocd-joel-cloud-tls
+  # TLS section
+  tls:
+  - hosts:
+    - argocd.bunnycloud.xyz
+    secretName: argocd-joel-cloud-tls
   rules:
     - host: argocd.bunnycloud.xyz
       http:

@@ -209,28 +209,28 @@ jobs:
           echo "Waiting for ingress-nginx controller pod to be ready..."
           kubectl rollout status deployment ingress-nginx-controller -n ingress-nginx --timeout=5m
 
-      # - name: Install Cert-Manager
-      #   run: |
-      #     echo "Installing Cert-Manager..."
-      #     kubectl apply -f https://github.com/cert-manager/cert-manager/releases/latest/download/cert-manager.yaml
-      #     echo "Waiting for Cert-Manager pods to become ready..."
-      #     kubectl rollout status deployment cert-manager -n cert-manager --timeout=2m
-      #     kubectl rollout status deployment cert-manager-webhook -n cert-manager --timeout=2m
-      #     kubectl rollout status deployment cert-manager-cainjector -n cert-manager --timeout=2m
+      - name: Install Cert-Manager
+        run: |
+          echo "Installing Cert-Manager..."
+          kubectl apply -f https://github.com/cert-manager/cert-manager/releases/latest/download/cert-manager.yaml
+          echo "Waiting for Cert-Manager pods to become ready..."
+          kubectl rollout status deployment cert-manager -n cert-manager --timeout=2m
+          kubectl rollout status deployment cert-manager-webhook -n cert-manager --timeout=2m
+          kubectl rollout status deployment cert-manager-cainjector -n cert-manager --timeout=2m
 
-      # - name: Apply ClusterIssuer for Cert-Manager
-      #   run: |
-      #     echo "Applying Cert-Manager ClusterIssuer..."
-      #     # Ensure you have a ClusterIssuer manifest (e.g., k8s/argocd/argocd-certissuer.yaml)
-      #     # that defines how certificates are issued (e.g., using Let's Encrypt).
-      #     # Example: kubectl apply -f k8s/argocd/argocd-certissuer.yaml
-      #     # If you don't have one, you'll need to create it.
-      #     # For this example, I'll assume it exists at k8s/argocd/argocd-certissuer.yaml
-      #     if [ -f "k8s/argocd/argocd-certissuer.yaml" ]; then
-      #       kubectl apply -f k8s/argocd/argocd-certissuer.yaml
-      #     else
-      #       echo "Warning: ClusterIssuer manifest k8s/argocd/argocd-certissuer.yaml not found. SSL certificate issuance might fail."
-      #     fi
+      - name: Apply ClusterIssuer for Cert-Manager
+        run: |
+          echo "Applying Cert-Manager ClusterIssuer..."
+          # Ensure you have a ClusterIssuer manifest (e.g., k8s/argocd/argocd-certissuer.yaml)
+          # that defines how certificates are issued (e.g., using Let's Encrypt).
+          # Example: kubectl apply -f k8s/argocd/argocd-certissuer.yaml
+          # If you don't have one, you'll need to create it.
+          # For this example, I'll assume it exists at k8s/argocd/argocd-certissuer.yaml
+          if [ -f "k8s/argocd/argocd-certissuer.yaml" ]; then
+            kubectl apply -f k8s/argocd/argocd-certissuer.yaml
+          else
+            echo "Warning: ClusterIssuer manifest k8s/argocd/argocd-certissuer.yaml not found. SSL certificate issuance might fail."
+          fi
 
       - name: Install Argo CD
         run: |
