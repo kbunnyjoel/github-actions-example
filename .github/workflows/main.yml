@@ -310,20 +310,14 @@ jobs:
           echo "ArgoCD LoadBalancer hostname: $LB_HOSTNAME"
           
           # Get the Route53 hosted zone ID
-          ZONE_ID=$(aws route53 list-hosted-zones --query "HostedZones[?Name=='joel.cloud.'].Id" --output text | sed 's/\/hostedzone\///')
-          
-          # Get the LoadBalancer's hosted zone ID
-          LB_ZONE_ID=$(aws elbv2 describe-load-balancers --query "LoadBalancers[?DNSName=='$LB_HOSTNAME'].CanonicalHostedZoneId" --output text)
-          
-          if [ -z "$LB_ZONE_ID" ]; then
-            echo "Trying classic ELB..."
-            LB_ZONE_ID=$(aws elb describe-load-balancers --query "LoadBalancerDescriptions[?DNSName=='$LB_HOSTNAME'].CanonicalHostedZoneNameID" --output text)
-          fi
-          
-          echo "LoadBalancer zone ID: $LB_ZONE_ID"
-          
-          # Update the Route53 record with an ALIAS record
-          aws route53 change-resource-record-sets --hosted-zone-id $ZONE_ID --change-batch '{
+          ZONE_ID=$(aws route53 list-hosted-zones --query "HostedZones[?Name=='joel.cloud.'].Id" --output text | sed 's|/hostedzone/||')
+          LB_HOSTNAME="aad910c5a054a4773bd7a8330ee35421-6fd9ff86ae2ae1eb.elb.ap-southeast-2.amazonaws.com"
+          LB_ZONE_ID=$(aws elbv2 describe-load-balancers \
+            --query "LoadBalancers[?DNSName=='$LB_HOSTNAME'].CanonicalHostedZoneId" \
+            --output text)
+
+          cat > change-batch.json <<EOF
+          {
             "Changes": [
               {
                 "Action": "UPSERT",
@@ -331,14 +325,17 @@ jobs:
                   "Name": "argocd.joel.cloud",
                   "Type": "A",
                   "AliasTarget": {
-                    "HostedZoneId": "'$LB_ZONE_ID'",
-                    "DNSName": "'$LB_HOSTNAME'",
+                    "HostedZoneId": "$LB_ZONE_ID",
+                    "DNSName": "$LB_HOSTNAME",
                     "EvaluateTargetHealth": true
                   }
                 }
               }
             ]
-          }'
+          }
+          EOF
+
+          aws route53 change-resource-record-sets --hosted-zone-id $ZONE_ID --change-batch file://change-batch.json
           
           echo "DNS record updated for argocd.joel.cloud -> $LB_HOSTNAME"
 
