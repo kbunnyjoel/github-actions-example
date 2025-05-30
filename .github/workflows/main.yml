@@ -122,7 +122,7 @@ jobs:
       - name: Install Terraform
         uses: hashicorp/setup-terraform@v3
         with:
-          terraform_version: 1.11.0
+          terraform_version: 1.11.0 # Consider updating to a more recent version
       
       - name: Terraform Init
         working-directory: terraform
@@ -155,9 +155,9 @@ jobs:
         if: github.event.inputs.destroy != 'true'
         run: |
           set -e
-          VERSION=v1.33.1
+          VERSION=v1.29.2 # Use a valid and more recent kubectl version
           echo "Installing kubectl version: $VERSION"
-          curl -fsSL -o kubectl "https://dl.k8s.io/release/${VERSION}/bin/linux/amd64/kubectl"
+          curl -LO "https://dl.k8s.io/release/${VERSION}/bin/linux/amd64/kubectl"
           chmod +x kubectl && sudo mv kubectl /usr/local/bin/
 
           aws eks update-kubeconfig --region ap-southeast-2 --name github-actions-eks-example
@@ -211,6 +211,20 @@ jobs:
           kubectl rollout status deployment cert-manager-webhook -n cert-manager --timeout=2m
           kubectl rollout status deployment cert-manager-cainjector -n cert-manager --timeout=2m
 
+      - name: Apply ClusterIssuer for Cert-Manager
+        run: |
+          echo "Applying Cert-Manager ClusterIssuer..."
+          # Ensure you have a ClusterIssuer manifest (e.g., k8s/argocd/argocd-certissuer.yaml)
+          # that defines how certificates are issued (e.g., using Let's Encrypt).
+          # Example: kubectl apply -f k8s/argocd/argocd-certissuer.yaml
+          # If you don't have one, you'll need to create it.
+          # For this example, I'll assume it exists at k8s/argocd/argocd-certissuer.yaml
+          if [ -f "k8s/argocd/argocd-certissuer.yaml" ]; then
+            kubectl apply -f k8s/argocd/argocd-certissuer.yaml
+          else
+            echo "Warning: ClusterIssuer manifest k8s/argocd/argocd-certissuer.yaml not found. SSL certificate issuance might fail."
+          fi
+
       - name: Install Argo CD
         run: |
           echo "Installing ArgoCD..."
@@ -220,23 +234,41 @@ jobs:
           echo "Checking ArgoCD pods status..."
           kubectl get pods -n argocd
           
-          echo "Proceeding without waiting for ArgoCD server to be ready"
-      
-      - name: Apply ArgoCD LoadBalancer Service
-        run: kubectl apply -f k8s/argocd/argocd-svc.yaml
+          echo "Waiting for ArgoCD deployments to be ready..."
+          kubectl wait --for=condition=Available deployment --all -n argocd --timeout=5m
+          echo "ArgoCD installed and deployments are ready."
 
-      - name: Wait for ArgoCD LoadBalancer
+      - name: Apply ArgoCD Ingress
         run: |
-          echo "Waiting for ArgoCD LoadBalancer to be provisioned..."
+          echo "Applying ArgoCD Ingress..."
+          # This assumes your k8s/argocd/argocd-ingress.yaml is updated as suggested
+          kubectl apply -f k8s/argocd/argocd-ingress.yaml
+          echo "ArgoCD Ingress applied."
+
+      - name: Wait for Ingress LoadBalancer
+        run: |
+          echo "Waiting for Ingress LoadBalancer to be provisioned for argocd-server-ingress..."
+          INGRESS_HOSTNAME=""
+          # Increased timeout as Ingress LBs can take a few minutes
           for i in {1..30}; do
-            LB_HOSTNAME=$(kubectl get svc argocd-server-lb -n argocd -o jsonpath='{.status.loadBalancer.ingress[0].hostname}' 2>/dev/null)
-            if [ ! -z "$LB_HOSTNAME" ]; then
-              echo "ArgoCD LoadBalancer found: $LB_HOSTNAME"
+            INGRESS_HOSTNAME=$(kubectl get ingress argocd-server-ingress -n argocd -o jsonpath='{.status.loadBalancer.ingress[0].hostname}' 2>/dev/null)
+            if [ ! -z "$INGRESS_HOSTNAME" ]; then
+              echo "Ingress LoadBalancer found: $INGRESS_HOSTNAME"
               break
             fi
-            echo "Waiting for ArgoCD LoadBalancer to be provisioned... (attempt $i/30)"
-            sleep 10
+            echo "Waiting for Ingress LoadBalancer... (attempt $i/30)"
+            sleep 20 # Wait a bit longer between checks
           done
+
+          if [ -z "$INGRESS_HOSTNAME" ]; then
+            echo "Error: Ingress LoadBalancer for argocd-server-ingress not found after timeout."
+            kubectl get ingress argocd-server-ingress -n argocd -o yaml # For debugging
+            kubectl describe ingress argocd-server-ingress -n argocd # For debugging
+            # Check events for your Ingress controller (e.g., Nginx or AWS LBC)
+            # kubectl get pods -n <ingress-controller-namespace>
+            # kubectl logs <ingress-controller-pod> -n <ingress-controller-namespace>
+            exit 1
+          fi
 
       - name: Delete existing ArgoCD DNS record (if exists)
         run: |
@@ -261,15 +293,10 @@ jobs:
       - name: Update ArgoCD DNS record
         run: |
           # Get the LoadBalancer hostname
-          LB_HOSTNAME=$(kubectl get svc argocd-server-lb -n argocd -o jsonpath='{.status.loadBalancer.ingress[0].hostname}')
-          
-          if [ -z "$LB_HOSTNAME" ]; then
-            echo "Error: ArgoCD LoadBalancer not found"
-            exit 1
-          fi
-          
-          echo "ArgoCD LoadBalancer hostname: $LB_HOSTNAME"
-          
+          # INGRESS_HOSTNAME is already set from the "Wait for Ingress LoadBalancer" step
+          echo "ArgoCD Ingress LoadBalancer hostname: $INGRESS_HOSTNAME"
+          # Ensure INGRESS_HOSTNAME is available to this step if it was set in a previous step's subshell
+          INGRESS_HOSTNAME_FOR_DNS=$(kubectl get ingress argocd-server-ingress -n argocd -o jsonpath='{.status.loadBalancer.ingress[0].hostname}')
           # Get the Route53 hosted zone ID
           ZONE_ID=$(aws route53 list-hosted-zones --query "HostedZones[?Name=='joel.cloud.'].Id" --output text | sed 's/\/hostedzone\///')
           
@@ -284,7 +311,7 @@ jobs:
                   "TTL": 60,
                   "ResourceRecords": [
                     {
-                      "Value": "'"$LB_HOSTNAME"'"
+                      "Value": "'"$INGRESS_HOSTNAME_FOR_DNS"'"
                     }
                   ]
                 }
@@ -292,7 +319,7 @@ jobs:
             ]
           }'
           
-          echo "DNS record updated for argocd.joel.cloud -> $LB_HOSTNAME"
+          echo "DNS record updated for argocd.joel.cloud -> $INGRESS_HOSTNAME_FOR_DNS"
 
           echo "Validating Route53 CNAME record..."
           RECORD_VALUE=$(aws route53 list-resource-record-sets \
@@ -300,13 +327,31 @@ jobs:
             --query "ResourceRecordSets[?Name == 'argocd.joel.cloud.'] | [?Type == 'CNAME'].ResourceRecords[0].Value" \
             --output text)
 
-          if [[ "$RECORD_VALUE" == "$LB_HOSTNAME" ]]; then
+          if [[ "$RECORD_VALUE" == "$INGRESS_HOSTNAME_FOR_DNS" ]]; then
             echo "✅ Route53 CNAME record correctly points to $RECORD_VALUE"
           else
             echo "❌ Route53 record mismatch or not updated. Found: $RECORD_VALUE"
             exit 1
           fi
-                
+
+      - name: Wait for SSL Certificate
+        run: |
+          echo "Waiting for SSL certificate for argocd.joel.cloud..."
+          # The secretName comes from your Ingress's tls section
+          CERT_SECRET_NAME="argocd-joel-cloud-tls" 
+          for i in {1..20}; do # ~10 minutes total
+            # Check if the secret exists and has data (tls.crt)
+            if kubectl get secret $CERT_SECRET_NAME -n argocd -o jsonpath='{.data.tls\.crt}' 2>/dev/null; then
+              echo "✅ SSL Certificate secret $CERT_SECRET_NAME found and contains data."
+              break
+            fi
+            echo "Waiting for certificate secret $CERT_SECRET_NAME to be populated by cert-manager... (attempt $i/20)"
+            sleep 30
+          done
+          kubectl get certificate -n argocd # List all certificates for debugging
+          kubectl describe certificate -n argocd -l "acme.cert-manager.io/order-name" # Find related orders
+          kubectl get secret $CERT_SECRET_NAME -n argocd -o yaml # Check the secret content
+
       - name: Check and update EKS node security group
         run: |
           SG_ID="sg-0b8ab3f7f818243fd"  # Your EKS node security group ID
@@ -314,6 +359,10 @@ jobs:
           
           # Check if the rule exists
           RULE_EXISTS=$(aws ec2 describe-security-groups --group-ids $SG_ID --query "SecurityGroups[0].IpPermissions[?FromPort==\`8080\` && ToPort==\`8080\` && IpProtocol==\`tcp\`]" --output text)
+          
+          # Note: This rule for port 8080 on nodes might be for a direct LoadBalancer service.
+          # If using an Ingress controller (like Nginx or AWS LBC), the relevant ports would be
+          # the NodePorts used by the Ingress controller service, and the ELB it creates should have access to them.
           
           if [ -z "$RULE_EXISTS" ]; then
             echo "Adding rule to allow inbound traffic on port 8080..."
