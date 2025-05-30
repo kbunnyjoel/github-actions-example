@@ -22,15 +22,21 @@ BASTION_IP=$(aws ec2 describe-instances \
   --query "Reservations[0].Instances[0].PublicIpAddress" \
   --output text)
 
-if [ -z "$BASTION_IP" ] || [ "$BASTION_IP" == "None" ]; then
-  echo "Error: Could not fetch bastion IP from AWS"
-  echo "Using hardcoded IP as fallback"
-  BASTION_IP=$BASTION_IP  # Fallback to hardcoded IP
+CONNECT_TARGET="$BASTION_HOST" # Default to BASTION_HOST
+
+if [ -n "$BASTION_IP" ] && [ "$BASTION_IP" != "None" ]; then
+  echo "Successfully fetched dynamic bastion IP: $BASTION_IP"
+  CONNECT_TARGET="$BASTION_IP"
 else
-  echo "Found bastion IP: $BASTION_IP"
+  echo "Error: Could not fetch bastion IP from AWS"
+  echo "Falling back to pre-configured BASTION_HOST: $BASTION_HOST"
+  # CONNECT_TARGET is already set to BASTION_HOST
 fi
 
-echo "Connecting to bastion host at $BASTION_IP..."
-ssh -i "$KEY_PATH" ec2-user@bastion.bunnycloud.xyz
+if [ -z "$CONNECT_TARGET" ]; then
+  echo "Error: Bastion connection target could not be determined. Ensure BASTION_HOST is set."
+  exit 1
+fi
 
-aws eks update-kubeconfig --region ap-southeast-2 --name github-actions-eks-example
+echo "Connecting to bastion host at $CONNECT_TARGET to update kubeconfig..."
+ssh -i "$KEY_PATH" ec2-user@"$CONNECT_TARGET" "aws eks update-kubeconfig --region ap-southeast-2 --name github-actions-eks-example && echo 'Success: Kubeconfig updated on bastion host ($CONNECT_TARGET). You can now SSH into the bastion and use kubectl.'"
