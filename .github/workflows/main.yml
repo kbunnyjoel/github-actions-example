@@ -254,7 +254,7 @@ jobs:
 
       - name: Apply ArgoCD LoadBalancer Service
         run: kubectl apply -f k8s/argocd/argocd-svc.yaml
-        
+
       - name: Wait for Ingress LoadBalancer
         run: |
           echo "Waiting for Ingress LoadBalancer to be provisioned for argocd-server-ingress..."
@@ -374,7 +374,7 @@ jobs:
 
       - name: Check and update EKS node security group
         run: |
-          SG_ID="sg-0b8ab3f7f818243fd"  # Your EKS node security group ID
+          SG_ID=$(aws eks describe-cluster --name github-actions-eks-example --region ap-southeast-2 --query "cluster.resourcesVpcConfig.securityGroupIds[0]" --output text)
           echo "Checking if security group allows inbound traffic on port 8080..."
           
           # Check if the rule exists
