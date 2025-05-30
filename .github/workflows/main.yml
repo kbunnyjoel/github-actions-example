@@ -21,10 +21,6 @@ jobs:
   buil-and-test:
     runs-on: ubuntu-latest
 
-    env:
-      NUMBER1: ${{ github.event.inputs.number1 }}
-      NUMBER2: ${{ github.event.inputs.number2 }}
-
     strategy:
       matrix:
         node-version: [20.x]
@@ -47,21 +43,6 @@ jobs:
 
       - name: Run tests and collect coverage
         run: npm test
-
-      - name: Debug input values
-        run: |
-          echo "NUMBER1=${NUMBER1}"
-          echo "NUMBER2=${NUMBER2}"
-        env:
-          NUMBER1: ${{ github.event.inputs.number1 }}
-          NUMBER2: ${{ github.event.inputs.number2 }}
-
-      - name: Start Node server in background
-        run: |
-          npm start &
-        env:
-          INPUT_NUMBER1: ${{ github.event.inputs.number1 }}
-          INPUT_NUMBER2: ${{ github.event.inputs.number2 }}
 
       - name: Upload coverage reports
         uses: actions/upload-artifact@v4
@@ -146,9 +127,6 @@ jobs:
       - name: Terraform Init
         working-directory: terraform
         run: terraform init
-
-      # - name: Terraform Unlock
-      #   run: terraform force-unlock -force 17e8de4f-d48a-dd7a-825a-b76d390468d0
 
       - name: Terraform Validate
         run: terraform validate
@@ -266,7 +244,7 @@ jobs:
           # Get the Route53 hosted zone ID
           ZONE_ID=$(aws route53 list-hosted-zones --query "HostedZones[?Name=='joel.cloud.'].Id" --output text | sed 's/\/hostedzone\///')
           
-          # Update the Route53 record
+          # Update the Route53 record to use the ELB hostname directly (CNAME)
           aws route53 change-resource-record-sets --hosted-zone-id $ZONE_ID --change-batch '{
             "Changes": [
               {
@@ -277,7 +255,7 @@ jobs:
                   "TTL": 60,
                   "ResourceRecords": [
                     {
-                      "Value": "'$LB_HOSTNAME'"
+                      "Value": "'"$LB_HOSTNAME"'"
                     }
                   ]
                 }
@@ -286,7 +264,20 @@ jobs:
           }'
           
           echo "DNS record updated for argocd.joel.cloud -> $LB_HOSTNAME"
-          
+
+          echo "Validating Route53 CNAME record..."
+          RECORD_VALUE=$(aws route53 list-resource-record-sets \
+            --hosted-zone-id $ZONE_ID \
+            --query "ResourceRecordSets[?Name == 'argocd.joel.cloud.'] | [?Type == 'CNAME'].ResourceRecords[0].Value" \
+            --output text)
+
+          if [[ "$RECORD_VALUE" == "$LB_HOSTNAME" ]]; then
+            echo "✅ Route53 CNAME record correctly points to $RECORD_VALUE"
+          else
+            echo "❌ Route53 record mismatch or not updated. Found: $RECORD_VALUE"
+            exit 1
+          fi
+                
       - name: Check and update EKS node security group
         run: |
           SG_ID="sg-0b8ab3f7f818243fd"  # Your EKS node security group ID
