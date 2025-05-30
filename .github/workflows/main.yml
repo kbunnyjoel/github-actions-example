@@ -202,28 +202,28 @@ jobs:
           kubectl apply -f k8s/argocd/aws-auth-patch.yaml
           echo "aws-auth ConfigMap applied"
 
-      - name: Install Cert-Manager
-        run: |
-          echo "Installing Cert-Manager..."
-          kubectl apply -f https://github.com/cert-manager/cert-manager/releases/latest/download/cert-manager.yaml
-          echo "Waiting for Cert-Manager pods to become ready..."
-          kubectl rollout status deployment cert-manager -n cert-manager --timeout=2m
-          kubectl rollout status deployment cert-manager-webhook -n cert-manager --timeout=2m
-          kubectl rollout status deployment cert-manager-cainjector -n cert-manager --timeout=2m
+      # - name: Install Cert-Manager
+      #   run: |
+      #     echo "Installing Cert-Manager..."
+      #     kubectl apply -f https://github.com/cert-manager/cert-manager/releases/latest/download/cert-manager.yaml
+      #     echo "Waiting for Cert-Manager pods to become ready..."
+      #     kubectl rollout status deployment cert-manager -n cert-manager --timeout=2m
+      #     kubectl rollout status deployment cert-manager-webhook -n cert-manager --timeout=2m
+      #     kubectl rollout status deployment cert-manager-cainjector -n cert-manager --timeout=2m
 
-      - name: Apply ClusterIssuer for Cert-Manager
-        run: |
-          echo "Applying Cert-Manager ClusterIssuer..."
-          # Ensure you have a ClusterIssuer manifest (e.g., k8s/argocd/argocd-certissuer.yaml)
-          # that defines how certificates are issued (e.g., using Let's Encrypt).
-          # Example: kubectl apply -f k8s/argocd/argocd-certissuer.yaml
-          # If you don't have one, you'll need to create it.
-          # For this example, I'll assume it exists at k8s/argocd/argocd-certissuer.yaml
-          if [ -f "k8s/argocd/argocd-certissuer.yaml" ]; then
-            kubectl apply -f k8s/argocd/argocd-certissuer.yaml
-          else
-            echo "Warning: ClusterIssuer manifest k8s/argocd/argocd-certissuer.yaml not found. SSL certificate issuance might fail."
-          fi
+      # - name: Apply ClusterIssuer for Cert-Manager
+      #   run: |
+      #     echo "Applying Cert-Manager ClusterIssuer..."
+      #     # Ensure you have a ClusterIssuer manifest (e.g., k8s/argocd/argocd-certissuer.yaml)
+      #     # that defines how certificates are issued (e.g., using Let's Encrypt).
+      #     # Example: kubectl apply -f k8s/argocd/argocd-certissuer.yaml
+      #     # If you don't have one, you'll need to create it.
+      #     # For this example, I'll assume it exists at k8s/argocd/argocd-certissuer.yaml
+      #     if [ -f "k8s/argocd/argocd-certissuer.yaml" ]; then
+      #       kubectl apply -f k8s/argocd/argocd-certissuer.yaml
+      #     else
+      #       echo "Warning: ClusterIssuer manifest k8s/argocd/argocd-certissuer.yaml not found. SSL certificate issuance might fail."
+      #     fi
 
       - name: Install Argo CD
         run: |
@@ -293,64 +293,66 @@ jobs:
       - name: Update ArgoCD DNS record
         run: |
           # Get the LoadBalancer hostname
-          # INGRESS_HOSTNAME is already set from the "Wait for Ingress LoadBalancer" step
-          echo "ArgoCD Ingress LoadBalancer hostname: $INGRESS_HOSTNAME"
-          # Ensure INGRESS_HOSTNAME is available to this step if it was set in a previous step's subshell
-          INGRESS_HOSTNAME_FOR_DNS=$(kubectl get ingress argocd-server-ingress -n argocd -o jsonpath='{.status.loadBalancer.ingress[0].hostname}')
+          LB_HOSTNAME=$(kubectl get svc argocd-server-lb -n argocd -o jsonpath='{.status.loadBalancer.ingress[0].hostname}')
+          
+          if [ -z "$LB_HOSTNAME" ]; then
+            echo "Error: ArgoCD LoadBalancer not found"
+            exit 1
+          fi
+          
+          echo "ArgoCD LoadBalancer hostname: $LB_HOSTNAME"
+          
           # Get the Route53 hosted zone ID
           ZONE_ID=$(aws route53 list-hosted-zones --query "HostedZones[?Name=='joel.cloud.'].Id" --output text | sed 's/\/hostedzone\///')
           
-          # Update the Route53 record to use the ELB hostname directly (CNAME)
+          # Get the LoadBalancer's hosted zone ID
+          LB_ZONE_ID=$(aws elbv2 describe-load-balancers --query "LoadBalancers[?DNSName=='$LB_HOSTNAME'].CanonicalHostedZoneId" --output text)
+          
+          if [ -z "$LB_ZONE_ID" ]; then
+            echo "Trying classic ELB..."
+            LB_ZONE_ID=$(aws elb describe-load-balancers --query "LoadBalancerDescriptions[?DNSName=='$LB_HOSTNAME'].CanonicalHostedZoneNameID" --output text)
+          fi
+          
+          echo "LoadBalancer zone ID: $LB_ZONE_ID"
+          
+          # Update the Route53 record with an ALIAS record
           aws route53 change-resource-record-sets --hosted-zone-id $ZONE_ID --change-batch '{
             "Changes": [
               {
                 "Action": "UPSERT",
                 "ResourceRecordSet": {
                   "Name": "argocd.joel.cloud",
-                  "Type": "CNAME",
-                  "TTL": 60,
-                  "ResourceRecords": [
-                    {
-                      "Value": "'"$INGRESS_HOSTNAME_FOR_DNS"'"
-                    }
-                  ]
+                  "Type": "A",
+                  "AliasTarget": {
+                    "HostedZoneId": "'$LB_ZONE_ID'",
+                    "DNSName": "'$LB_HOSTNAME'",
+                    "EvaluateTargetHealth": true
+                  }
                 }
               }
             ]
           }'
           
-          echo "DNS record updated for argocd.joel.cloud -> $INGRESS_HOSTNAME_FOR_DNS"
+          echo "DNS record updated for argocd.joel.cloud -> $LB_HOSTNAME"
 
-          echo "Validating Route53 CNAME record..."
-          RECORD_VALUE=$(aws route53 list-resource-record-sets \
-            --hosted-zone-id $ZONE_ID \
-            --query "ResourceRecordSets[?Name == 'argocd.joel.cloud.'] | [?Type == 'CNAME'].ResourceRecords[0].Value" \
-            --output text)
 
-          if [[ "$RECORD_VALUE" == "$INGRESS_HOSTNAME_FOR_DNS" ]]; then
-            echo "✅ Route53 CNAME record correctly points to $RECORD_VALUE"
-          else
-            echo "❌ Route53 record mismatch or not updated. Found: $RECORD_VALUE"
-            exit 1
-          fi
-
-      - name: Wait for SSL Certificate
-        run: |
-          echo "Waiting for SSL certificate for argocd.joel.cloud..."
-          # The secretName comes from your Ingress's tls section
-          CERT_SECRET_NAME="argocd-joel-cloud-tls" 
-          for i in {1..20}; do # ~10 minutes total
-            # Check if the secret exists and has data (tls.crt)
-            if kubectl get secret $CERT_SECRET_NAME -n argocd -o jsonpath='{.data.tls\.crt}' 2>/dev/null; then
-              echo "✅ SSL Certificate secret $CERT_SECRET_NAME found and contains data."
-              break
-            fi
-            echo "Waiting for certificate secret $CERT_SECRET_NAME to be populated by cert-manager... (attempt $i/20)"
-            sleep 30
-          done
-          kubectl get certificate -n argocd # List all certificates for debugging
-          kubectl describe certificate -n argocd -l "acme.cert-manager.io/order-name" # Find related orders
-          kubectl get secret $CERT_SECRET_NAME -n argocd -o yaml # Check the secret content
+      # - name: Wait for SSL Certificate
+      #   run: |
+      #     echo "Waiting for SSL certificate for argocd.joel.cloud..."
+      #     # The secretName comes from your Ingress's tls section
+      #     CERT_SECRET_NAME="argocd-joel-cloud-tls" 
+      #     for i in {1..20}; do # ~10 minutes total
+      #       # Check if the secret exists and has data (tls.crt)
+      #       if kubectl get secret $CERT_SECRET_NAME -n argocd -o jsonpath='{.data.tls\.crt}' 2>/dev/null; then
+      #         echo "✅ SSL Certificate secret $CERT_SECRET_NAME found and contains data."
+      #         break
+      #       fi
+      #       echo "Waiting for certificate secret $CERT_SECRET_NAME to be populated by cert-manager... (attempt $i/20)"
+      #       sleep 30
+      #     done
+      #     kubectl get certificate -n argocd # List all certificates for debugging
+      #     kubectl describe certificate -n argocd -l "acme.cert-manager.io/order-name" # Find related orders
+      #     kubectl get secret $CERT_SECRET_NAME -n argocd -o yaml # Check the secret content
 
       - name: Check and update EKS node security group
         run: |
@@ -392,8 +394,8 @@ jobs:
             sleep 30
           done
           
-          echo "Testing HTTPS access to argocd.joel.cloud..."
-          curl -vL --max-time 20 https://argocd.joel.cloud || echo "HTTPS access failed"
+          # echo "Testing HTTPS access to argocd.joel.cloud..."
+          # curl -vL --max-time 20 https://argocd.joel.cloud || echo "HTTPS access failed"
 
       - name: Check Route53 record
         run: |

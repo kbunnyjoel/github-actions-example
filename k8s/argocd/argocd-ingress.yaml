@@ -5,16 +5,19 @@ metadata:
   name: argocd-server-ingress
   namespace: argocd
   annotations:
-    # Nginx Ingress terminates SSL, talks HTTP to the argocd-server pod
     nginx.ingress.kubernetes.io/backend-protocol: "HTTP"
-    nginx.ingress.kubernetes.io/ssl-redirect: "true"
-    cert-manager.io/cluster-issuer: letsencrypt # Ensure you have a ClusterIssuer named 'letsencrypt'
-    nginx.ingress.kubernetes.io/force-ssl-redirect: "true" # Optional: stronger SSL redirect
+    # All HTTPS-related annotations are commented out
+    # nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    # nginx.ingress.kubernetes.io/ssl-passthrough: "true"
+    # cert-manager.io/cluster-issuer: letsencrypt
+    # nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
 spec:
-  tls:
-  - hosts:
-    - argocd.joel.cloud
-    secretName: argocd-joel-cloud-tls # Cert-Manager will store the certificate in this secret
+  ingressClassName: nginx
+  # TLS section is commented out
+  # tls:
+  # - hosts:
+  #   - argocd.joel.cloud
+  #   secretName: argocd-joel-cloud-tls
   rules:
     - host: argocd.joel.cloud
       http:
@@ -23,6 +26,6 @@ spec:
             pathType: Prefix
             backend:
               service:
-                name: argocd-server # Standard ArgoCD service name
+                name: argocd-server
                 port:
-                  number: 80 # ArgoCD service's HTTP port (targets pod port 8080)
+                  number: 80  # Using HTTP port instead of HTTPS
