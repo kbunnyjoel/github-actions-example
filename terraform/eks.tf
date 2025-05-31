@@ -41,23 +41,45 @@ module "eks" {
   source          = "terraform-aws-modules/eks/aws"
   version         = ">=20.35.0"
   cluster_name    = var.cluster_name
-  cluster_version = "1.29" # Example: Use a currently supported EKS version. Please verify the latest.
-  # subnet_ids      = module.vpc.public_subnets
-  subnet_ids = module.vpc.private_subnets
+  cluster_version = "1.29"
+
+  # Use both private and public subnets for better connectivity
+  subnet_ids = concat(module.vpc.private_subnets, module.vpc.public_subnets)
 
   vpc_id = module.vpc.vpc_id
+
   # API access settings
-  cluster_endpoint_public_access  = true # or true to enable public API access
+  cluster_endpoint_public_access  = true
   cluster_endpoint_private_access = true
+
+  # Add cluster security group rules for external DNS
+  cluster_security_group_additional_rules = {
+    egress_dns = {
+      description = "Allow DNS resolution"
+      protocol    = "tcp"
+      from_port   = 53
+      to_port     = 53
+      type        = "egress"
+      cidr_blocks = ["0.0.0.0/0"]
+    }
+    egress_https = {
+      description = "Allow HTTPS outbound"
+      protocol    = "tcp"
+      from_port   = 443
+      to_port     = 443
+      type        = "egress"
+      cidr_blocks = ["0.0.0.0/0"]
+    }
+  }
 
   eks_managed_node_groups = {
     spot-nodes = {
       desired_size   = 2
       min_size       = 1
       max_size       = 3
-      instance_types = ["t3.large", "t3.medium"]            # Larger instance types for better pod capacity
-      capacity_type  = "SPOT"                               # Cost-efficient for non-critical workloads
-      key_name       = aws_key_pair.deployment_key.key_name # For SSH access via bastion
+      instance_types = ["t3.large", "t3.medium"]
+      capacity_type  = "SPOT"
+      key_name       = aws_key_pair.deployment_key.key_name
 
       # Add labels to identify these nodes
       labels = {
@@ -73,11 +95,11 @@ module "eks" {
       }
     }
   }
+
   tags = {
     Environment = "dev"
     Project     = "github-actions-example"
   }
-
 
   enable_cluster_creator_admin_permissions = true
   authentication_mode                      = "API_AND_CONFIG_MAP"
