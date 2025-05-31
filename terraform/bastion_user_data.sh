@@ -89,33 +89,20 @@ echo "INFO: Diagnostic script created. SSH into the bastion and run: /home/ec2-u
 
 # Configure kubectl for the EKS cluster
 echo "INFO: Configuring kubectl for EKS cluster..."
-aws eks update-kubeconfig --region ${aws_region} --name ${cluster_name}
+aws eks update-kubeconfig --region ap-southeast-2 --name github-actions-eks-example
 
-# Add helper function to access ArgoCD
-cat << 'EOF' >> /home/ec2-user/.bashrc
-# Kubernetes aliases
-alias k=kubectl
-alias kgp='kubectl get pods'
-alias kgs='kubectl get services'
-alias kgi='kubectl get ingress'
+# Install kubectl with a more reliable method
+echo "INFO: Installing kubectl..."
+curl -LO "https://dl.k8s.io/release/v1.29.2/bin/linux/amd64/kubectl"
+chmod +x kubectl
+sudo mv kubectl /usr/local/bin/kubectl
+sudo ln -sf /usr/local/bin/kubectl /usr/bin/kubectl  # Create symlink in /usr/bin
 
-# ArgoCD helper function
-function argocd_url() {
-  LB_HOSTNAME=$(kubectl get svc argocd-server-lb -n argocd -o jsonpath='{.status.loadBalancer.ingress[0].hostname}' 2>/dev/null)
-  if [ ! -z "$LB_HOSTNAME" ]; then
-    echo "ArgoCD URL: http://$LB_HOSTNAME"
-    echo "Username: admin"
-    echo "Password: $(kubectl -n argocd get secret argocd-initial-admin-secret -o jsonpath="{.data.password}" | base64 -d 2>/dev/null || echo "Password not found")"
-  else
-    echo "ArgoCD LoadBalancer not found"
-  fi
-}
+# Verify kubectl installation
+which kubectl || echo "Error: kubectl not found in PATH"
+kubectl version --client || echo "Error: kubectl command failed"
 
-# Print welcome message
-echo ""
-echo "Welcome to the EKS bastion host!"
-echo "Run 'argocd_url' to get the ArgoCD URL and credentials"
-echo ""
-EOF
-
-echo "INFO: Bastion host setup complete!"
+# Configure kubectl for the EKS cluster with explicit path
+echo "INFO: Configuring kubectl for EKS cluster..."
+/usr/local/bin/kubectl version --client
+/usr/local/bin/aws eks update-kubeconfig --region ap-southeast-2 --name github-actions-eks-example
