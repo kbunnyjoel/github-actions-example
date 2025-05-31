@@ -26,7 +26,7 @@ CONNECT_TARGET="$BASTION_HOST" # Default to BASTION_HOST
 
 if [ -n "$BASTION_IP" ] && [ "$BASTION_IP" != "None" ]; then
   echo "Successfully fetched dynamic bastion IP: $BASTION_IP"
-  CONNECT_TARGET="$BASTION_IP"
+  CONNECT_TARGET="$BASTION_HOST"
 else
   echo "Error: Could not fetch bastion IP from AWS"
   echo "Falling back to pre-configured BASTION_HOST: $BASTION_HOST"
