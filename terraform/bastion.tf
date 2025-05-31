@@ -82,6 +82,9 @@ resource "aws_instance" "bastion" {
   tags = {
     Name = "bastion-host"
   }
+  lifecycle {
+    create_before_destroy = true
+  }
 }
 
 
@@ -93,6 +96,9 @@ resource "aws_eip" "bastion_eip" {
   # }
   tags = {
     Name = "bastion-eip"
+  }
+  lifecycle {
+    create_before_destroy = true
   }
 }
 
