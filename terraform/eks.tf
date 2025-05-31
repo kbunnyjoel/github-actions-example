@@ -54,9 +54,17 @@ module "eks" {
 
   # Add cluster security group rules for external DNS
   cluster_security_group_additional_rules = {
-    egress_dns = {
-      description = "Allow DNS resolution"
+    egress_dns_tcp = {
+      description = "Allow DNS resolution (TCP)"
       protocol    = "tcp"
+      from_port   = 53
+      to_port     = 53
+      type        = "egress"
+      cidr_blocks = ["0.0.0.0/0"]
+    }
+    egress_dns_udp = {
+      description = "Allow DNS resolution (UDP)"
+      protocol    = "udp"
       from_port   = 53
       to_port     = 53
       type        = "egress"
