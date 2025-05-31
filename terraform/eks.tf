@@ -141,116 +141,20 @@ module "eks" {
   }
 }
 
-
-
-# Create IAM role for cluster autoscaler
-resource "aws_iam_role" "cluster_autoscaler" {
-  name = "eks-cluster-autoscaler"
-
-  assume_role_policy = jsonencode({
-    Version = "2012-10-17"
-    Statement = [
-      {
-        Action = "sts:AssumeRoleWithWebIdentity"
-        Effect = "Allow"
-        Principal = {
-          Federated = module.eks.oidc_provider_arn
-        }
-        Condition = {
-          StringEquals = {
-            "${module.eks.oidc_provider}:sub" = "system:serviceaccount:kube-system:cluster-autoscaler"
-            "${module.eks.oidc_provider}:aud" = "sts.amazonaws.com"
-          }
-        }
-      }
-    ]
-  })
-}
-
-# Create IAM policy for cluster autoscaler
-resource "aws_iam_policy" "cluster_autoscaler_role_policy" {
-  name        = "eks-cluster-autoscaler-policy"
-  description = "EKS cluster autoscaler policy"
-
-  policy = jsonencode({
-    Version = "2012-10-17"
-    Statement = [
-      {
-        Action = [
-          "autoscaling:DescribeAutoScalingGroups",
-          "autoscaling:DescribeAutoScalingInstances",
-          "autoscaling:DescribeLaunchConfigurations",
-          "autoscaling:DescribeTags",
-          "autoscaling:SetDesiredCapacity",
-          "autoscaling:TerminateInstanceInAutoScalingGroup",
-          "ec2:DescribeLaunchTemplateVersions"
-        ]
-        Effect   = "Allow"
-        Resource = "*"
-      }
-    ]
-  })
-}
-
-# Attach the policy to the role
-resource "aws_iam_role_policy_attachment" "cluster_autoscaler_role_policy" {
-  role       = aws_iam_role.cluster_autoscaler.name
-  policy_arn = aws_iam_policy.cluster_autoscaler_role_policy.arn
-}
-
-
-# Add this to your eks.tf file after the eks module
-
 # Configure the VPC CNI add-on to delete ENIs on termination
 resource "aws_eks_addon" "vpc_cni" {
   cluster_name             = module.eks.cluster_name
   addon_name               = "vpc-cni"
-  addon_version            = "v1.12.6-eksbuild.2" # Use the latest version compatible with your EKS version
   resolve_conflicts        = "OVERWRITE"
   service_account_role_arn = aws_iam_role.vpc_cni.arn
 
-  # Add configuration to delete ENIs on termination
+  # Use a simpler configuration without the unsupported parameter
   configuration_values = jsonencode({
     env = {
-      WARM_ENI_TARGET                    = "0"
-      WARM_IP_TARGET                     = "0"
-      AWS_VPC_K8S_CNI_CUSTOM_NETWORK_CFG = "true"
-      AWS_VPC_ENI_MTU                    = "9001"
-      ENABLE_POD_ENI                     = "true"
-      # This is the key setting to ensure ENIs are deleted
-      DELETE_ENI_ON_TERMINATION = "true"
+      WARM_ENI_TARGET = "0"
+      WARM_IP_TARGET  = "0"
     }
   })
 
   depends_on = [module.eks]
-}
-
-# Create IAM role for VPC CNI
-resource "aws_iam_role" "vpc_cni" {
-  name = "eks-vpc-cni-role"
-
-  assume_role_policy = jsonencode({
-    Version = "2012-10-17"
-    Statement = [
-      {
-        Action = "sts:AssumeRoleWithWebIdentity"
-        Effect = "Allow"
-        Principal = {
-          Federated = module.eks.oidc_provider_arn
-        }
-        Condition = {
-          StringEquals = {
-            "${module.eks.oidc_provider}:sub" = "system:serviceaccount:kube-system:aws-node"
-            "${module.eks.oidc_provider}:aud" = "sts.amazonaws.com"
-          }
-        }
-      }
-    ]
-  })
-}
-
-# Attach the required policy to the VPC CNI role
-resource "aws_iam_role_policy_attachment" "vpc_cni" {
-  role       = aws_iam_role.vpc_cni.name
-  policy_arn = "arn:aws:iam::aws:policy/AmazonEKS_CNI_Policy"
 }
