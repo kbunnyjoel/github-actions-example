@@ -79,6 +79,11 @@ resource "aws_instance" "bastion" {
     cluster_name = "github-actions-eks-example" # Replace with your EKS cluster name
   })
 
+  root_block_device {
+    delete_on_termination = true
+    volume_size           = 8
+  }
+
   tags = {
     Name = "bastion-host"
   }
