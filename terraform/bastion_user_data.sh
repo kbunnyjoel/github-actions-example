@@ -29,6 +29,14 @@ cat << 'EOF' > /home/ec2-user/check_ssh.sh
 echo "SSH server status:"
 sudo systemctl status sshd
 
+yum update -y
+curl -LO "https://dl.k8s.io/release/v1.29.2/bin/linux/amd64/kubectl"
+chmod +x kubectl
+mv kubectl /usr/local/bin/
+yum install -y unzip curl
+curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
+unzip awscliv2.zip && ./aws/install
+
 echo "SSH server configuration:"
 sudo grep -v "^#" /etc/ssh/sshd_config | grep -v "^$"
 

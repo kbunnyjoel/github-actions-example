@@ -18,7 +18,7 @@ spec:
   tls:
   - hosts:
     - argocd.bunnycloud.xyz
-    secretName: argocd-joel-cloud-tls
+    secretName: argocd-bunnycloud-tls
   rules:
     - host: argocd.bunnycloud.xyz
       http:
