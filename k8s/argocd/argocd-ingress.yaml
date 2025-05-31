@@ -6,12 +6,9 @@ metadata:
   namespace: argocd
   annotations:
     nginx.ingress.kubernetes.io/backend-protocol: "HTTPS"
-    nginx.ingress.kubernetes.io/rewrite-target: /
-    # All HTTPS-related annotations are commented out
-    # nginx.ingress.kubernetes.io/ssl-redirect: "true"
-    # nginx.ingress.kubernetes.io/ssl-passthrough: "true"
+    nginx.ingress.kubernetes.io/ssl-passthrough: "true"
     cert-manager.io/cluster-issuer: letsencrypt
-    nginx.ingress.kubernetes.io/force-ssl-redirect: "false"
+    nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
 spec:
   ingressClassName: nginx
   # TLS section
@@ -29,4 +26,4 @@ spec:
               service:
                 name: argocd-server
                 port:
-                  number: 80  # Using HTTP port instead of HTTPS
+                  number: 443  # Using HTTPS port for ArgoCD server
