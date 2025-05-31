@@ -82,10 +82,10 @@ module "eks" {
 
   eks_managed_node_groups = {
     spot-nodes = {
-      desired_size   = 2
+      desired_size   = 1 # Reduce from 2 to 1 for initial deployment
       min_size       = 1
       max_size       = 3
-      instance_types = ["t3.large", "t3.medium"]
+      instance_types = ["t3a.medium", "t3.medium"] # Use AMD-based instances first
       capacity_type  = "SPOT"
       key_name       = aws_key_pair.deployment_key.key_name
 
@@ -112,4 +112,12 @@ module "eks" {
   enable_cluster_creator_admin_permissions = true
   authentication_mode                      = "API_AND_CONFIG_MAP"
   enable_irsa                              = true
+
+  # Add IAM policies with least privilege principle
+  create_cluster_security_group = true
+  create_node_security_group    = true
+  node_security_group_tags = {
+    "kubernetes.io/cluster/${var.cluster_name}" = "owned"
+  }
+
 }

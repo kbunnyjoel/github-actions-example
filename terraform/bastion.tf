@@ -103,3 +103,37 @@ resource "aws_route53_record" "bastion_dns" {
   ttl     = 60 # Reduced TTL for faster propagation
   records = [aws_eip.bastion_eip.public_ip]
 }
+
+
+# Add to bastion.tf
+resource "aws_cloudwatch_event_rule" "stop_bastion_weekdays" {
+  name                = "stop-bastion-weekdays"
+  description         = "Stop bastion host outside working hours on weekdays"
+  schedule_expression = "cron(0 18 ? * MON-FRI *)" # 6 PM UTC
+}
+
+resource "aws_cloudwatch_event_target" "stop_bastion_weekdays" {
+  rule      = aws_cloudwatch_event_rule.stop_bastion_weekdays.name
+  target_id = "stop-bastion"
+  arn       = "arn:aws:ssm:${var.aws_region}:${data.aws_caller_identity.current.account_id}:automation-definition/AWS-StopEC2Instance"
+
+  input = jsonencode({
+    InstanceId = [aws_instance.bastion.id]
+  })
+}
+
+resource "aws_cloudwatch_event_rule" "start_bastion_weekdays" {
+  name                = "start-bastion-weekdays"
+  description         = "Start bastion host during working hours on weekdays"
+  schedule_expression = "cron(0 8 ? * MON-FRI *)" # 8 AM UTC
+}
+
+resource "aws_cloudwatch_event_target" "start_bastion_weekdays" {
+  rule      = aws_cloudwatch_event_rule.start_bastion_weekdays.name
+  target_id = "start-bastion"
+  arn       = "arn:aws:ssm:${var.aws_region}:${data.aws_caller_identity.current.account_id}:automation-definition/AWS-StartEC2Instance"
+
+  input = jsonencode({
+    InstanceId = [aws_instance.bastion.id]
+  })
+}
