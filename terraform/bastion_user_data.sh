@@ -79,6 +79,7 @@ fi
 echo ""
 echo "Public IP:"
 curl -s http://169.254.169.254/latest/meta-data/public-ipv4
+sudo cat /var/log/cloud-init-output.log
 EOF
 
 chmod +x /home/ec2-user/check_bastion_setup.sh
