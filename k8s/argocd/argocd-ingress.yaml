@@ -7,7 +7,6 @@ metadata:
   annotations:
     nginx.ingress.kubernetes.io/backend-protocol: "HTTPS"
     nginx.ingress.kubernetes.io/ssl-passthrough: "false"
-    cert-manager.io/cluster-issuer: letsencrypt
     nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
 spec:
   ingressClassName: nginx
@@ -15,7 +14,7 @@ spec:
   tls:
   - hosts:
     - argocd.bunnycloud.xyz
-    secretName: argocd-bunnycloud-tls
+    secretName: argocd-server-tls
   rules:
     - host: argocd.bunnycloud.xyz
       http:
