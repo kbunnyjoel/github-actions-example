@@ -372,27 +372,7 @@ jobs:
           echo "Testing DNS record using AWS nameservers..."
           aws route53 list-resource-record-sets --hosted-zone-id $ZONE_ID --query "ResourceRecordSets[?Name=='argocd.bunnycloud.xyz.']"
           dig @ns-94.awsdns-11.com argocd.bunnycloud.xyz
-
-
-
-      # - name: Wait for SSL Certificate
-      #   run: |
-      #     echo "Waiting for SSL certificate for argocd.bunnycloud.xyz..."
-      #     # The secretName comes from your Ingress's tls section
-      #     CERT_SECRET_NAME="argocd-joel-cloud-tls" 
-      #     for i in {1..20}; do # ~10 minutes total
-      #       # Check if the secret exists and has data (tls.crt)
-      #       if kubectl get secret $CERT_SECRET_NAME -n argocd -o jsonpath='{.data.tls\.crt}' 2>/dev/null; then
-      #         echo "✅ SSL Certificate secret $CERT_SECRET_NAME found and contains data."
-      #         break
-      #       fi
-      #       echo "Waiting for certificate secret $CERT_SECRET_NAME to be populated by cert-manager... (attempt $i/20)"
-      #       sleep 30
-      #     done
-      #     kubectl get certificate -n argocd # List all certificates for debugging
-      #     kubectl describe certificate -n argocd -l "acme.cert-manager.io/order-name" # Find related orders
-      #     kubectl get secret $CERT_SECRET_NAME -n argocd -o yaml # Check the secret content
-
+          
       - name: Check and update EKS node security group
         run: |
           SG_ID=$(aws eks describe-cluster --name github-actions-eks-example --region ap-southeast-2 --query "cluster.resourcesVpcConfig.securityGroupIds[0]" --output text)
