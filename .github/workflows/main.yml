@@ -21,58 +21,34 @@ jobs:
   buil-and-test:
     runs-on: ubuntu-latest
 
-    env:
-      NUMBER1: ${{ github.event.inputs.number1 }}
-      NUMBER2: ${{ github.event.inputs.number2 }}
-
     strategy:
       matrix:
-        node-version: [18.x, 20.x] # Test on multiple Node.js versions
+        node-version: [20.x]
 
     steps:
-    
-    - name: Checkout repository
-      uses: actions/checkout@v4
+      - name: Checkout repository
+        uses: actions/checkout@v4
 
-    - name: List files in workspace
-      run: ls -l
-    - name: Use Node.js ${{ matrix.node-version }}
-      uses: actions/setup-node@v4
-      with:
-        node-version: ${{ matrix.node-version }}
-        cache: 'npm' # Cache npm dependencies
+      - name: List files in workspace
+        run: ls -l
 
-    - name: Install dependencies
-      run: npm ci # Use ci for cleaner installs from package-lock.json
+      - name: Use Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: 'npm'
 
-    - name: Run tests and collect coverage
-      run: npm test # This will now run 'jest --coverage'
+      - name: Install dependencies
+        run: npm ci
 
-    - name: Debug input values
-      run: |
-        echo "NUMBER1=${NUMBER1}"
-        echo "NUMBER2=${NUMBER2}"
-      env:
-        NUMBER1: ${{ github.event.inputs.number1 }}
-        NUMBER2: ${{ github.event.inputs.number2 }}
+      - name: Run tests and collect coverage
+        run: npm test
 
-    - name: Start Node server in background
-      # run: |
-      #   nohup npm start > server.log 2>&1 &
-      #   sleep 5
-      #   curl --fail http://localhost:3000/status || (echo "Server failed to start" && exit 1)
-      run: |
-        npm start &
-      env:
-        INPUT_NUMBER1: ${{ github.event.inputs.number1 }}
-        INPUT_NUMBER2: ${{ github.event.inputs.number2 }}
-
-    - name: Upload coverage reports
-      uses: actions/upload-artifact@v4
-      with:
-        name: coverage-report-node-${{ matrix.node-version }}
-        path: coverage/ # Upload the entire coverage directory
-
+      - name: Upload coverage reports
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report-node-${{ matrix.node-version }}
+          path: coverage/
 
   docker:
     name: Build and push Docker image
@@ -106,17 +82,16 @@ jobs:
         with:
           context: .
           push: true
-          # tags: ${{ secrets.DOCKER_USERNAME }}/my-node-app:${{ github.sha }}
           tags: |
             ${{ secrets.DOCKER_USERNAME }}/my-node-app:${{ github.sha }}
             ghcr.io/${{ github.repository_owner }}/my-node-app:${{ github.sha }}
-      
+
       - name: Run Docker container in background
         run: docker run -d -p 3000:3000 --name live-app ${{ secrets.DOCKER_USERNAME }}/my-node-app:${{ github.sha }}
-      
+
       - name: Replace image tag with Git SHA
         run: |
-          sed -i "s|__BUILD_SHA__|${{ github.sha }}|g" k8s/deployment.yaml
+          sed -i "s|__BUILD_SHA__|${{ github.sha }}|g" k8s/deployment/deployment.yaml
 
       - name: Wait for app to be ready
         run: |
@@ -125,16 +100,14 @@ jobs:
             sleep 2
           done
           echo "App did not become ready" && exit 1
-  
+
   terraform-eks:
     if: ${{ github.event.inputs.run_terraform == 'true' }}
     runs-on: ubuntu-latest
     needs: docker
-
     defaults:
       run:
         working-directory: terraform
-
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -149,37 +122,344 @@ jobs:
       - name: Install Terraform
         uses: hashicorp/setup-terraform@v3
         with:
-          terraform_version: 1.11.0
-
+          terraform_version: 1.11.0 # Consider updating to a more recent version
+      
       - name: Terraform Init
+        working-directory: terraform
         run: terraform init
 
+      - name: Terraform Validate
+        run: terraform validate
+      - name: Terraform Format
+        run: terraform fmt -check
+      
       - name: Terraform Plan
         run: terraform plan
 
-      - name: Apply or Destroy Terraform
-        run: |
-          if [[ "${{ github.event.inputs.destroy }}" == "true" ]]; then
-            echo "Destroying infrastructure..."
-            terraform destroy -auto-approve
-          else
-            echo "Applying infrastructure..."
-            terraform apply -auto-approve
-          fi
+      - name: Terraform Apply
+        working-directory: terraform
+        if: github.event.inputs.destroy != 'true'
+        run: terraform apply -auto-approve
       
+      - name: Upload deployment_key.pem as artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: deployment-key
+          path: terraform/keys/deployment_key.pem
+
+      - name: Terraform Destroy
+        if: github.event.inputs.destroy == 'true'
+        run: terraform destroy -auto-approve
+          
       - name: Install kubectl and check EKS status
         if: github.event.inputs.destroy != 'true'
         run: |
-          curl -LO https://dl.k8s.io/release/$(curl -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl
+          set -e
+          VERSION=v1.29.2 # Use a valid and more recent kubectl version
+          echo "Installing kubectl version: $VERSION"
+          curl -LO "https://dl.k8s.io/release/${VERSION}/bin/linux/amd64/kubectl"
           chmod +x kubectl && sudo mv kubectl /usr/local/bin/
 
-          aws eks update-kubeconfig --region ap-southeast-2 --name github-actions-eks
+          aws eks update-kubeconfig --region ap-southeast-2 --name github-actions-eks-example
 
           echo "Checking Kubernetes nodes..."
           kubectl get nodes
-
           echo "Checking component statuses..."
           kubectl get componentstatuses
-
           echo "Listing kube-system pods..."
           kubectl get pods -n kube-system
+      
+  deploy-argocd:
+    if: github.event.inputs.run_terraform == 'true' && github.event.inputs.destroy != 'true'
+    needs: terraform-eks
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v3
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ap-southeast-2
+      - name: Configure kubectl for EKS
+        run: |
+          aws eks update-kubeconfig --region ap-southeast-2 --name github-actions-eks-example
+      - name: Wait for EKS API and nodes to be ready
+        run: |
+          echo "Waiting for Kubernetes API..."
+          for i in {1..30}; do
+            kubectl version && break || sleep 10
+          done
+          echo "Waiting for at least one node to be Ready..."
+          for i in {1..30}; do
+            kubectl get nodes | grep -q ' Ready ' && break || sleep 10
+          done
+
+      - name: Apply aws-auth ConfigMap for bastion access
+        run: |
+          echo "Applying aws-auth ConfigMap for bastion access..."
+          kubectl apply -f k8s/argocd/aws-auth-patch.yaml
+          echo "aws-auth ConfigMap applied"
+
+      - name: Install NGINX Ingress Controller
+        run: |
+          echo "Installing NGINX Ingress Controller for AWS..."
+          kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/controller-v1.10.1/deploy/static/provider/aws/deploy.yaml
+          echo "Waiting for ingress-nginx controller pod to be ready..."
+          kubectl rollout status deployment ingress-nginx-controller -n ingress-nginx --timeout=5m
+
+      - name: Install Cert-Manager
+        run: |
+          echo "Installing Cert-Manager..."
+          kubectl apply -f https://github.com/cert-manager/cert-manager/releases/latest/download/cert-manager.yaml
+          echo "Waiting for Cert-Manager pods to become ready..."
+          kubectl rollout status deployment cert-manager -n cert-manager --timeout=2m
+          kubectl rollout status deployment cert-manager-webhook -n cert-manager --timeout=2m
+          kubectl rollout status deployment cert-manager-cainjector -n cert-manager --timeout=2m
+
+      - name: Apply ClusterIssuer for Cert-Manager
+        run: |
+          echo "Applying Cert-Manager ClusterIssuer..."
+          # Ensure you have a ClusterIssuer manifest (e.g., k8s/argocd/argocd-certissuer.yaml)
+          # that defines how certificates are issued (e.g., using Let's Encrypt).
+          # Example: kubectl apply -f k8s/argocd/argocd-certissuer.yaml
+          # If you don't have one, you'll need to create it.
+          # For this example, I'll assume it exists at k8s/argocd/argocd-certissuer.yaml
+          if [ -f "k8s/argocd/argocd-certissuer.yaml" ]; then
+            kubectl apply -f k8s/argocd/argocd-certissuer.yaml
+          else
+            echo "Warning: ClusterIssuer manifest k8s/argocd/argocd-certissuer.yaml not found. SSL certificate issuance might fail."
+          fi
+
+      - name: Install Argo CD
+        run: |
+          echo "Installing ArgoCD..."
+          kubectl create namespace argocd || true
+          kubectl apply -n argocd -f https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/install.yaml
+          
+          echo "Checking ArgoCD pods status..."
+          kubectl get pods -n argocd
+          
+          echo "Waiting for ArgoCD deployments to be ready..."
+          kubectl wait --for=condition=Available deployment --all -n argocd --timeout=5m
+          echo "ArgoCD installed and deployments are ready."
+
+      - name: Apply ArgoCD Ingress
+        run: |
+          echo "Waiting for Ingress LoadBalancer IP from ingress-nginx-controller..."
+
+          for i in {1..30}; do
+            ELB_HOSTNAME=$(kubectl get svc ingress-nginx-controller -n ingress-nginx -o jsonpath='{.status.loadBalancer.ingress[0].hostname}' 2>/dev/null)
+            if [ ! -z "$ELB_HOSTNAME" ]; then
+              echo "Found ELB Hostname: $ELB_HOSTNAME"
+              break
+            fi
+            echo "ELB Hostname not available yet... retrying ($i/30)"
+            sleep 20
+          done
+
+          if [ -z "$ELB_HOSTNAME" ]; then
+            echo "❌ Error: Could not fetch ELB Hostname after timeout."
+            kubectl get svc ingress-nginx-controller -n ingress-nginx -o yaml
+            exit 1
+          fi
+
+          INGRESS_DOMAIN="argocd.bunnycloud.xyz"
+          echo "Ingress domain: $INGRESS_DOMAIN"
+
+          cp k8s/argocd/argocd-ingress.yaml k8s/argocd/argocd-ingress-patched.yaml
+          yq eval ".spec.rules[0].host = \"${INGRESS_DOMAIN}\"" -i k8s/argocd/argocd-ingress-patched.yaml
+          kubectl apply -f k8s/argocd/argocd-ingress-patched.yaml
+          echo "✅ Patched Ingress applied successfully."
+
+      - name: Apply ArgoCD LoadBalancer Service
+        run: kubectl apply -f k8s/argocd/argocd-svc.yaml
+
+      - name: Wait for Ingress LoadBalancer
+        run: |
+          echo "Waiting for Ingress LoadBalancer to be provisioned for argocd-server-ingress..."
+          INGRESS_HOSTNAME=""
+          # Increased timeout as Ingress LBs can take a few minutes
+          for i in {1..30}; do
+            INGRESS_HOSTNAME=$(kubectl get ingress argocd-server-ingress -n argocd -o jsonpath='{.status.loadBalancer.ingress[0].hostname}' 2>/dev/null)
+            if [ ! -z "$INGRESS_HOSTNAME" ]; then
+              echo "Ingress LoadBalancer found: $INGRESS_HOSTNAME"
+              break
+            fi
+            echo "Waiting for Ingress LoadBalancer... (attempt $i/30)"
+            sleep 20 # Wait a bit longer between checks
+          done
+
+          if [ -z "$INGRESS_HOSTNAME" ]; then
+            echo "Error: Ingress LoadBalancer for argocd-server-ingress not found after timeout."
+            kubectl get ingress argocd-server-ingress -n argocd -o yaml # For debugging
+            kubectl describe ingress argocd-server-ingress -n argocd # For debugging
+            exit 1
+          fi
+
+      - name: Delete existing ArgoCD DNS record (if exists)
+        run: |
+          ZONE_ID=$(aws route53 list-hosted-zones --query "HostedZones[?Name=='bunnycloud.xyz.'].Id" --output text | sed 's/\/hostedzone\///')
+          
+          echo "Checking for existing A or CNAME record..."
+          RECORD=$(aws route53 list-resource-record-sets \
+            --hosted-zone-id $ZONE_ID \
+            --query "ResourceRecordSets[?Name=='argocd.bunnycloud.xyz.'] | [?Type=='A' || Type=='CNAME']" \
+            --output json)
+          
+          if [[ "$RECORD" != "[]" ]]; then
+            echo "$RECORD" > existing_record.json
+            cat existing_record.json | jq '{Changes: [{Action: "DELETE", ResourceRecordSet: .[0]}]}' > delete-change-batch.json
+            
+            echo "Deleting existing record..."
+            aws route53 change-resource-record-sets --hosted-zone-id $ZONE_ID --change-batch file://delete-change-batch.json || echo "Delete failed (possibly due to mismatch)"
+          else
+            echo "No existing A or CNAME record found."
+          fi
+
+      - name: Update ArgoCD DNS record
+        run: |
+          # Get the LoadBalancer hostname
+          LB_HOSTNAME=$(kubectl get svc argocd-server-lb -n argocd -o jsonpath='{.status.loadBalancer.ingress[0].hostname}')
+          
+          if [ -z "$LB_HOSTNAME" ]; then
+            echo "Error: ArgoCD LoadBalancer not found"
+            exit 1
+          fi
+          
+          echo "ArgoCD LoadBalancer hostname: $LB_HOSTNAME"
+          
+          # Get the Route53 hosted zone ID
+          ZONE_ID=$(aws route53 list-hosted-zones --query "HostedZones[?Name=='bunnycloud.xyz.'].Id" --output text | sed 's/\/hostedzone\///')
+          echo "Route53 zone ID: $ZONE_ID"
+          
+          # Get the LoadBalancer's hosted zone ID
+          LB_ZONE_ID=$(aws elbv2 describe-load-balancers --query "LoadBalancers[?DNSName=='$LB_HOSTNAME'].CanonicalHostedZoneId" --output text)
+          
+          if [ -z "$LB_ZONE_ID" ] || [ "$LB_ZONE_ID" == "None" ]; then
+            echo "Trying classic ELB..."
+            LB_ZONE_ID=$(aws elb describe-load-balancers --query "LoadBalancerDescriptions[?DNSName=='$LB_HOSTNAME'].CanonicalHostedZoneNameID" --output text)
+          fi
+          
+          echo "LoadBalancer zone ID: $LB_ZONE_ID"
+          
+          # Update the Route53 record with an ALIAS record
+          CHANGE_BATCH='{
+            "Changes": [
+              {
+                "Action": "UPSERT",
+                "ResourceRecordSet": {
+                  "Name": "argocd.bunnycloud.xyz",
+                  "Type": "A",
+                  "AliasTarget": {
+                    "HostedZoneId": "'$LB_ZONE_ID'",
+                    "DNSName": "'$LB_HOSTNAME'",
+                    "EvaluateTargetHealth": true
+                  }
+                }
+              }
+            ]
+          }'
+          echo "Change batch: $CHANGE_BATCH"
+          
+          CHANGE_RESULT=$(aws route53 change-resource-record-sets --hosted-zone-id $ZONE_ID --change-batch "$CHANGE_BATCH")
+          echo "Change result: $CHANGE_RESULT"
+          
+          echo "DNS record updated for argocd.bunnycloud.xyz -> $LB_HOSTNAME"
+          
+          # Test the record using AWS nameservers
+          echo "Testing DNS record using AWS nameservers..."
+          aws route53 list-resource-record-sets --hosted-zone-id $ZONE_ID --query "ResourceRecordSets[?Name=='argocd.bunnycloud.xyz.']"
+          dig @ns-94.awsdns-11.com argocd.bunnycloud.xyz
+
+
+
+      # - name: Wait for SSL Certificate
+      #   run: |
+      #     echo "Waiting for SSL certificate for argocd.bunnycloud.xyz..."
+      #     # The secretName comes from your Ingress's tls section
+      #     CERT_SECRET_NAME="argocd-joel-cloud-tls" 
+      #     for i in {1..20}; do # ~10 minutes total
+      #       # Check if the secret exists and has data (tls.crt)
+      #       if kubectl get secret $CERT_SECRET_NAME -n argocd -o jsonpath='{.data.tls\.crt}' 2>/dev/null; then
+      #         echo "✅ SSL Certificate secret $CERT_SECRET_NAME found and contains data."
+      #         break
+      #       fi
+      #       echo "Waiting for certificate secret $CERT_SECRET_NAME to be populated by cert-manager... (attempt $i/20)"
+      #       sleep 30
+      #     done
+      #     kubectl get certificate -n argocd # List all certificates for debugging
+      #     kubectl describe certificate -n argocd -l "acme.cert-manager.io/order-name" # Find related orders
+      #     kubectl get secret $CERT_SECRET_NAME -n argocd -o yaml # Check the secret content
+
+      - name: Check and update EKS node security group
+        run: |
+          SG_ID=$(aws eks describe-cluster --name github-actions-eks-example --region ap-southeast-2 --query "cluster.resourcesVpcConfig.securityGroupIds[0]" --output text)
+          echo "Checking if security group allows inbound traffic on port 8080..."
+          
+          # Check if the rule exists
+          RULE_EXISTS=$(aws ec2 describe-security-groups --group-ids $SG_ID --query "SecurityGroups[0].IpPermissions[?FromPort==\`8080\` && ToPort==\`8080\` && IpProtocol==\`tcp\`]" --output text)
+          
+          # Note: This rule for port 8080 on nodes might be for a direct LoadBalancer service.
+          # If using an Ingress controller (like Nginx or AWS LBC), the relevant ports would be
+          # the NodePorts used by the Ingress controller service, and the ELB it creates should have access to them.
+          
+          if [ -z "$RULE_EXISTS" ]; then
+            echo "Adding rule to allow inbound traffic on port 8080..."
+            aws ec2 authorize-security-group-ingress \
+              --group-id $SG_ID \
+              --protocol tcp \
+              --port 8080 \
+              --cidr 0.0.0.0/0
+            echo "Rule added successfully"
+          else
+            echo "Rule already exists"
+          fi
+          
+      - name: Check domain nameserver delegation
+        run: |
+          echo "Checking nameserver delegation for bunnycloud.xyz..."
+          
+          # Get AWS Route53 nameservers for the zone
+          ZONE_ID=$(aws route53 list-hosted-zones --query "HostedZones[?Name=='bunnycloud.xyz.'].Id" --output text | sed 's/\/hostedzone\///')
+          AWS_NS=$(aws route53 get-hosted-zone --id $ZONE_ID --query "DelegationSet.NameServers" --output text)
+          echo "AWS Route53 nameservers for bunnycloud.xyz: $AWS_NS"
+          
+          # Get actual nameservers from public DNS
+          ACTUAL_NS=$(dig +short NS bunnycloud.xyz)
+          echo "Actual nameservers for bunnycloud.xyz: $ACTUAL_NS"
+          
+          # Check if they match
+          for NS in $AWS_NS; do
+            if ! echo "$ACTUAL_NS" | grep -q "$NS"; then
+              echo "⚠️ WARNING: AWS nameserver $NS not found in actual nameservers"
+            fi
+          done
+          
+          echo "To fix this issue, update the nameservers at your domain registrar (Strato) to use the AWS Route53 nameservers listed above."
+      - name: Test DNS record
+        run: |
+          echo "Testing DNS record for argocd.bunnycloud.xyz..."
+          dig argocd.bunnycloud.xyz
+          
+          echo "Waiting for DNS propagation..."
+          for i in {1..10}; do
+            IP=$(dig +short argocd.bunnycloud.xyz)
+            if [ ! -z "$IP" ]; then
+              echo "DNS record found: argocd.bunnycloud.xyz -> $IP"
+              break
+            fi
+            echo "Waiting for DNS propagation... (attempt $i/10)"
+            sleep 30
+          done
+          
+          # echo "Testing HTTPS access to argocd.bunnycloud.xyz..."
+          # curl -vL --max-time 20 https://argocd.bunnycloud.xyz || echo "HTTPS access failed"
+
+      - name: Check Route53 record
+        run: |
+          echo "Checking Route53 record for argocd.bunnycloud.xyz..."
+          # ZONE_ID=$(aws route53 list-hosted-zones --query "HostedZones[?Name=='bunnycloud.xyz.'].Id" --output text | sed 's/\/hostedzone\///')
+          ZONE_ID=$(aws route53 list-hosted-zones --query "HostedZones[?Name=='bunnycloud.xyz.'].Id" --output text | sed 's/\/hostedzone\///')
+          aws route53 list-resource-record-sets --hosted-zone-id $ZONE_ID --query "ResourceRecordSets[?Name=='argocd.bunnycloud.xyz.']"

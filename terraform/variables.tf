@@ -7,5 +7,5 @@ variable "aws_region" {
 variable "cluster_name" {
   description = "EKS Cluster name"
   type        = string
-  default     = "github-actions-eks"
+  default     = "github-actions-eks-example"
 }
