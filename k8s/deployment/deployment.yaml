@@ -1,32 +1,21 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: test-app
+  name: {{APP_NAME}}
+  labels:
+    app: {{APP_NAME}}
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: test
+      app: {{APP_NAME}}
   template:
     metadata:
       labels:
-        app: test
+        app: {{APP_NAME}}
     spec:
       containers:
-        - name: test-container
-          image: ${{ secrets.DOCKER_USERNAME }}/my-node-app:__BUILD_SHA__
+        - name: {{APP_NAME}}
+          image: your-dockerhub-username/{{APP_NAME}}:latest
           ports:
             - containerPort: 80
----
-apiVersion: v1
-kind: Service
-metadata:
-  name: test-service
-spec:
-  selector:
-    app: test
-  ports:
-    - protocol: TCP
-      port: 80
-      targetPort: 80
-  type: NodePort
