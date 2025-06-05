@@ -17,6 +17,10 @@ on:
   pull_request:
     branches: [ main, 'feature/*' ]
 
+env:
+  APP_NAME: ${{ github.event.repository.name }}
+  REGISTRY: docker.io/your-dockerhub-username
+
 jobs:
   buil-and-test:
     runs-on: ubuntu-latest
@@ -209,28 +213,6 @@ jobs:
           echo "Waiting for ingress-nginx controller pod to be ready..."
           kubectl rollout status deployment ingress-nginx-controller -n ingress-nginx --timeout=5m
 
-      - name: Install Cert-Manager
-        run: |
-          echo "Installing Cert-Manager..."
-          kubectl apply -f https://github.com/cert-manager/cert-manager/releases/latest/download/cert-manager.yaml
-          echo "Waiting for Cert-Manager pods to become ready..."
-          kubectl rollout status deployment cert-manager -n cert-manager --timeout=2m
-          kubectl rollout status deployment cert-manager-webhook -n cert-manager --timeout=2m
-          kubectl rollout status deployment cert-manager-cainjector -n cert-manager --timeout=2m
-
-      - name: Apply ClusterIssuer for Cert-Manager
-        run: |
-          echo "Applying Cert-Manager ClusterIssuer..."
-          # Ensure you have a ClusterIssuer manifest (e.g., k8s/argocd/argocd-certissuer.yaml)
-          # that defines how certificates are issued (e.g., using Let's Encrypt).
-          # Example: kubectl apply -f k8s/argocd/argocd-certissuer.yaml
-          # If you don't have one, you'll need to create it.
-          # For this example, I'll assume it exists at k8s/argocd/argocd-certissuer.yaml
-          if [ -f "k8s/argocd/argocd-certissuer.yaml" ]; then
-            kubectl apply -f k8s/argocd/argocd-certissuer.yaml
-          else
-            echo "Warning: ClusterIssuer manifest k8s/argocd/argocd-certissuer.yaml not found. SSL certificate issuance might fail."
-          fi
 
       - name: Install Argo CD
         run: |
@@ -372,7 +354,7 @@ jobs:
           echo "Testing DNS record using AWS nameservers..."
           aws route53 list-resource-record-sets --hosted-zone-id $ZONE_ID --query "ResourceRecordSets[?Name=='argocd.bunnycloud.xyz.']"
           dig @ns-94.awsdns-11.com argocd.bunnycloud.xyz
-          
+
       - name: Check and update EKS node security group
         run: |
           SG_ID=$(aws eks describe-cluster --name github-actions-eks-example --region ap-southeast-2 --query "cluster.resourcesVpcConfig.securityGroupIds[0]" --output text)
@@ -443,3 +425,87 @@ jobs:
           # ZONE_ID=$(aws route53 list-hosted-zones --query "HostedZones[?Name=='bunnycloud.xyz.'].Id" --output text | sed 's/\/hostedzone\///')
           ZONE_ID=$(aws route53 list-hosted-zones --query "HostedZones[?Name=='bunnycloud.xyz.'].Id" --output text | sed 's/\/hostedzone\///')
           aws route53 list-resource-record-sets --hosted-zone-id $ZONE_ID --query "ResourceRecordSets[?Name=='argocd.bunnycloud.xyz.']"
+
+  generate-argo-apps:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up Python and install Jinja2
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y python3 python3-pip
+        pip3 install jinja2-cli
+
+    - name: Detect new app folders
+      id: detect
+      run: |
+        echo "apps=$(ls apps/ | jq -R -s -c 'split("\n") | map(select(length > 0))')" >> $GITHUB_OUTPUT
+
+    - name: Generate manifests
+      run: |
+        mkdir -p k8s/argocd/applications
+        for app in $(echo '${{ steps.detect.outputs.apps }}' | jq -r '.[]'); do
+          OUTFILE="k8s/argocd/applications/${app}.yaml"
+          echo "Rendering $OUTFILE..."
+          jinja2 manifests/templates/argocd-app.yaml.j2 \
+            -D app_name="$app" \
+            -D github_repository="${{ github.repository }}" \
+            > "$OUTFILE"
+        done
+
+    - name: Commit & create PR
+      uses: peter-evans/create-pull-request@v5
+      with:
+        commit-message: "Generate ArgoCD Application manifests"
+        branch: auto/argo-apps
+        title: "Generate ArgoCD Application manifests"
+        body: |
+          This PR contains ArgoCD Application manifests for newly detected applications.
+          Each manifest was rendered using the provided Jinja2 template.
+          Please review the generated files under `k8s/argocd/applications/` before merging.
+
+  lint-and-deploy-helm:
+    needs: docker
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install Helm
+        run: |
+          curl https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
+
+      - name: Lint Helm charts
+        run: |
+          if [ -d "helm" ]; then
+            for chart in helm/*; do
+              if [ -d "$chart" ]; then
+                echo "Linting $chart..."
+                helm lint "$chart"
+              fi
+            done
+          fi
+
+      - name: Template Helm charts (dry-run render)
+        run: |
+          if [ -d "helm" ]; then
+            for chart in helm/*; do
+              if [ -d "$chart" ]; then
+                echo "Rendering $chart..."
+                helm template "$chart"
+              fi
+            done
+          fi
+
+      - name: Apply ArgoCD Application manifests
+        run: |
+          if [ -f "k8s/argocd/applications/nodejs.yaml" ]; then
+            kubectl apply -f k8s/argocd/applications/nodejs.yaml
+          else
+            echo "Node.js ArgoCD application manifest not found in k8s/argocd/applications."
+          fi

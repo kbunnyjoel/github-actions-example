@@ -1,0 +1,12 @@
+apiVersion: v2
+name: nodejs-app
+description: A Helm chart for deploying a Node.js application
+# This chart is used in the GitHub Actions example repository to demonstrate CI/CD with ArgoCD.
+# It deploys a simple Node.js application and is configured to work with ArgoCD.
+# The chart includes a deployment, service, and ingress resources.
+# The application is built using Node.js and serves a simple web page.
+# The chart is designed to be used in a Kubernetes cluster and can be customized using values.yaml.
+# The chart is compatible with Helm 3 and follows best practices for Helm chart development.
+# The chart is versioned and follows semantic versioning.
+# The chart is maintained in the GitHub repository and can be used as a reference for creating similar charts.
+version: 0.1.0
