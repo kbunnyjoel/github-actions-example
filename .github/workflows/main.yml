@@ -590,7 +590,7 @@ jobs:
           done
 
           echo "Port-forwarding service and checking health endpoint..."
-          kubectl port-forward svc/nodejs-service 8080:80 &
+          kubectl port-forward svc/nodejs-app 8080:80 &
           sleep 5
 
           for i in {1..10}; do
