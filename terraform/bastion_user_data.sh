@@ -52,14 +52,18 @@ rm -rf awscliv2.zip aws
 echo "INFO: Configuring kubectl for EKS cluster..."
 rm -rf /home/ec2-user/.kube
 mkdir -p /home/ec2-user/.kube
-aws eks update-kubeconfig --region ap-southeast-2 --name github-actions-eks-example --kubeconfig /home/ec2-user/.kube/config
+
+aws eks update-kubeconfig --region ap-southeast-2 --name github-actions-eks-example \
+  --kubeconfig /home/ec2-user/.kube/config
+
 chown -R ec2-user:ec2-user /home/ec2-user/.kube
 chmod 600 /home/ec2-user/.kube/config
 
 # Also configure for root user
 rm -rf /root/.kube
 mkdir -p /root/.kube
-aws eks update-kubeconfig --region ap-southeast-2 --name github-actions-eks-example --kubeconfig /root/.kube/config
+aws eks update-kubeconfig --region ap-southeast-2 --name github-actions-eks-example \
+  --kubeconfig /root/.kube/config
 
 echo "INFO: Tool installation complete."
 
