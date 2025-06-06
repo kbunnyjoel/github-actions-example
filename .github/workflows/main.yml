@@ -93,10 +93,6 @@ jobs:
       - name: Run Docker container in background
         run: docker run -d -p 3000:3000 --name live-app ${{ secrets.DOCKER_USERNAME }}/my-node-app:${{ github.sha }}
 
-      - name: Replace image tag with Git SHA
-        run: |
-          sed -i "s|__BUILD_SHA__|${{ github.sha }}|g" k8s/deployment/deployment.yaml
-
       - name: Wait for app to be ready
         run: |
           for i in {1..10}; do
