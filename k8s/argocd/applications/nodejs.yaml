@@ -1,20 +1,20 @@
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
-  name: my-app
-  namespace: argocd
+  name: nodejs-app
+  namespace: nodejs
 spec:
   project: default
   source:
     repoURL: https://github.com/{{ github_repository }}
     targetRevision: HEAD
-    path: apps/my-app/chart
+    path: apps/nodejs/chart
     helm:
       valueFiles:
         - values.yaml
   destination:
     server: https://kubernetes.default.svc
-    namespace: my-app
+    namespace: nodejs
   syncPolicy:
     automated:
       prune: true
