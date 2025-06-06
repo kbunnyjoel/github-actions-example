@@ -293,10 +293,11 @@ jobs:
             cat existing_record.json | jq '{Changes: [{Action: "DELETE", ResourceRecordSet: .[0]}]}' > delete-change-batch.json
             
             echo "Deleting existing record..."
-            aws route53 change-resource-record-sets --hosted-zone-id $ZONE_ID --change-batch file://delete-change-batch.json || echo "Delete failed (possibly due to mismatch)"
+            aws route53 change-resource-record-sets --hosted-zone-id $ZONE_ID --change-batch file://delete-change-batch.json
           else
-            echo "No existing A or CNAME record found."
+            echo "No existing record found to delete."
           fi
+
 
       - name: Update ArgoCD DNS record
         run: |
