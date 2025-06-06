@@ -40,17 +40,40 @@ curl -LO "https://dl.k8s.io/release/v1.29.0/bin/linux/amd64/kubectl"
 chmod +x kubectl
 sudo mv kubectl /usr/bin/kubectl
 
-# Install AWS CLI v2
-echo "INFO: Installing AWS CLI v2..."
-yum install -y unzip curl
+## Check AWS CLI version
+aws --version
+
+# Update AWS CLI if needed
 curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
 unzip -o awscliv2.zip
 sudo ./aws/install --update
 rm -rf awscliv2.zip aws
 
+# Test AWS CLI authentication with EKS
+echo "INFO: Testing AWS CLI authentication with EKS..."
+if aws eks get-token --cluster-name github-actions-eks-example --region ap-southeast-2; then
+  echo "INFO: Successfully authenticated with EKS cluster"
+else
+  echo "WARNING: Failed to authenticate with EKS cluster. Check IAM permissions."
+fi
+
 echo "INFO: Installing yq..."
 curl -L https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64 -o /usr/local/bin/yq
 chmod +x /usr/local/bin/yq
+
+# Configure kubectl for the EKS cluster
+echo "INFO: Setting up kubectl directories..."
+mkdir -p /home/ec2-user/.kube
+mkdir -p /root/.kube
+
+# Create placeholder kubeconfig files
+touch /home/ec2-user/.kube/config
+touch /root/.kube/config
+
+# Set proper permissions
+chown -R ec2-user:ec2-user /home/ec2-user/.kube
+chmod 600 /home/ec2-user/.kube/config
+chmod 600 /root/.kube/config
 
 echo "INFO: Tool installation complete."
 
@@ -77,15 +100,27 @@ EOF
 
 # Source the .bashrc file to make aliases available immediately
 echo "export HOME=/home/ec2-user" >> /home/ec2-user/.bash_profile
+echo "export KUBECONFIG=/home/ec2-user/.kube/config" >> /home/ec2-user/.bash_profile
 echo "source ~/.bashrc" >> /home/ec2-user/.bash_profile
 
+# Create a script to fix kubectl config on login
+cat > /home/ec2-user/fix-kubectl-config.sh << 'EOF'
+#!/bin/bash
 
-# Wait until kubeconfig files are present before patching
-for file in /home/ec2-user/.kube/config /root/.kube/config; do
-  timeout=60
-  while [ ! -f "$file" ] && [ $timeout -gt 0 ]; do
-    echo "Waiting for $file to be created..."
-    sleep 1
-    timeout=$((timeout - 1))
-  done
-done
+# Check if kubeconfig exists
+if [ -f ~/.kube/config ]; then
+  # Check if interactiveMode is missing
+  if ! grep -q "interactiveMode" ~/.kube/config; then
+    echo "Adding interactiveMode: Never to kubectl config..."
+    sed -i '/command: aws/i \      interactiveMode: Never' ~/.kube/config
+    echo "kubectl config updated successfully."
+  fi
+fi
+EOF
+
+chmod +x /home/ec2-user/fix-kubectl-config.sh
+chown ec2-user:ec2-user /home/ec2-user/fix-kubectl-config.sh
+
+# Add the fix script to .bashrc to run on login
+echo "# Fix kubectl config on login" >> /home/ec2-user/.bashrc
+echo "~/fix-kubectl-config.sh" >> /home/ec2-user/.bashrc
