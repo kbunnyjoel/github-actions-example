@@ -355,6 +355,60 @@ jobs:
           aws route53 list-resource-record-sets --hosted-zone-id $ZONE_ID --query "ResourceRecordSets[?Name=='argocd.bunnycloud.xyz.']"
           dig @ns-94.awsdns-11.com argocd.bunnycloud.xyz
 
+      - name: Update Nodejs App DNS record
+        env:
+          AWS_REGION: ap-southeast-2 # Ensure AWS_REGION is available
+        run: |
+          echo "Attempting to update DNS for Node.js application..."
+          # The NGINX Ingress ELB is shared. We need its hostname and canonical zone ID.
+          # This should ideally be fetched once and reused.
+          # Assuming ELB_HOSTNAME and LB_ZONE_ID might have been set by previous ArgoCD DNS step.
+          # If not, we re-fetch for the ingress-nginx-controller service.
+
+          # Get NGINX Ingress Controller ELB Hostname
+          NGINX_ELB_HOSTNAME=$(kubectl get svc ingress-nginx-controller -n ingress-nginx -o jsonpath='{.status.loadBalancer.ingress[0].hostname}' 2>/dev/null)
+          if [ -z "$NGINX_ELB_HOSTNAME" ]; then
+            echo "❌ Error: Could not fetch NGINX Ingress ELB Hostname for Node.js app DNS."
+            exit 1
+          fi
+          echo "NGINX Ingress ELB Hostname: $NGINX_ELB_HOSTNAME"
+
+          # Get NGINX Ingress ELB Canonical Hosted Zone ID
+          NGINX_LB_ZONE_ID=$(aws elbv2 describe-load-balancers --query "LoadBalancers[?DNSName=='$NGINX_ELB_HOSTNAME'].CanonicalHostedZoneId" --output text --region ${{ env.AWS_REGION }})
+          if [ -z "$NGINX_LB_ZONE_ID" ] || [ "$NGINX_LB_ZONE_ID" == "None" ]; then
+            echo "NGINX Ingress ELB not found as ALB/NLB, trying Classic ELB..."
+            NGINX_LB_ZONE_ID=$(aws elb describe-load-balancers --query "LoadBalancerDescriptions[?DNSName=='$NGINX_ELB_HOSTNAME'].CanonicalHostedZoneNameID" --output text --region ${{ env.AWS_REGION }})
+          fi
+          if [ -z "$NGINX_LB_ZONE_ID" ] || [ "$NGINX_LB_ZONE_ID" == "None" ]; then
+            echo "❌ Error: Could not fetch NGINX Ingress ELB CanonicalHostedZoneId for Node.js app DNS."
+            exit 1
+          fi
+          echo "NGINX Ingress ELB Canonical Zone ID: $NGINX_LB_ZONE_ID"
+
+          APP_DNS_NAME="nodejs.bunnycloud.xyz"
+          ROUTE53_HOSTED_ZONE_ID=$(aws route53 list-hosted-zones --query "HostedZones[?Name=='bunnycloud.xyz.'].Id" --output text | sed 's/\/hostedzone\///')
+
+          echo "Updating DNS for $APP_DNS_NAME to point to $NGINX_ELB_HOSTNAME (Zone ID: $NGINX_LB_ZONE_ID) in Hosted Zone $ROUTE53_HOSTED_ZONE_ID"
+
+          CHANGE_BATCH_APP='{
+            "Changes": [
+              {
+                "Action": "UPSERT",
+                "ResourceRecordSet": {
+                  "Name": "'"$APP_DNS_NAME"'",
+                  "Type": "A",
+                  "AliasTarget": {
+                    "HostedZoneId": "'"$NGINX_LB_ZONE_ID"'",
+                    "DNSName": "'"$NGINX_ELB_HOSTNAME"'",
+                    "EvaluateTargetHealth": true
+                  }
+                }
+              }
+            ]
+          }'
+          aws route53 change-resource-record-sets --hosted-zone-id "$ROUTE53_HOSTED_ZONE_ID" --change-batch "$CHANGE_BATCH_APP"
+          echo "✅ DNS record update initiated for $APP_DNS_NAME."
+
       - name: Check and update EKS node security group
         run: |
           SG_ID=$(aws eks describe-cluster --name github-actions-eks-example --region ap-southeast-2 --query "cluster.resourcesVpcConfig.securityGroupIds[0]" --output text)
