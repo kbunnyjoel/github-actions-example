@@ -48,6 +48,10 @@ unzip -o awscliv2.zip
 sudo ./aws/install --update
 rm -rf awscliv2.zip aws
 
+echo "INFO: Installing yq..."
+curl -L https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64 -o /usr/local/bin/yq
+chmod +x /usr/local/bin/yq
+
 # Configure kubectl for the EKS cluster
 echo "INFO: Configuring kubectl for EKS cluster..."
 rm -rf /home/ec2-user/.kube
@@ -62,7 +66,8 @@ sed -i 's/client.authentication.k8s.io\/v1alpha1/client.authentication.k8s.io\/v
 if command -v yq >/dev/null 2>&1; then
   yq -i '(.users[].user.exec).interactiveMode = "Never"' /home/ec2-user/.kube/config || true
 else
-  sed -i '/exec:/a \ \ \ \ interactiveMode: Never' /home/ec2-user/.kube/config
+  sed -i '/exec:/a \    interactiveMode: Never' /home/ec2-user/.kube/config
+  grep -A5 'exec:' /home/ec2-user/.kube/config | grep interactiveMode
 fi
 
 echo "INFO: Verifying kubeconfig version for ec2-user..."
@@ -81,12 +86,13 @@ aws eks update-kubeconfig --region ap-southeast-2 --name github-actions-eks-exam
   --kubeconfig /root/.kube/config
 
 
-sed -i 's/client.authentication.k8s.io\/v1alpha1/client.authentication.k8s.io\/v1/' ~/.kube/config
+sed -i 's/client.authentication.k8s.io\/v1alpha1/client.authentication.k8s.io\/v1/' /root/.kube/config
 # Add interactiveMode: Never to the exec section for root kubeconfig
 if command -v yq >/dev/null 2>&1; then
   yq -i '(.users[].user.exec).interactiveMode = "Never"' /root/.kube/config || true
 else
-  sed -i '/exec:/a \ \ \ \ interactiveMode: Never' /root/.kube/config
+  sed -i '/exec:/a \    interactiveMode: Never' /root/.kube/config
+  grep -A5 'exec:' /root/.kube/config | grep interactiveMode
 fi
 
 echo "INFO: Verifying kubeconfig version for root..."
