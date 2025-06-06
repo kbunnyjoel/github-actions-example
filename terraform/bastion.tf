@@ -75,9 +75,9 @@ resource "aws_instance" "bastion" {
   iam_instance_profile   = aws_iam_instance_profile.bastion_profile.name
 
   user_data = templatefile("${path.module}/bastion_user_data.sh", {
-    aws_region   = var.aws_region,
-    cluster_name = var.cluster_name,
-    KUBECTL_VERSION  = var.kubectl_version # or fetch dynamically via a variable if needed
+    aws_region      = var.aws_region,
+    cluster_name    = var.cluster_name,
+    KUBECTL_VERSION = var.kubectl_version # or fetch dynamically via a variable if needed
   })
   user_data_replace_on_change = true
 
