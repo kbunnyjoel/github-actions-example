@@ -56,6 +56,21 @@ mkdir -p /home/ec2-user/.kube
 aws eks update-kubeconfig --region ap-southeast-2 --name github-actions-eks-example \
   --kubeconfig /home/ec2-user/.kube/config
 
+
+sed -i 's/client.authentication.k8s.io\/v1alpha1/client.authentication.k8s.io\/v1/' /home/ec2-user/.kube/config
+# Add interactiveMode: Never to the exec section for ec2-user kubeconfig
+if command -v yq >/dev/null 2>&1; then
+  yq -i '(.users[].user.exec).interactiveMode = "Never"' /home/ec2-user/.kube/config || true
+else
+  sed -i '/exec:/a \ \ \ \ interactiveMode: Never' /home/ec2-user/.kube/config
+fi
+
+echo "INFO: Verifying kubeconfig version for ec2-user..."
+grep 'apiVersion:' /home/ec2-user/.kube/config
+
+echo "INFO: Confirmed updated exec apiVersion for ec2-user:"
+grep 'apiVersion:' /home/ec2-user/.kube/config
+
 chown -R ec2-user:ec2-user /home/ec2-user/.kube
 chmod 600 /home/ec2-user/.kube/config
 
@@ -64,6 +79,21 @@ rm -rf /root/.kube
 mkdir -p /root/.kube
 aws eks update-kubeconfig --region ap-southeast-2 --name github-actions-eks-example \
   --kubeconfig /root/.kube/config
+
+
+sed -i 's/client.authentication.k8s.io\/v1alpha1/client.authentication.k8s.io\/v1/' ~/.kube/config
+# Add interactiveMode: Never to the exec section for root kubeconfig
+if command -v yq >/dev/null 2>&1; then
+  yq -i '(.users[].user.exec).interactiveMode = "Never"' /root/.kube/config || true
+else
+  sed -i '/exec:/a \ \ \ \ interactiveMode: Never' /root/.kube/config
+fi
+
+echo "INFO: Verifying kubeconfig version for root..."
+grep 'apiVersion:' /root/.kube/config
+
+echo "INFO: Confirmed updated exec apiVersion for root:"
+grep 'apiVersion:' /root/.kube/config
 
 echo "INFO: Tool installation complete."
 
@@ -89,4 +119,6 @@ function argocd_url() {
 EOF
 
 # Source the .bashrc file to make aliases available immediately
+echo "export HOME=/home/ec2-user" >> /home/ec2-user/.bash_profile
+echo "export KUBECONFIG=/home/ec2-user/.kube/config" >> /home/ec2-user/.bash_profile
 echo "source ~/.bashrc" >> /home/ec2-user/.bash_profile
