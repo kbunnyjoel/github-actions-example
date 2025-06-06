@@ -517,7 +517,7 @@ jobs:
             OUTFILE="k8s/argocd/applications/${app}.yaml"
             echo "Rendering $OUTFILE..."
             jinja2 manifests/templates/argocd-app.yaml.j2 \
-              -D app_name="$app" \
+              -D app_name="$app" -D chart_path="apps/$app/chart" \
               -D github_repository="${{ github.repository }}" \
               > "$OUTFILE"
           done

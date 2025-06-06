@@ -3,7 +3,7 @@ apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
   name: {{ app_name }}
-  namespace: argocd
+  namespace: nodejs
 spec:
   project: default
   source:
@@ -15,7 +15,7 @@ spec:
         - values.yaml
   destination:
     server: https://kubernetes.default.svc
-    namespace: {{ app_name }}
+    namespace: nodejs
   syncPolicy:
     automated:
       prune: true
