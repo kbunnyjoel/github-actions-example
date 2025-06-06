@@ -519,7 +519,7 @@ jobs:
 
   lint-and-deploy-helm:
     if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
-    needs: docker
+    needs: [docker, deploy-argocd]
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
