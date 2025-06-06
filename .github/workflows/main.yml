@@ -11,11 +11,17 @@ on:
         description: 'Run Terraform? (true/false)'
         required: false
         default: 'true'
-
   push:
     branches: [ main ]
+    paths:
+      - 'apps/**'
+      - 'manifests/templates/**'
   pull_request:
     branches: [ main, 'feature/*' ]
+
+env:
+  APP_NAME: ${{ github.event.repository.name }}
+  REGISTRY: docker.io/your-dockerhub-username
 
 jobs:
   buil-and-test:
@@ -89,10 +95,6 @@ jobs:
       - name: Run Docker container in background
         run: docker run -d -p 3000:3000 --name live-app ${{ secrets.DOCKER_USERNAME }}/my-node-app:${{ github.sha }}
 
-      - name: Replace image tag with Git SHA
-        run: |
-          sed -i "s|__BUILD_SHA__|${{ github.sha }}|g" k8s/deployment/deployment.yaml
-
       - name: Wait for app to be ready
         run: |
           for i in {1..10}; do
@@ -140,7 +142,22 @@ jobs:
         working-directory: terraform
         if: github.event.inputs.destroy != 'true'
         run: terraform apply -auto-approve
-      
+
+      - name: Generate kubeconfig and upload
+        if: github.event.inputs.destroy != 'true'
+        run: |
+          mkdir -p /tmp/kubeconfig
+          aws eks update-kubeconfig --region ap-southeast-2 --name github-actions-eks-example --kubeconfig /tmp/kubeconfig/config
+        env:
+          AWS_REGION: ap-southeast-2
+        shell: bash
+
+      - name: Upload kubeconfig as artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: bastion-kubeconfig
+          path: /tmp/kubeconfig/config
+
       - name: Upload deployment_key.pem as artifact
         uses: actions/upload-artifact@v4
         with:
@@ -209,28 +226,6 @@ jobs:
           echo "Waiting for ingress-nginx controller pod to be ready..."
           kubectl rollout status deployment ingress-nginx-controller -n ingress-nginx --timeout=5m
 
-      - name: Install Cert-Manager
-        run: |
-          echo "Installing Cert-Manager..."
-          kubectl apply -f https://github.com/cert-manager/cert-manager/releases/latest/download/cert-manager.yaml
-          echo "Waiting for Cert-Manager pods to become ready..."
-          kubectl rollout status deployment cert-manager -n cert-manager --timeout=2m
-          kubectl rollout status deployment cert-manager-webhook -n cert-manager --timeout=2m
-          kubectl rollout status deployment cert-manager-cainjector -n cert-manager --timeout=2m
-
-      - name: Apply ClusterIssuer for Cert-Manager
-        run: |
-          echo "Applying Cert-Manager ClusterIssuer..."
-          # Ensure you have a ClusterIssuer manifest (e.g., k8s/argocd/argocd-certissuer.yaml)
-          # that defines how certificates are issued (e.g., using Let's Encrypt).
-          # Example: kubectl apply -f k8s/argocd/argocd-certissuer.yaml
-          # If you don't have one, you'll need to create it.
-          # For this example, I'll assume it exists at k8s/argocd/argocd-certissuer.yaml
-          if [ -f "k8s/argocd/argocd-certissuer.yaml" ]; then
-            kubectl apply -f k8s/argocd/argocd-certissuer.yaml
-          else
-            echo "Warning: ClusterIssuer manifest k8s/argocd/argocd-certissuer.yaml not found. SSL certificate issuance might fail."
-          fi
 
       - name: Install Argo CD
         run: |
@@ -313,10 +308,11 @@ jobs:
             cat existing_record.json | jq '{Changes: [{Action: "DELETE", ResourceRecordSet: .[0]}]}' > delete-change-batch.json
             
             echo "Deleting existing record..."
-            aws route53 change-resource-record-sets --hosted-zone-id $ZONE_ID --change-batch file://delete-change-batch.json || echo "Delete failed (possibly due to mismatch)"
+            aws route53 change-resource-record-sets --hosted-zone-id $ZONE_ID --change-batch file://delete-change-batch.json
           else
-            echo "No existing A or CNAME record found."
+            echo "No existing record found to delete."
           fi
+
 
       - name: Update ArgoCD DNS record
         run: |
@@ -372,7 +368,61 @@ jobs:
           echo "Testing DNS record using AWS nameservers..."
           aws route53 list-resource-record-sets --hosted-zone-id $ZONE_ID --query "ResourceRecordSets[?Name=='argocd.bunnycloud.xyz.']"
           dig @ns-94.awsdns-11.com argocd.bunnycloud.xyz
-          
+
+      - name: Update Nodejs App DNS record
+        env:
+          AWS_REGION: ap-southeast-2 # Ensure AWS_REGION is available
+        run: |
+          echo "Attempting to update DNS for Node.js application..."
+          # The NGINX Ingress ELB is shared. We need its hostname and canonical zone ID.
+          # This should ideally be fetched once and reused.
+          # Assuming ELB_HOSTNAME and LB_ZONE_ID might have been set by previous ArgoCD DNS step.
+          # If not, we re-fetch for the ingress-nginx-controller service.
+
+          # Get NGINX Ingress Controller ELB Hostname
+          NGINX_ELB_HOSTNAME=$(kubectl get svc ingress-nginx-controller -n ingress-nginx -o jsonpath='{.status.loadBalancer.ingress[0].hostname}' 2>/dev/null)
+          if [ -z "$NGINX_ELB_HOSTNAME" ]; then
+            echo "❌ Error: Could not fetch NGINX Ingress ELB Hostname for Node.js app DNS."
+            exit 1
+          fi
+          echo "NGINX Ingress ELB Hostname: $NGINX_ELB_HOSTNAME"
+
+          # Get NGINX Ingress ELB Canonical Hosted Zone ID
+          NGINX_LB_ZONE_ID=$(aws elbv2 describe-load-balancers --query "LoadBalancers[?DNSName=='$NGINX_ELB_HOSTNAME'].CanonicalHostedZoneId" --output text --region ${{ env.AWS_REGION }})
+          if [ -z "$NGINX_LB_ZONE_ID" ] || [ "$NGINX_LB_ZONE_ID" == "None" ]; then
+            echo "NGINX Ingress ELB not found as ALB/NLB, trying Classic ELB..."
+            NGINX_LB_ZONE_ID=$(aws elb describe-load-balancers --query "LoadBalancerDescriptions[?DNSName=='$NGINX_ELB_HOSTNAME'].CanonicalHostedZoneNameID" --output text --region ${{ env.AWS_REGION }})
+          fi
+          if [ -z "$NGINX_LB_ZONE_ID" ] || [ "$NGINX_LB_ZONE_ID" == "None" ]; then
+            echo "❌ Error: Could not fetch NGINX Ingress ELB CanonicalHostedZoneId for Node.js app DNS."
+            exit 1
+          fi
+          echo "NGINX Ingress ELB Canonical Zone ID: $NGINX_LB_ZONE_ID"
+
+          APP_DNS_NAME="nodejs.bunnycloud.xyz"
+          ROUTE53_HOSTED_ZONE_ID=$(aws route53 list-hosted-zones --query "HostedZones[?Name=='bunnycloud.xyz.'].Id" --output text | sed 's/\/hostedzone\///')
+
+          echo "Updating DNS for $APP_DNS_NAME to point to $NGINX_ELB_HOSTNAME (Zone ID: $NGINX_LB_ZONE_ID) in Hosted Zone $ROUTE53_HOSTED_ZONE_ID"
+
+          CHANGE_BATCH_APP='{
+            "Changes": [
+              {
+                "Action": "UPSERT",
+                "ResourceRecordSet": {
+                  "Name": "'"$APP_DNS_NAME"'",
+                  "Type": "A",
+                  "AliasTarget": {
+                    "HostedZoneId": "'"$NGINX_LB_ZONE_ID"'",
+                    "DNSName": "'"$NGINX_ELB_HOSTNAME"'",
+                    "EvaluateTargetHealth": true
+                  }
+                }
+              }
+            ]
+          }'
+          aws route53 change-resource-record-sets --hosted-zone-id "$ROUTE53_HOSTED_ZONE_ID" --change-batch "$CHANGE_BATCH_APP"
+          echo "✅ DNS record update initiated for $APP_DNS_NAME."
+
       - name: Check and update EKS node security group
         run: |
           SG_ID=$(aws eks describe-cluster --name github-actions-eks-example --region ap-southeast-2 --query "cluster.resourcesVpcConfig.securityGroupIds[0]" --output text)
@@ -443,3 +493,111 @@ jobs:
           # ZONE_ID=$(aws route53 list-hosted-zones --query "HostedZones[?Name=='bunnycloud.xyz.'].Id" --output text | sed 's/\/hostedzone\///')
           ZONE_ID=$(aws route53 list-hosted-zones --query "HostedZones[?Name=='bunnycloud.xyz.'].Id" --output text | sed 's/\/hostedzone\///')
           aws route53 list-resource-record-sets --hosted-zone-id $ZONE_ID --query "ResourceRecordSets[?Name=='argocd.bunnycloud.xyz.']"
+
+  generate-argo-apps:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Python and install Jinja2
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y python3 python3-pip
+          pip3 install jinja2-cli
+      - name: Detect new app folders
+        id: detect
+        run: |
+          echo "apps=$(ls apps/ | jq -R -s -c 'split("\n") | map(select(length > 0))')" >> $GITHUB_OUTPUT
+      - name: Generate manifests
+        run: |
+          mkdir -p k8s/argocd/applications
+          for app in $(echo '${{ steps.detect.outputs.apps }}' | jq -r '.[]'); do
+            OUTFILE="k8s/argocd/applications/${app}.yaml"
+            echo "Rendering $OUTFILE..."
+            jinja2 manifests/templates/argocd-app.yaml.j2 \
+              -D app_name="$app" -D chart_path="apps/$app/chart" \
+              -D github_repository="${{ github.repository }}" \
+              > "$OUTFILE"
+          done
+      - name: Commit & create PR
+        uses: peter-evans/create-pull-request@v5
+        with:
+          token: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
+          commit-message: "Generate ArgoCD Application manifests"
+          branch: auto/argo-apps
+          title: "Generate ArgoCD Application manifests"
+          body: |
+            This PR contains ArgoCD Application manifests for newly detected applications.
+            Each manifest was rendered using the provided Jinja2 template.
+            Please review the generated files under `k8s/argocd/applications/` before merging.
+
+  lint-and-deploy-helm:
+    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+    needs: [docker, deploy-argocd]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: Install Helm
+        run: |
+          curl https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
+      - name: Lint Helm charts
+        run: |
+          if [ -d "helm" ]; then
+            for chart in helm/*; do
+              if [ -d "$chart" ]; then
+                echo "Linting $chart..."
+                helm lint "$chart"
+              fi
+            done
+          fi
+      - name: Template Helm charts (dry-run render)
+        run: |
+          if [ -d "helm" ]; then
+            for chart in helm/*; do
+              if [ -d "$chart" ]; then
+                echo "Rendering $chart..."
+                helm template "$chart"
+              fi
+            done
+          fi
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v3
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ap-southeast-2
+
+      - name: Configure kubeconfig for EKS
+        run: aws eks update-kubeconfig --region ap-southeast-2 --name github-actions-eks-example
+
+      - name: Apply ArgoCD Application manifests
+        run: |
+          if [ -f "k8s/argocd/applications/nodejs.yaml" ]; then
+            kubectl apply -f k8s/argocd/applications/nodejs.yaml
+          else
+            echo "Node.js ArgoCD application manifest not found in k8s/argocd/applications."
+          fi
+
+      - name: Wait for Node.js app to be ready
+        run: |
+          echo "Waiting for Node.js pod to be ready..."
+          for i in {1..30}; do
+            kubectl get pods -n default | grep nodejs | grep 'Running' && break
+            sleep 10
+          done
+
+          echo "Port-forwarding service and checking health endpoint..."
+          kubectl port-forward svc/nodejs-app 8080:80 &
+          sleep 5
+
+          for i in {1..10}; do
+            curl --fail http://localhost:8080/status && echo "✅ App is healthy" && exit 0
+            echo "Waiting for app to respond... ($i/10)"
+            sleep 5
+          done
+
+          echo "❌ App did not become healthy in time"
+          exit 1

@@ -13,7 +13,7 @@ chmod 400 "$KEY_PATH"
 # Get bastion IP from AWS
 echo "Fetching bastion IP from AWS..."
 BASTION_IP=$(aws ec2 describe-instances \
-  --filters "Name=tag:Name,Values=bastion" "Name=instance-state-name,Values=running" \
+  --filters "Name=tag:Name,Values=bastion-host" "Name=instance-state-name,Values=running" \
   --query "Reservations[0].Instances[0].PublicIpAddress" \
   --output text)
 

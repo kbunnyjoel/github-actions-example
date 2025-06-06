@@ -1,0 +1,22 @@
+# manifests/templates/argocd-app.yaml.j2
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: {{ app_name }}
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/{{ github_repository }}
+    targetRevision: HEAD
+    path: apps/{{ app_name }}/chart
+    helm:
+      valueFiles:
+        - values.yaml
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: default
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true

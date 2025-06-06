@@ -145,7 +145,6 @@ module "eks" {
 resource "aws_eks_addon" "vpc_cni" {
   cluster_name             = module.eks.cluster_name
   addon_name               = "vpc-cni"
-  resolve_conflicts        = "OVERWRITE"
   service_account_role_arn = aws_iam_role.vpc_cni.arn
 
   # Use a simpler configuration without the unsupported parameter

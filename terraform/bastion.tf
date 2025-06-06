@@ -75,9 +75,11 @@ resource "aws_instance" "bastion" {
   iam_instance_profile   = aws_iam_instance_profile.bastion_profile.name
 
   user_data = templatefile("${path.module}/bastion_user_data.sh", {
-    aws_region   = "ap-southeast-2",
-    cluster_name = "github-actions-eks-example"
+    aws_region      = var.aws_region,
+    cluster_name    = var.cluster_name,
+    KUBECTL_VERSION = var.kubectl_version # or fetch dynamically via a variable if needed
   })
+  user_data_replace_on_change = true
 
   root_block_device {
     delete_on_termination = true
@@ -114,4 +116,52 @@ resource "aws_route53_record" "bastion_dns" {
   type    = "A"
   ttl     = 60 # Reduced TTL for faster propagation
   records = [aws_eip.bastion_eip.public_ip]
+}
+
+# Create a kubeconfig file locally
+# Update the kubeconfig template
+resource "local_file" "kubeconfig" {
+  content = templatefile("${path.module}/templates/kubeconfig.tpl", {
+    cluster_name     = var.cluster_name
+    cluster_endpoint = module.eks.cluster_endpoint
+    cluster_ca_data  = module.eks.cluster_certificate_authority_data
+    region           = var.aws_region
+    account_id       = data.aws_caller_identity.current.account_id
+    api_version      = "client.authentication.k8s.io/v1beta1" # Add this line
+  })
+  filename = "${path.module}/kubeconfig"
+}
+
+# Copy kubeconfig to bastion host
+resource "null_resource" "copy_kubeconfig" {
+  depends_on = [aws_instance.bastion, local_file.kubeconfig, aws_eip.bastion_eip]
+
+  provisioner "local-exec" {
+    command = <<-EOT
+      # Wait for SSH to be available
+      echo "Waiting for SSH to become available..."
+      for i in {1..30}; do
+        if ssh -i ./keys/deployment_key.pem -o StrictHostKeyChecking=no -o ConnectTimeout=5 ec2-user@${aws_eip.bastion_eip.public_ip} "echo SSH is ready"; then
+          echo "SSH is ready"
+          break
+        fi
+        echo "Attempt $i: SSH not ready yet, waiting 10 seconds..."
+        sleep 10
+        if [ $i -eq 30 ]; then
+          echo "Timed out waiting for SSH to become available"
+          exit 1
+        fi
+      done
+      
+      # Create .kube directory and copy kubeconfig
+      ssh -i ./keys/deployment_key.pem -o StrictHostKeyChecking=no ec2-user@${aws_eip.bastion_eip.public_ip} "mkdir -p ~/.kube"
+      scp -i ./keys/deployment_key.pem -o StrictHostKeyChecking=no ./kubeconfig ec2-user@${aws_eip.bastion_eip.public_ip}:/home/ec2-user/.kube/config
+      ssh -i ./keys/deployment_key.pem -o StrictHostKeyChecking=no ec2-user@${aws_eip.bastion_eip.public_ip} "chmod 600 ~/.kube/config && sudo mkdir -p /root/.kube && sudo cp ~/.kube/config /root/.kube/config"
+    EOT
+  }
+
+  triggers = {
+    bastion_id         = aws_instance.bastion.id
+    kubeconfig_content = local_file.kubeconfig.content
+  }
 }

@@ -8,4 +8,4 @@ data:
     - rolearn: arn:aws:iam::806210429052:role/bastion-role
       username: bastion
       groups:
-        - system:masters
+      - system:masters
