@@ -158,23 +158,6 @@ jobs:
           name: bastion-kubeconfig
           path: /tmp/kubeconfig/config
 
-      - name: Copy kubeconfig to Bastion
-        if: github.event.inputs.destroy != 'true'
-        run: |
-          echo "Copying kubeconfig to Bastion..."
-          chmod 600 terraform/keys/deployment_key.pem
-          scp -i terraform/keys/deployment_key.pem -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
-            /tmp/kubeconfig/config ec2-user@${{ secrets.BASTION_HOST }}:/home/ec2-user/.kube/config
-          
-          # Patch the kubeconfig on Bastion for compatibility
-          ssh -i terraform/keys/deployment_key.pem -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null ec2-user@${{ secrets.BASTION_HOST }} << 'EOF'
-            if ! grep -q "interactiveMode" ~/.kube/config; then
-              sed -i '/exec:/a \    interactiveMode: Never' ~/.kube/config
-            fi
-            chown -R ec2-user:ec2-user ~/.kube
-            chmod 600 ~/.kube/config
-          EOF
-      
       - name: Upload deployment_key.pem as artifact
         uses: actions/upload-artifact@v4
         with:
