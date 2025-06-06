@@ -75,9 +75,11 @@ resource "aws_instance" "bastion" {
   iam_instance_profile   = aws_iam_instance_profile.bastion_profile.name
 
   user_data = templatefile("${path.module}/bastion_user_data.sh", {
-    aws_region   = "ap-southeast-2",
-    cluster_name = "github-actions-eks-example"
+    aws_region   = var.aws_region,
+    cluster_name = var.cluster_name,
+    KUBECTL_VERSION  = var.kubectl_version # or fetch dynamically via a variable if needed
   })
+  user_data_replace_on_change = true
 
   root_block_device {
     delete_on_termination = true

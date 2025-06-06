@@ -1,23 +1,7 @@
 #!/bin/bash
+echo "MARKER: User data script started running at $(date)" >> /var/log/cloud-init-output.log
 set -e # Exit immediately if a command exits with a non-zero status.
 
-# Add a section to ensure the SSH server is properly configured
-cat << 'EOF' | sudo tee /etc/ssh/sshd_config.d/custom.conf
-Port 22
-ListenAddress 0.0.0.0
-PermitRootLogin no
-PubkeyAuthentication yes
-PasswordAuthentication no
-ChallengeResponseAuthentication no
-UsePAM yes
-X11Forwarding yes
-PrintMotd no
-AcceptEnv LANG LC_*
-Subsystem sftp /usr/libexec/openssh/sftp-server
-EOF
-
-# Restart SSH service to apply changes
-sudo systemctl restart sshd
 
 # Ensure the SSH key is properly set up
 mkdir -p /home/ec2-user/.ssh
@@ -43,15 +27,28 @@ yum update -y
 # Remove any existing kubectl and aws-iam-authenticator
 sudo rm -f /usr/bin/kubectl /usr/local/bin/kubectl /usr/bin/aws-iam-authenticator /usr/local/bin/aws-iam-authenticator
 
-# Install kubectl with a version that supports v1alpha1
-echo "INFO: Installing kubectl..."
-curl -LO "https://dl.k8s.io/release/v1.23.6/bin/linux/amd64/kubectl"
-chmod +x kubectl
-sudo mv kubectl /usr/bin/kubectl
-sudo ln -sf /usr/bin/kubectl /usr/local/bin/kubectl  # Create symlink in /usr/local/bin
-which kubectl || echo "Error: kubectl not found in PATH"
-kubectl version --client || echo "Error: kubectl command failed"
+echo "INFO: Installing kubectl version ${KUBECTL_VERSION}..."
 
+KUBECTL_URL="https://dl.k8s.io/release/${KUBECTL_VERSION}/bin/linux/amd64/kubectl"
+echo "Downloading from: $KUBECTL_URL"
+
+curl -fLo /tmp/kubectl "$KUBECTL_URL"
+
+if [ ! -s /tmp/kubectl ]; then
+  echo "ERROR: kubectl not downloaded correctly."
+  exit 1
+fi
+
+chmod +x /tmp/kubectl
+sudo mv /tmp/kubectl /usr/bin/kubectl
+
+echo "INFO: Verifying kubectl installation..."
+if ! command -v kubectl &>/dev/null; then
+  echo "ERROR: kubectl not found in PATH after installation."
+  exit 1
+fi
+
+kubectl version --client || echo "WARNING: kubectl installed but failed to run"
 
 ## Check AWS CLI version
 aws --version
@@ -74,7 +71,18 @@ echo "INFO: Installing yq..."
 curl -L https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64 -o /usr/local/bin/yq
 chmod +x /usr/local/bin/yq
 
+
 echo "INFO: Tool installation complete."
+
+echo "INFO: Installing Helm..."
+curl -fsSL https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
+export PATH=$PATH:/usr/local/bin
+echo 'export PATH=$PATH:/usr/local/bin' >> /home/ec2-user/.bash_profile
+if ! command -v helm &>/dev/null; then
+  echo "ERROR: helm installation failed"
+  exit 1
+fi
+helm version
 
 # Add Kubernetes aliases
 cat << 'EOF' >> /home/ec2-user/.bashrc
@@ -123,3 +131,4 @@ chown ec2-user:ec2-user /home/ec2-user/fix-kubectl-config.sh
 # Add the fix script to .bashrc to run on login
 echo "# Fix kubectl config on login" >> /home/ec2-user/.bashrc
 echo "~/fix-kubectl-config.sh" >> /home/ec2-user/.bashrc
+echo "MARKER: User data script completed at $(date)" >> /var/log/cloud-init-output.log
