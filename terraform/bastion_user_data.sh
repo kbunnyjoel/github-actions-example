@@ -31,28 +31,24 @@ echo "INFO: Starting package updates and tool installation..."
 echo "INFO: Running yum update..."
 yum update -y
 
-echo "INFO: Installing unzip and AWS CLI v2..."
+# Install kubectl with the correct version for your EKS cluster
+echo "INFO: Installing kubectl..."
+curl -LO "https://dl.k8s.io/release/v1.28.5/bin/linux/amd64/kubectl"
+chmod +x kubectl
+sudo mv kubectl /usr/bin/kubectl
+
+# Install AWS CLI v2 with the aws-iam-authenticator
+echo "INFO: Installing AWS CLI v2 and aws-iam-authenticator..."
 yum install -y unzip curl
 curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
-unzip -o awscliv2.zip # -o to overwrite without prompting if it exists
+unzip -o awscliv2.zip
 sudo ./aws/install
-rm -rf awscliv2.zip aws # Clean up installation files
+rm -rf awscliv2.zip aws
 
-# Install kubectl with a more reliable method
-echo "INFO: Installing kubectl..."
-curl -LO "https://dl.k8s.io/release/v1.29.2/bin/linux/amd64/kubectl"
-chmod +x kubectl
-sudo mv kubectl /usr/bin/kubectl  # Install directly to /usr/bin for simplicity
-
-# Verify kubectl installation
-which kubectl || echo "Error: kubectl not found in PATH"
-kubectl version --client || echo "Error: kubectl command failed"
-
-# Ensure .kube directory exists for ec2-user before configuring kubectl
-echo "INFO: Ensuring /home/ec2-user/.kube directory exists with correct permissions..."
-mkdir -p /home/ec2-user/.kube
-chown ec2-user:ec2-user /home/ec2-user/.kube
-chmod 700 /home/ec2-user/.kube
+# Install aws-iam-authenticator
+curl -Lo aws-iam-authenticator https://github.com/kubernetes-sigs/aws-iam-authenticator/releases/download/v0.6.11/aws-iam-authenticator_0.6.11_linux_amd64
+chmod +x ./aws-iam-authenticator
+sudo mv ./aws-iam-authenticator /usr/bin/aws-iam-authenticator
 
 # Configure kubectl for the EKS cluster
 echo "INFO: Configuring kubectl for EKS cluster..."
@@ -67,40 +63,13 @@ aws eks update-kubeconfig --region ap-southeast-2 --name github-actions-eks-exam
 echo "INFO: Tool installation complete."
 
 # Create a diagnostic script for the ec2-user
-echo "INFO: Creating diagnostic script /home/ec2-user/check_bastion_setup.sh..."
-cat << 'EOF' > /home/ec2-user/check_bastion_setup.sh
-#!/bin/bash
-echo "--- Bastion Setup Diagnostic ---"
-echo "Date: $(date)"
-echo ""
-echo "== Kubectl Status =="
-if command -v kubectl &> /dev/null; then
-    kubectl version --client --output=yaml
-else
-    echo "Error: kubectl command not found!"
-fi
-echo ""
-echo "== AWS CLI Status =="
-if command -v aws &> /dev/null; then
-    aws --version
-else
-    echo "Error: AWS CLI command not found!"
-fi
-echo ""
-echo "== EKS Cluster Access =="
-kubectl get nodes || echo "Error: Cannot access EKS cluster"
-EOF
-
-chmod +x /home/ec2-user/check_bastion_setup.sh
-chown ec2-user:ec2-user /home/ec2-user/check_bastion_setup.sh
-
-# Add helper function to access ArgoCD
+# Add Kubernetes aliases
 cat << 'EOF' >> /home/ec2-user/.bashrc
 # Kubernetes aliases
-alias k=kubectl
-alias kgp='kubectl get pods'
-alias kgs='kubectl get services'
-alias kgi='kubectl get ingress'
+alias k="kubectl"
+alias kgp="kubectl get pods"
+alias kgs="kubectl get services"
+alias kgi="kubectl get ingress"
 
 # ArgoCD helper function
 function argocd_url() {
@@ -114,3 +83,6 @@ function argocd_url() {
   fi
 }
 EOF
+
+# Source the .bashrc file to make aliases available immediately
+echo "source ~/.bashrc" >> /home/ec2-user/.bash_profile
