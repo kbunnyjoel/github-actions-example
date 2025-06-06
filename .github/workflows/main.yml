@@ -508,6 +508,7 @@ jobs:
       - name: Commit & create PR
         uses: peter-evans/create-pull-request@v5
         with:
+          token: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
           commit-message: "Generate ArgoCD Application manifests"
           branch: auto/argo-apps
           title: "Generate ArgoCD Application manifests"
@@ -517,7 +518,7 @@ jobs:
             Please review the generated files under `k8s/argocd/applications/` before merging.
 
   lint-and-deploy-helm:
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
     needs: docker
     runs-on: ubuntu-latest
     steps:
