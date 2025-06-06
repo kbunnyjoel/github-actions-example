@@ -580,3 +580,24 @@ jobs:
           else
             echo "Node.js ArgoCD application manifest not found in k8s/argocd/applications."
           fi
+
+      - name: Wait for Node.js app to be ready
+        run: |
+          echo "Waiting for Node.js pod to be ready..."
+          for i in {1..30}; do
+            kubectl get pods -n default | grep nodejs | grep 'Running' && break
+            sleep 10
+          done
+
+          echo "Port-forwarding service and checking health endpoint..."
+          kubectl port-forward svc/nodejs-service 8080:80 &
+          sleep 5
+
+          for i in {1..10}; do
+            curl --fail http://localhost:8080/health && echo "✅ App is healthy" && exit 0
+            echo "Waiting for app to respond... ($i/10)"
+            sleep 5
+          done
+
+          echo "❌ App did not become healthy in time"
+          exit 1
