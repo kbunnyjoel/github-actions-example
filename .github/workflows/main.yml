@@ -11,9 +11,11 @@ on:
         description: 'Run Terraform? (true/false)'
         required: false
         default: 'true'
-
   push:
     branches: [ main ]
+    paths:
+      - 'apps/**'
+      - 'manifests/templates/**'
   pull_request:
     branches: [ main, 'feature/*' ]
 
@@ -481,55 +483,49 @@ jobs:
     permissions:
       contents: write
       pull-requests: write
-
     steps:
-    - uses: actions/checkout@v4
-
-    - name: Set up Python and install Jinja2
-      run: |
-        sudo apt-get update
-        sudo apt-get install -y python3 python3-pip
-        pip3 install jinja2-cli
-
-    - name: Detect new app folders
-      id: detect
-      run: |
-        echo "apps=$(ls apps/ | jq -R -s -c 'split("\n") | map(select(length > 0))')" >> $GITHUB_OUTPUT
-
-    - name: Generate manifests
-      run: |
-        mkdir -p k8s/argocd/applications
-        for app in $(echo '${{ steps.detect.outputs.apps }}' | jq -r '.[]'); do
-          OUTFILE="k8s/argocd/applications/${app}.yaml"
-          echo "Rendering $OUTFILE..."
-          jinja2 manifests/templates/argocd-app.yaml.j2 \
-            -D app_name="$app" \
-            -D github_repository="${{ github.repository }}" \
-            > "$OUTFILE"
-        done
-
-    - name: Commit & create PR
-      uses: peter-evans/create-pull-request@v5
-      with:
-        commit-message: "Generate ArgoCD Application manifests"
-        branch: auto/argo-apps
-        title: "Generate ArgoCD Application manifests"
-        body: |
-          This PR contains ArgoCD Application manifests for newly detected applications.
-          Each manifest was rendered using the provided Jinja2 template.
-          Please review the generated files under `k8s/argocd/applications/` before merging.
+      - uses: actions/checkout@v4
+      - name: Set up Python and install Jinja2
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y python3 python3-pip
+          pip3 install jinja2-cli
+      - name: Detect new app folders
+        id: detect
+        run: |
+          echo "apps=$(ls apps/ | jq -R -s -c 'split("\n") | map(select(length > 0))')" >> $GITHUB_OUTPUT
+      - name: Generate manifests
+        run: |
+          mkdir -p k8s/argocd/applications
+          for app in $(echo '${{ steps.detect.outputs.apps }}' | jq -r '.[]'); do
+            OUTFILE="k8s/argocd/applications/${app}.yaml"
+            echo "Rendering $OUTFILE..."
+            jinja2 manifests/templates/argocd-app.yaml.j2 \
+              -D app_name="$app" \
+              -D github_repository="${{ github.repository }}" \
+              > "$OUTFILE"
+          done
+      - name: Commit & create PR
+        uses: peter-evans/create-pull-request@v5
+        with:
+          commit-message: "Generate ArgoCD Application manifests"
+          branch: auto/argo-apps
+          title: "Generate ArgoCD Application manifests"
+          body: |
+            This PR contains ArgoCD Application manifests for newly detected applications.
+            Each manifest was rendered using the provided Jinja2 template.
+            Please review the generated files under `k8s/argocd/applications/` before merging.
 
   lint-and-deploy-helm:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     needs: docker
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-
       - name: Install Helm
         run: |
           curl https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
-
       - name: Lint Helm charts
         run: |
           if [ -d "helm" ]; then
@@ -540,7 +536,6 @@ jobs:
               fi
             done
           fi
-
       - name: Template Helm charts (dry-run render)
         run: |
           if [ -d "helm" ]; then
@@ -551,7 +546,6 @@ jobs:
               fi
             done
           fi
-
       - name: Apply ArgoCD Application manifests
         run: |
           if [ -f "k8s/argocd/applications/nodejs.yaml" ]; then
