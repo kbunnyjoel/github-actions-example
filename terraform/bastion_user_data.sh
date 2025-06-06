@@ -31,38 +31,38 @@ echo "INFO: Starting package updates and tool installation..."
 echo "INFO: Running yum update..."
 yum update -y
 
-# Install kubectl with the correct version for your EKS cluster
+# Remove any existing kubectl and aws-iam-authenticator
+sudo rm -f /usr/bin/kubectl /usr/local/bin/kubectl /usr/bin/aws-iam-authenticator /usr/local/bin/aws-iam-authenticator
+
+# Install kubectl with the exact version matching your EKS cluster
 echo "INFO: Installing kubectl..."
-curl -LO "https://dl.k8s.io/release/v1.28.5/bin/linux/amd64/kubectl"
+curl -LO "https://dl.k8s.io/release/v1.29.0/bin/linux/amd64/kubectl"
 chmod +x kubectl
 sudo mv kubectl /usr/bin/kubectl
 
-# Install AWS CLI v2 with the aws-iam-authenticator
-echo "INFO: Installing AWS CLI v2 and aws-iam-authenticator..."
+# Install AWS CLI v2
+echo "INFO: Installing AWS CLI v2..."
 yum install -y unzip curl
 curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
 unzip -o awscliv2.zip
-sudo ./aws/install
+sudo ./aws/install --update
 rm -rf awscliv2.zip aws
-
-# Install aws-iam-authenticator
-curl -Lo aws-iam-authenticator https://github.com/kubernetes-sigs/aws-iam-authenticator/releases/download/v0.6.11/aws-iam-authenticator_0.6.11_linux_amd64
-chmod +x ./aws-iam-authenticator
-sudo mv ./aws-iam-authenticator /usr/bin/aws-iam-authenticator
 
 # Configure kubectl for the EKS cluster
 echo "INFO: Configuring kubectl for EKS cluster..."
+rm -rf /home/ec2-user/.kube
 mkdir -p /home/ec2-user/.kube
 aws eks update-kubeconfig --region ap-southeast-2 --name github-actions-eks-example --kubeconfig /home/ec2-user/.kube/config
 chown -R ec2-user:ec2-user /home/ec2-user/.kube
 chmod 600 /home/ec2-user/.kube/config
 
 # Also configure for root user
-aws eks update-kubeconfig --region ap-southeast-2 --name github-actions-eks-example
+rm -rf /root/.kube
+mkdir -p /root/.kube
+aws eks update-kubeconfig --region ap-southeast-2 --name github-actions-eks-example --kubeconfig /root/.kube/config
 
 echo "INFO: Tool installation complete."
 
-# Create a diagnostic script for the ec2-user
 # Add Kubernetes aliases
 cat << 'EOF' >> /home/ec2-user/.bashrc
 # Kubernetes aliases
