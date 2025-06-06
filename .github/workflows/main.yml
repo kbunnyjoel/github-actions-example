@@ -547,6 +547,16 @@ jobs:
               fi
             done
           fi
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v3
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ap-southeast-2
+
+      - name: Configure kubeconfig for EKS
+        run: aws eks update-kubeconfig --region ap-southeast-2 --name github-actions-eks-example
+
       - name: Apply ArgoCD Application manifests
         run: |
           if [ -f "k8s/argocd/applications/nodejs.yaml" ]; then
