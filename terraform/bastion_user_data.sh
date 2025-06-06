@@ -52,55 +52,6 @@ echo "INFO: Installing yq..."
 curl -L https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64 -o /usr/local/bin/yq
 chmod +x /usr/local/bin/yq
 
-# Configure kubectl for the EKS cluster
-echo "INFO: Configuring kubectl for EKS cluster..."
-rm -rf /home/ec2-user/.kube
-mkdir -p /home/ec2-user/.kube
-
-aws eks update-kubeconfig --region ap-southeast-2 --name github-actions-eks-example \
-  --kubeconfig /home/ec2-user/.kube/config
-
-
-sed -i 's/client.authentication.k8s.io\/v1alpha1/client.authentication.k8s.io\/v1/' /home/ec2-user/.kube/config
-# Add interactiveMode: Never to the exec section for ec2-user kubeconfig
-if command -v yq >/dev/null 2>&1; then
-  yq -i '(.users[].user.exec).interactiveMode = "Never"' /home/ec2-user/.kube/config || true
-else
-  sed -i '/exec:/a \    interactiveMode: Never' /home/ec2-user/.kube/config
-  grep -A5 'exec:' /home/ec2-user/.kube/config | grep interactiveMode
-fi
-
-echo "INFO: Verifying kubeconfig version for ec2-user..."
-grep 'apiVersion:' /home/ec2-user/.kube/config
-
-echo "INFO: Confirmed updated exec apiVersion for ec2-user:"
-grep 'apiVersion:' /home/ec2-user/.kube/config
-
-chown -R ec2-user:ec2-user /home/ec2-user/.kube
-chmod 600 /home/ec2-user/.kube/config
-
-# Also configure for root user
-rm -rf /root/.kube
-mkdir -p /root/.kube
-aws eks update-kubeconfig --region ap-southeast-2 --name github-actions-eks-example \
-  --kubeconfig /root/.kube/config
-
-
-sed -i 's/client.authentication.k8s.io\/v1alpha1/client.authentication.k8s.io\/v1/' /root/.kube/config
-# Add interactiveMode: Never to the exec section for root kubeconfig
-if command -v yq >/dev/null 2>&1; then
-  yq -i '(.users[].user.exec).interactiveMode = "Never"' /root/.kube/config || true
-else
-  sed -i '/exec:/a \    interactiveMode: Never' /root/.kube/config
-  grep -A5 'exec:' /root/.kube/config | grep interactiveMode
-fi
-
-echo "INFO: Verifying kubeconfig version for root..."
-grep 'apiVersion:' /root/.kube/config
-
-echo "INFO: Confirmed updated exec apiVersion for root:"
-grep 'apiVersion:' /root/.kube/config
-
 echo "INFO: Tool installation complete."
 
 # Add Kubernetes aliases
@@ -126,5 +77,15 @@ EOF
 
 # Source the .bashrc file to make aliases available immediately
 echo "export HOME=/home/ec2-user" >> /home/ec2-user/.bash_profile
-echo "export KUBECONFIG=/home/ec2-user/.kube/config" >> /home/ec2-user/.bash_profile
 echo "source ~/.bashrc" >> /home/ec2-user/.bash_profile
+
+
+# Wait until kubeconfig files are present before patching
+for file in /home/ec2-user/.kube/config /root/.kube/config; do
+  timeout=60
+  while [ ! -f "$file" ] && [ $timeout -gt 0 ]; do
+    echo "Waiting for $file to be created..."
+    sleep 1
+    timeout=$((timeout - 1))
+  done
+done
