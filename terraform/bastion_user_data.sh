@@ -26,6 +26,15 @@ touch /home/ec2-user/.ssh/authorized_keys
 chmod 600 /home/ec2-user/.ssh/authorized_keys
 chown -R ec2-user:ec2-user /home/ec2-user/.ssh
 
+# Create kubectl config directories early
+mkdir -p /home/ec2-user/.kube
+mkdir -p /root/.kube
+touch /home/ec2-user/.kube/config
+touch /root/.kube/config
+chown -R ec2-user:ec2-user /home/ec2-user/.kube
+chmod 600 /home/ec2-user/.kube/config
+chmod 600 /root/.kube/config
+
 echo "INFO: Starting package updates and tool installation..."
 
 echo "INFO: Running yum update..."
@@ -34,11 +43,15 @@ yum update -y
 # Remove any existing kubectl and aws-iam-authenticator
 sudo rm -f /usr/bin/kubectl /usr/local/bin/kubectl /usr/bin/aws-iam-authenticator /usr/local/bin/aws-iam-authenticator
 
-# Install kubectl with the exact version matching your EKS cluster
+# Install kubectl with a version that supports v1alpha1
 echo "INFO: Installing kubectl..."
-curl -LO "https://dl.k8s.io/release/v1.29.0/bin/linux/amd64/kubectl"
+curl -LO "https://dl.k8s.io/release/v1.23.6/bin/linux/amd64/kubectl"
 chmod +x kubectl
 sudo mv kubectl /usr/bin/kubectl
+sudo ln -sf /usr/bin/kubectl /usr/local/bin/kubectl  # Create symlink in /usr/local/bin
+which kubectl || echo "Error: kubectl not found in PATH"
+kubectl version --client || echo "Error: kubectl command failed"
+
 
 ## Check AWS CLI version
 aws --version
@@ -60,20 +73,6 @@ fi
 echo "INFO: Installing yq..."
 curl -L https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64 -o /usr/local/bin/yq
 chmod +x /usr/local/bin/yq
-
-# Configure kubectl for the EKS cluster
-echo "INFO: Setting up kubectl directories..."
-mkdir -p /home/ec2-user/.kube
-mkdir -p /root/.kube
-
-# Create placeholder kubeconfig files
-touch /home/ec2-user/.kube/config
-touch /root/.kube/config
-
-# Set proper permissions
-chown -R ec2-user:ec2-user /home/ec2-user/.kube
-chmod 600 /home/ec2-user/.kube/config
-chmod 600 /root/.kube/config
 
 echo "INFO: Tool installation complete."
 

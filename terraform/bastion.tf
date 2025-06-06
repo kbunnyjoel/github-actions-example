@@ -139,7 +139,7 @@ resource "null_resource" "copy_kubeconfig" {
       # Wait for SSH to be available
       echo "Waiting for SSH to become available..."
       for i in {1..30}; do
-        if ssh -i ${path.module}/keys/deployment_key.pem -o StrictHostKeyChecking=no -o ConnectTimeout=5 ec2-user@${aws_eip.bastion_eip.public_ip} "echo SSH is ready"; then
+        if ssh -i ./keys/deployment_key.pem -o StrictHostKeyChecking=no -o ConnectTimeout=5 ec2-user@${aws_eip.bastion_eip.public_ip} "echo SSH is ready"; then
           echo "SSH is ready"
           break
         fi
@@ -151,9 +151,10 @@ resource "null_resource" "copy_kubeconfig" {
         fi
       done
       
-      # Copy kubeconfig
-      scp -i ${path.module}/keys/deployment_key.pem -o StrictHostKeyChecking=no ${path.module}/kubeconfig ec2-user@${aws_eip.bastion_eip.public_ip}:/home/ec2-user/.kube/config
-      ssh -i ${path.module}/keys/deployment_key.pem -o StrictHostKeyChecking=no ec2-user@${aws_eip.bastion_eip.public_ip} "chmod 600 /home/ec2-user/.kube/config && sudo mkdir -p /root/.kube && sudo cp /home/ec2-user/.kube/config /root/.kube/config"
+      # Create .kube directory and copy kubeconfig
+      ssh -i ./keys/deployment_key.pem -o StrictHostKeyChecking=no ec2-user@${aws_eip.bastion_eip.public_ip} "mkdir -p ~/.kube"
+      scp -i ./keys/deployment_key.pem -o StrictHostKeyChecking=no ./kubeconfig ec2-user@${aws_eip.bastion_eip.public_ip}:/home/ec2-user/.kube/config
+      ssh -i ./keys/deployment_key.pem -o StrictHostKeyChecking=no ec2-user@${aws_eip.bastion_eip.public_ip} "chmod 600 ~/.kube/config && sudo mkdir -p /root/.kube && sudo cp ~/.kube/config /root/.kube/config"
     EOT
   }
 
