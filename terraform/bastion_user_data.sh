@@ -48,8 +48,20 @@ sudo mv kubectl /usr/bin/kubectl  # Install directly to /usr/bin for simplicity
 which kubectl || echo "Error: kubectl not found in PATH"
 kubectl version --client || echo "Error: kubectl command failed"
 
+# Ensure .kube directory exists for ec2-user before configuring kubectl
+echo "INFO: Ensuring /home/ec2-user/.kube directory exists with correct permissions..."
+mkdir -p /home/ec2-user/.kube
+chown ec2-user:ec2-user /home/ec2-user/.kube
+chmod 700 /home/ec2-user/.kube
+
 # Configure kubectl for the EKS cluster
 echo "INFO: Configuring kubectl for EKS cluster..."
+mkdir -p /home/ec2-user/.kube
+aws eks update-kubeconfig --region ap-southeast-2 --name github-actions-eks-example --kubeconfig /home/ec2-user/.kube/config
+chown -R ec2-user:ec2-user /home/ec2-user/.kube
+chmod 600 /home/ec2-user/.kube/config
+
+# Also configure for root user
 aws eks update-kubeconfig --region ap-southeast-2 --name github-actions-eks-example
 
 echo "INFO: Tool installation complete."
