@@ -1,7 +1,7 @@
 // math.test.js
 
 // Import the function we want to test
-const { add } = require('./math');
+const { add } = require('../math');
 
 // Describe block groups related tests
 describe('Math functions', () => {

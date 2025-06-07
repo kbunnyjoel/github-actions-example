@@ -1,0 +1,88 @@
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(20px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes pop {
+    0%, 100% { transform: scale(1); }
+    50% { transform: scale(1.05); }
+}
+
+body {
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 100vh;
+    margin: 0;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+}
+
+.container {
+    background-color: #fff;
+    padding: 20px 40px;
+    border-radius: 8px;
+    box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+    text-align: center;
+    /* transition: transform 0.3s ease-in-out; // Can be removed if using keyframe animation */
+    animation: fadeIn 0.5s ease-out forwards;
+}
+
+h1 {
+    color: #333;
+    /* animation: fadeIn 0.5s ease-out 0.2s forwards; // Optional: delay h1 animation */
+    margin-bottom: 25px;
+}
+
+form input[type="text"] {
+    padding: 10px;
+    margin: 10px 5px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    transition: border-color 0.3s ease;
+}
+
+form input[type="text"]:focus {
+    border-color: #667eea;
+}
+
+form button {
+    padding: 10px 20px;
+    background-color: #5cb85c;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: background-color 0.3s ease, transform 0.2s ease;
+}
+
+form button:hover {
+    background-color: #4cae4c;
+    /* transform: translateY(-2px); // Replaced by pop animation */
+    animation: pop 0.3s ease-out;
+}
+
+.error {
+    color: red;
+    margin-top: 15px;
+}
+
+h2, .error { /* Apply fade-in to result and error messages */
+    margin-top: 20px;
+    color: #333;
+    font-weight: 500;
+    opacity: 0; /* Start hidden for animation */
+    animation: fadeIn 0.4s ease-out 0.3s forwards; /* Delay slightly */
+}
+
+.error {
+    color: red; /* Ensure error color is maintained */
+}
+
+footer {
+    position: absolute;
+    bottom: 10px;
+    width: 100%;
+    text-align: center;
+    color: rgba(255, 255, 255, 0.7);
+}

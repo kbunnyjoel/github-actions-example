@@ -89,19 +89,19 @@ jobs:
           context: .
           push: true
           tags: |
-            ${{ secrets.DOCKER_USERNAME }}/my-node-app:${{ github.sha }}
-            ghcr.io/${{ github.repository_owner }}/my-node-app:${{ github.sha }}
+            ${{ secrets.DOCKER_USERNAME }}/${{ env.APP_NAME }}:${{ github.sha }}
+            ghcr.io/${{ github.repository_owner }}/${{ env.APP_NAME }}:${{ github.sha }}
 
       - name: Run Docker container in background
-        run: docker run -d -p 3000:3000 --name live-app ${{ secrets.DOCKER_USERNAME }}/my-node-app:${{ github.sha }}
+        run: docker run -d -p 3000:3000 --name live-app ${{ secrets.DOCKER_USERNAME }}/${{ env.APP_NAME }}:${{ github.sha }}
 
       - name: Wait for app to be ready
         run: |
-          for i in {1..10}; do
+          for i in {1..20}; do
             curl --fail http://localhost:3000/status && exit 0
-            sleep 2
+            echo "Waiting for app to be ready ($i/20)..."
+            sleep 5
           done
-          echo "App did not become ready" && exit 1
 
   terraform-eks:
     if: ${{ github.event.inputs.run_terraform == 'true' }}
@@ -626,12 +626,8 @@ jobs:
             echo "Rendering $OUTFILE..."
     
             # Define image repository and tag
-            # Assuming your image name is 'my-node-app' for the 'nodejs' app.
-            # Adjust 'my-node-app' if your image name varies or is derived from $app.
-            APP_SPECIFIC_IMAGE_NAME="my-node-app" # Default or specific logic
-            if [ "$app" == "nodejs" ]; then
-              APP_SPECIFIC_IMAGE_NAME="my-node-app" # Explicit for nodejs app
-            fi
+            # Use app folder name as image name
+            APP_SPECIFIC_IMAGE_NAME="${app}" # Use app folder name as image name
             IMAGE_REPOSITORY="${{ secrets.DOCKER_USERNAME }}/${APP_SPECIFIC_IMAGE_NAME}"
             IMAGE_TAG="${{ github.sha }}"
             TARGET_REVISION_BRANCH="main" # Or derive from github.ref

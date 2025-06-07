@@ -1,34 +1,33 @@
 {
-  "name": "@kbunnyjoel/github-actions-example",
-  "version": "1.0.1",
-  "publishConfig": {
-    "registry": "https://npm.pkg.github.com/"
-  },
-  "description": "",
-  "main": "math.js",
+  "name": "github-actions-example",
+  "version": "1.0.0",
+  "description": "A simple addition app",
+  "main": "index.js",
   "scripts": {
-  "start": "node index.js",
-  "test": "jest --coverage",
-  "dev": "nodemon --watch . --ext js,json --exec node index.js"
+    "dev": "NODE_ENV=development nodemon index.js",
+    "start": "node index.js",
+    "test": "NODE_ENV=test jest",
+    "coverage": "NODE_ENV=test jest --coverage"
   },
-  "keywords": [],
-  "author": "",
+  "author": "Your Name",
   "license": "ISC",
+  "dependencies": {
+    "ejs": "^3.1.10",
+    "express": "^4.18.2"
+  },
   "devDependencies": {
+    "connect-livereload": "^0.6.1",
     "jest": "^29.7.0",
-    "nodemon": "^3.0.0"
+    "livereload": "^0.9.3",
+    "nodemon": "^3.1.10",
+    "supertest": "^7.1.1"
   },
   "jest": {
-    "collectCoverage": true,
-    "coverageReporters": [
-      "json",
-      "lcov",
-      "text",
-      "clover"
-    ],
-    "coverageDirectory": "coverage"
-  },
-  "dependencies": {
-    "express": "^5.1.0"
-  }
+  "collectCoverage": true,
+  "collectCoverageFrom": [
+    "index.js",
+    "math.js"
+  ],
+  "coverageDirectory": "coverage"
+}
 }
