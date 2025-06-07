@@ -1,0 +1,5 @@
+{
+  "watch": ["views/", "public/", "routes/", "index.js"],
+  "ext": "js,ejs,json,css,html",
+  "legacyWatch": true
+}

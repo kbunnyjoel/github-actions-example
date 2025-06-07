@@ -1,133 +1,56 @@
 const express = require('express');
+const path = require('path');
 const app = express();
-const port = 3000;
+const port = process.env.PORT || 3000;
 
-app.use(express.static('public'));
+// --- Live Reload Setup (for development) ---
+if (process.env.NODE_ENV !== 'production') {
+  const livereload = require('livereload');
+  const connectLiveReload = require('connect-livereload');
 
-app.get('/', (req, res) => {
-  res.send(`
-    <!DOCTYPE html>
-    <html>
-      <head>
-        <title>🎈 Cool Number Adder 🎈</title>
-        <link rel="icon" href="https://emojiapi.dev/api/v1/rocket/64.png" type="image/png">
-        <style>
-          body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            text-align: center;
-            margin-top: 50px;
-            background: linear-gradient(to right, #74ebd5, #acb6e5);
-            color: #333;
-          }
-          input, button {
-            padding: 15px;
-            margin: 10px;
-            font-size: 1.2em;
-            border-radius: 8px;
-            border: none;
-          }
-          button {
-            background-color: #ff7675;
-            color: white;
-            cursor: pointer;
-          }
-          @keyframes bounce {
-            0% { transform: scale(1); }
-            50% { transform: scale(1.1); }
-            100% { transform: scale(1); }
-          }
-          button:hover {
-            background-color: #d63031;
-            animation: bounce 0.3s ease-in-out;
-          }
-        </style>
-      </head>
-      <body>
-        <h1>🧪 Testing Nodemon Live Reload! 🧪</h1>
-        <form action="/add" method="get">
-          <input type="number" name="num1" placeholder="Enter first number" step="any" inputmode="decimal" required>
-          <input type="number" name="num2" placeholder="Enter second number" step="any" inputmode="decimal" required>
-          <br>
-          <button type="submit">💥 Add Numbers 💥</button>
-        </form>
-      </body>
-    </html>
-  `);
-});
+  // Create a livereload server instance
+  // It will watch files in 'public' and 'views' directories
+  const liveReloadServer = livereload.createServer();
+  liveReloadServer.watch(path.join(__dirname, 'public'));
+  liveReloadServer.watch(path.join(__dirname, 'views'));
 
-app.get('/add', (req, res) => {
-  const num1 = parseFloat(req.query.num1);
-  const num2 = parseFloat(req.query.num2);
-  if (isNaN(num1) || isNaN(num2)) {
-    return res.status(400).send(`
-      <!DOCTYPE html>
-      <html>
-        <head>
-          <title>Invalid Input</title>
-          <style>
-            body { font-family: sans-serif; text-align: center; margin-top: 50px; color: red; }
-          </style>
-        </head>
-        <body>
-          <h1>❌ Invalid input!</h1>
-          <p>Please enter valid numbers (decimals and negatives are allowed).</p>
-          <a href="/">🔙 Try Again</a>
-        </body>
-      </html>
-    `);
-  }
-  const result = num1 + num2;
+  // Use connect-livereload middleware to inject the client script
+  app.use(connectLiveReload());
 
-  res.send(`
-    <!DOCTYPE html>
-    <html>
-      <head>
-        <title>🎉 Result</title>
-        <link rel="icon" href="https://emojiapi.dev/api/v1/rocket/64.png" type="image/png">
-        <style>
-          body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            text-align: center;
-            margin-top: 50px;
-            background: linear-gradient(to right, #ffecd2, #fcb69f);
-            color: #2d3436;
-          }
-          .result {
-            font-size: 2em;
-            font-weight: bold;
-            color: #d63031;
-            animation: pop 0.6s ease-out;
-          }
-          @keyframes pop {
-            0% { transform: scale(0.7); opacity: 0; }
-            100% { transform: scale(1); opacity: 1; }
-          }
-          a {
-            display: inline-block;
-            margin-top: 20px;
-            text-decoration: none;
-            color: #0984e3;
-            font-weight: bold;
-          }
-        </style>
-      </head>
-      <body>
-        <h1>🚀 Live Result with Nodemon! 🚀</h1>
-        <p class="result">${num1} + ${num2} = ${result}</p>
-        <a href="/">🔙 Go Back</a>
-      </body>
-    </html>
-  `);
-});
-
-app.get('/status', (req, res) => {
-  res.json({ status: 'live', timestamp: new Date().toISOString() });
-});
-
-if (require.main === module) {
-  app.listen(port, () => {
-    console.log(`Server is running on http://localhost:${port}`);
+  // Refresh browser on server restart (after nodemon)
+  liveReloadServer.server.once("connection", () => {
+    setTimeout(() => liveReloadServer.refresh("/"), 100);
   });
 }
+// --- End Live Reload Setup ---
+// Set view engine to EJS
+app.set('view engine', 'ejs');
+app.set('views', path.join(__dirname, 'views'));
 
-module.exports = app;
+// Serve static files from 'public' directory
+app.use(express.static(path.join(__dirname, 'public')));
+app.use(express.urlencoded({ extended: true }));
+
+// Render the form
+app.get('/', (req, res) => {
+  res.render('index');
+});
+
+// Handle form submission
+app.post('/add', (req, res) => {
+  const { num1: num1Str, num2: num2Str } = req.body;
+  const num1 = parseFloat(num1Str);
+  const num2 = parseFloat(num2Str);
+
+  if (isNaN(num1) || isNaN(num2)) {
+    // If inputs are not valid numbers, re-render with an error message
+    return res.render('index', { error: 'Invalid input. Please enter numbers only.' });
+  }
+
+  const result = num1 + num2;
+  res.render('index', { result: result });
+});
+
+app.listen(port, () => {
+  console.log(`Server is running on http://localhost:${port}`);
+});
