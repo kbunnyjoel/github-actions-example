@@ -146,7 +146,7 @@ resource "null_resource" "bastion_config" {
   connection {
     type        = "ssh"
     user        = "ec2-user"
-    private_key = file("${path.module}/keys/deployment_key.pem")
+    private_key = tls_private_key.deployment_key.private_key_pem
     host        = aws_eip.bastion_eip.public_ip
   }
 
