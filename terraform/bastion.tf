@@ -73,6 +73,10 @@ resource "aws_instance" "bastion" {
   vpc_security_group_ids = [aws_security_group.bastion_sg.id]
   key_name               = aws_key_pair.deployment_key.key_name
   iam_instance_profile   = aws_iam_instance_profile.bastion_profile.name
+  user_data = templatefile("${path.module}/bastion_user_data.sh", {
+    KUBECTL_VERSION = var.kubectl_version,
+    HELM_VERSION    = var.helm_version
+  })
 
   root_block_device {
     delete_on_termination = true
@@ -86,6 +90,7 @@ resource "aws_instance" "bastion" {
   lifecycle {
     create_before_destroy = true
   }
+  depends_on = [module.eks]
 }
 
 # Allocate and associate an Elastic IP for the bastion
@@ -125,7 +130,7 @@ resource "local_file" "kubeconfig" {
 }
 
 # Copy kubeconfig to bastion host
-resource "null_resource" "copy_kubeconfig" {
+resource "null_resource" "bastion_config" {
   depends_on = [aws_instance.bastion, local_file.kubeconfig, aws_eip.bastion_eip]
 
   provisioner "local-exec" {
@@ -151,7 +156,6 @@ resource "null_resource" "copy_kubeconfig" {
       ssh -i ./keys/deployment_key.pem -o StrictHostKeyChecking=no ec2-user@${aws_eip.bastion_eip.public_ip} "chmod 600 ~/.kube/config && sudo mkdir -p /root/.kube && sudo cp ~/.kube/config /root/.kube/config"
     EOT
   }
-
   triggers = {
     bastion_id         = aws_instance.bastion.id
     kubeconfig_content = local_file.kubeconfig.content

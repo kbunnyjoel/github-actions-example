@@ -15,3 +15,9 @@ variable "kubectl_version" {
   default     = "v1.29.0"
   description = "The version of kubectl to install"
 }
+
+variable "helm_version" {
+  type        = string
+  description = "Version of Helm to install on the bastion host"
+  default     = "v3.14.0"
+}
