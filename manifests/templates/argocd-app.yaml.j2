@@ -54,7 +54,7 @@ spec:
 
         readinessProbe:
           httpGet:
-            path: /readyz # Your application's readiness probe endpoint
+            path: /status # Your application's readiness probe endpoint
             port: http    # This should refer to a named port in your Deployment spec
           initialDelaySeconds: 5
           periodSeconds: 10
