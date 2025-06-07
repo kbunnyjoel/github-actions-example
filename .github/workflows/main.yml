@@ -93,7 +93,7 @@ jobs:
             ghcr.io/${{ github.repository_owner }}/${{ env.APP_NAME }}:${{ github.sha }}
 
       - name: Run Docker container in background
-        run: docker run -d -p 3000:3000 --name live-app ${{ secrets.DOCKER_USERNAME }}/my-node-app:${{ github.sha }}
+        run: docker run -d -p 3000:3000 --name live-app ${{ secrets.DOCKER_USERNAME }}/${{ env.APP_NAME }}:${{ github.sha }}
 
       - name: Wait for app to be ready
         run: |
