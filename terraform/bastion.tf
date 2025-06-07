@@ -68,18 +68,11 @@ resource "aws_security_group" "bastion_sg" {
 # Bastion EC2 instance in public subnet
 resource "aws_instance" "bastion" {
   ami                    = data.aws_ami.amazon_linux.id
-  instance_type          = "t3.micro" # Changed from t3.small to t3.micro
+  instance_type          = "t3.micro"
   subnet_id              = module.vpc.public_subnets[0]
   vpc_security_group_ids = [aws_security_group.bastion_sg.id]
   key_name               = aws_key_pair.deployment_key.key_name
   iam_instance_profile   = aws_iam_instance_profile.bastion_profile.name
-
-  user_data = templatefile("${path.module}/bastion_user_data.sh", {
-    aws_region      = var.aws_region,
-    cluster_name    = var.cluster_name,
-    KUBECTL_VERSION = var.kubectl_version # or fetch dynamically via a variable if needed
-  })
-  user_data_replace_on_change = true
 
   root_block_device {
     delete_on_termination = true
@@ -89,12 +82,11 @@ resource "aws_instance" "bastion" {
   tags = {
     Name = "bastion-host"
   }
+
   lifecycle {
     create_before_destroy = true
   }
 }
-
-
 
 # Allocate and associate an Elastic IP for the bastion
 resource "aws_eip" "bastion_eip" {
