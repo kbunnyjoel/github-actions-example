@@ -616,12 +616,12 @@ jobs:
         run: |
           echo "Waiting for Node.js pod to be ready..."
           for i in {1..30}; do
-            kubectl get pods -n default | grep nodejs | grep 'Running' && break
+            kubectl get pods -n nodejs -l app.kubernetes.io/name=nodejs --field-selector=status.phase=Running && break # More specific selector
             sleep 10
           done
 
           echo "Port-forwarding service and checking health endpoint..."
-          kubectl port-forward svc/nodejs-app 8080:80 &
+          kubectl port-forward svc/nodejs-service -n nodejs 8080:3000 & # Forward to containerPort 3000, service port is 80
           sleep 5
 
           for i in {1..10}; do
