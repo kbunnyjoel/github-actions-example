@@ -89,11 +89,11 @@ jobs:
           context: .
           push: true
           tags: |
-            ${{ secrets.DOCKER_USERNAME }}/${{ env.APP_NAME }}:${{ github.sha }}
-            ghcr.io/${{ github.repository_owner }}/${{ env.APP_NAME }}:${{ github.sha }}
+            ${{ secrets.DOCKER_USERNAME }}/my-node-app:${{ github.sha }}
+            ghcr.io/${{ github.repository_owner }}/my-node-app:${{ github.sha }}
 
       - name: Run Docker container in background
-        run: docker run -d -p 3000:3000 --name live-app ${{ secrets.DOCKER_USERNAME }}/${{ env.APP_NAME }}:${{ github.sha }}
+        run: docker run -d -p 3000:3000 --name live-app ${{ secrets.DOCKER_USERNAME }}/my-node-app:${{ github.sha }}
 
       - name: Wait for app to be ready
         run: |
@@ -102,98 +102,6 @@ jobs:
             sleep 2
           done
           echo "App did not become ready" && exit 1
-
-  destroy-infrastructure:
-    if: github.event.inputs.destroy == 'true'
-    needs: [deploy-argocd]
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@v3
-        with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: ap-southeast-2
-
-      - name: Clean up resources before destroying infrastructure
-        run: |
-          echo "Cleaning up resources in VPC..."
-          
-          # Get VPC ID
-          VPC_ID=$(aws ec2 describe-vpcs --filters "Name=tag:Name,Values=eks-vpc" --query "Vpcs[0].VpcId" --output text)
-          echo "VPC ID: $VPC_ID"
-          
-          # Delete all load balancers in the VPC
-          echo "Deleting load balancers..."
-          LBS=$(aws elb describe-load-balancers --query "LoadBalancerDescriptions[?VPCId=='$VPC_ID'].LoadBalancerName" --output text)
-          for LB in $LBS; do
-            echo "Deleting load balancer $LB..."
-            aws elb delete-load-balancer --load-balancer-name $LB || true
-          done
-          
-          # Delete all target groups
-          echo "Deleting target groups..."
-          TGS=$(aws elbv2 describe-target-groups --query "TargetGroups[*].TargetGroupArn" --output text)
-          for TG in $TGS; do
-            echo "Deleting target group $TG..."
-            aws elbv2 delete-target-group --target-group-arn $TG || true
-          done
-          
-          # Get all subnets in the VPC
-          SUBNETS=$(aws ec2 describe-subnets --filters "Name=vpc-id,Values=$VPC_ID" --query "Subnets[*].SubnetId" --output text)
-          echo "Subnets: $SUBNETS"
-          
-          for SUBNET in $SUBNETS; do
-            echo "Cleaning up resources in subnet $SUBNET..."
-            
-            # Get all network interfaces in the subnet
-            NETWORK_INTERFACES=$(aws ec2 describe-network-interfaces --filters "Name=subnet-id,Values=$SUBNET" --query "NetworkInterfaces[*].NetworkInterfaceId" --output text)
-            
-            # Delete each network interface
-            for NI in $NETWORK_INTERFACES; do
-              echo "Checking network interface $NI..."
-              
-              # Check if the interface is attached
-              ATTACHMENT=$(aws ec2 describe-network-interfaces --network-interface-ids $NI --query "NetworkInterfaces[0].Attachment.AttachmentId" --output text)
-              
-              if [ "$ATTACHMENT" != "None" ] && [ ! -z "$ATTACHMENT" ]; then
-                echo "Detaching network interface $NI (attachment $ATTACHMENT)..."
-                aws ec2 detach-network-interface --attachment-id $ATTACHMENT --force || true
-                sleep 5
-              fi
-              
-              echo "Deleting network interface $NI..."
-              aws ec2 delete-network-interface --network-interface-id $NI || true
-            done
-          done
-          
-          # Release all Elastic IPs
-          echo "Releasing Elastic IPs..."
-          ALLOCATION_IDS=$(aws ec2 describe-addresses --query "Addresses[?AllocationId!=null].AllocationId" --output text)
-          for ALLOC_ID in $ALLOCATION_IDS; do
-            echo "Releasing Elastic IP $ALLOC_ID..."
-            aws ec2 disassociate-address --allocation-id $ALLOC_ID || true
-            sleep 2
-            aws ec2 release-address --allocation-id $ALLOC_ID || true
-          done
-          
-          # Wait for resources to be released
-          echo "Waiting for resources to be released..."
-          sleep 60
-
-
-      - name: Terraform Init
-        run: |
-          cd terraform
-          terraform init
-
-      - name: Terraform Destroy
-        run: |
-          cd terraform
-          terraform destroy -auto-approve
 
   terraform-eks:
     if: ${{ github.event.inputs.run_terraform == 'true' }}
@@ -256,6 +164,9 @@ jobs:
           name: deployment-key
           path: terraform/keys/deployment_key.pem
 
+      - name: Terraform Destroy
+        if: github.event.inputs.destroy == 'true'
+        run: terraform destroy -auto-approve
           
       - name: Install kubectl and check EKS status
         if: github.event.inputs.destroy != 'true'
@@ -595,6 +506,8 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y python3 python3-pip
           pip3 install jinja2-cli
+      # Ensure yq is installed if you need it for other YAML processing
+      # sudo wget https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64 -O /usr/bin/yq && sudo chmod +x /usr/bin/yq
       - name: Detect new app folders
         id: detect
         run: |
@@ -602,25 +515,54 @@ jobs:
       - name: Generate manifests
         run: |
           mkdir -p k8s/argocd/applications
-          for app in $(echo '${{ steps.detect.outputs.apps }}' | jq -r '.[]'); do
+          APPS_JSON='${{ steps.detect.outputs.apps }}'
+    
+          echo "$APPS_JSON" | jq -r '.[]' | while read app; do
             OUTFILE="k8s/argocd/applications/${app}.yaml"
             echo "Rendering $OUTFILE..."
+    
+            # Define image repository and tag
+            # Assuming your image name is 'my-node-app' for the 'nodejs' app.
+            # Adjust 'my-node-app' if your image name varies or is derived from $app.
+            APP_SPECIFIC_IMAGE_NAME="my-node-app" # Default or specific logic
+            if [ "$app" == "nodejs" ]; then
+              APP_SPECIFIC_IMAGE_NAME="my-node-app" # Explicit for nodejs app
+            fi
+            IMAGE_REPOSITORY="${{ secrets.DOCKER_USERNAME }}/${APP_SPECIFIC_IMAGE_NAME}"
+            IMAGE_TAG="${{ github.sha }}"
+            TARGET_REVISION_BRANCH="main" # Or derive from github.ref
+            DEPLOYMENT_NAMESPACE="$app" # Deploy each app to its own namespace, e.g., 'nodejs'
+    
             jinja2 manifests/templates/argocd-app.yaml.j2 \
               -D app_name="$app" -D chart_path="apps/$app/chart" \
-              -D github_repository="${{ github.repository }}" \
+              -D github_repository_url="${{ github.server_url }}/${{ github.repository }}" \
+              -D target_revision="$TARGET_REVISION_BRANCH" \
+              -D image_repository="$IMAGE_REPOSITORY" \
+              -D image_tag="$IMAGE_TAG" \
+              -D deployment_namespace="$DEPLOYMENT_NAMESPACE" \
               > "$OUTFILE"
+            echo "Generated manifest for $app:"
+            cat "$OUTFILE"
           done
-      - name: Commit & create PR
-        uses: peter-evans/create-pull-request@v5
+      - name: Commit generated ArgoCD Application manifests
+        env:
+          # Use PAT if GITHUB_TOKEN doesn't have push rights to main or if main is protected
+          # GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.PERSONAL_ACCESS_TOKEN }} # Assuming this PAT has repo write access
         with:
-          token: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
-          commit-message: "Generate ArgoCD Application manifests"
-          branch: auto/argo-apps
-          title: "Generate ArgoCD Application manifests"
-          body: |
-            This PR contains ArgoCD Application manifests for newly detected applications.
-            Each manifest was rendered using the provided Jinja2 template.
-            Please review the generated files under `k8s/argocd/applications/` before merging.
+          # This replaces the create-pull-request action.
+          # It commits directly to the branch the workflow is running on (e.g., 'main' after a PR merge).
+          git config --global user.name 'github-actions[bot]'
+          git config --global user.email 'github-actions[bot]@users.noreply.github.com'
+          git add k8s/argocd/applications/
+          # Commit and push only if there are changes
+          if ! git diff --staged --quiet; then
+            git commit -m "Generate/Update ArgoCD Application manifests for ${{ github.sha }}"
+            git push origin HEAD:${{ github.ref_name }} # Push to the current branch
+            echo "Committed and pushed ArgoCD Application manifests to ${{ github.ref_name }}."
+          else
+            echo "No changes to ArgoCD Application manifests to commit."
+          fi
 
   lint-and-deploy-helm:
     if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
