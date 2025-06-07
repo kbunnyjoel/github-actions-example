@@ -619,7 +619,7 @@ jobs:
           done
 
           echo "Port-forwarding service and checking health endpoint..."
-          kubectl port-forward svc/nodejs-service -n nodejs 8080:3000 & # Forward to containerPort 3000, service port is 80
+          kubectl port-forward svc/nodejs-service -n nodejs 8080:80 & # Forward to containerPort 8080, service port is 80
           sleep 5
 
           for i in {1..10}; do
