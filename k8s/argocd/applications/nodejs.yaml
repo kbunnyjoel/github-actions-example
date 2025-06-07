@@ -1,22 +1,69 @@
-# manifests/templates/argocd-app.yaml.j2
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
   name: nodejs
-  namespace: argocd
+  namespace: argocd # Your ArgoCD installation namespace
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io # Ensures Kubernetes resources are deleted when the ArgoCD Application is deleted
 spec:
-  project: default
+  project: default # Your ArgoCD project
   source:
-    repoURL: https://github.com/kbunnyjoel/github-actions-example
-    targetRevision: HEAD
-    path: apps/nodejs/chart
+    repoURL: https://github.com/kbunnyjoel/github-actions-example # URL of the Git repository where your Helm chart is located
+    targetRevision: main # Git branch/tag/commit to sync from
+    path: apps/nodejs/chart # Path to the Helm chart within the repository (e.g., apps/nodejs/chart)
     helm:
-      valueFiles:
-        - values.yaml
+      values: |
+        replicaCount: 1 # Default replica count, can be overridden
+        image:
+          repository: 1073286/my-node-app # Docker image repository (e.g., yourdockerhubusername/my-node-app)
+          tag: 96ac0326bb2e9bb157eb499875a76c5d00d06333 # Docker image tag (e.g., commit SHA or version)
+          pullPolicy: IfNotPresent
+
+        containerPort: 3000 # The port your Node.js application listens on inside the container
+
+        service:
+          name: nodejs-service # Dynamically set service name
+          type: ClusterIP
+          port: 80 # Service port
+          targetPort: 3000 # Port on the pod to forward traffic to (should match containerPort)
+
+        ingress:
+          enabled: true
+          className: "nginx" # Your Ingress controller's class name (e.g., "nginx", "alb")
+          host: "nodejs.bunnycloud.xyz" # Dynamically set hostname
+          # tls: # Uncomment and configure if you manage TLS certificates
+          #   - secretName: "nodejs-tls-secret" # Name of the Kubernetes secret containing TLS cert and key
+          #     hosts:
+          #       - "nodejs.bunnycloud.xyz"
+
+        # Define resource requests and limits for your application pods
+        resources: {} # Leave empty to use Helm chart defaults or override as needed
+        #  limits:
+        #    cpu: 200m
+        #    memory: 256Mi
+        #  requests:
+        #    cpu: 100m
+        #    memory: 128Mi
+
+        livenessProbe:
+          httpGet:
+            path: /status # Your application's liveness probe endpoint
+            port: http   # This should refer to a named port in your Deployment spec (e.g., name: http, containerPort: 3000)
+          initialDelaySeconds: 15
+          periodSeconds: 20
+
+        readinessProbe:
+          httpGet:
+            path: /readyz # Your application's readiness probe endpoint
+            port: http    # This should refer to a named port in your Deployment spec
+          initialDelaySeconds: 5
+          periodSeconds: 10
   destination:
-    server: https://kubernetes.default.svc
-    namespace: default
+    server: https://kubernetes.default.svc # Target Kubernetes API server
+    namespace: nodejs # Namespace to deploy the application into (e.g., "nodejs")
   syncPolicy:
     automated:
-      prune: true
-      selfHeal: true
+      prune: true # Automatically delete resources that are no longer defined in Git
+      selfHeal: true # Automatically sync if the live state drifts from the desired state in Git
+    syncOptions:
+    - CreateNamespace=true # Automatically create the target namespace if it doesn't exist
