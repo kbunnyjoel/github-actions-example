@@ -66,8 +66,8 @@ app.post('/add', (req, res) => {
   return res.status(200).json({ result: roundedResult });
 });
 
-const server = app.listen(port, () => {
-  console.log(`Server is running on http://localhost:${port}`);
+const server = app.listen(port, '0.0.0.0', () => {
+  console.log(`Server is running on http://0.0.0.0:${port}`);
 });
 
 // Export the app for supertest and server for explicit closing if needed
