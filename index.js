@@ -45,8 +45,8 @@ app.get('/', (req, res) => {
       <body>
         <h1>🧪 Testing Nodemon Live Reload! 🧪</h1>
         <form action="/add" method="get">
-          <input type="number" name="num1" placeholder="Enter first number" required>
-          <input type="number" name="num2" placeholder="Enter second number" required>
+          <input type="number" name="num1" placeholder="Enter first number" step="any" inputmode="decimal" required>
+          <input type="number" name="num2" placeholder="Enter second number" step="any" inputmode="decimal" required>
           <br>
           <button type="submit">💥 Add Numbers 💥</button>
         </form>
@@ -56,8 +56,26 @@ app.get('/', (req, res) => {
 });
 
 app.get('/add', (req, res) => {
-  const num1 = Number(req.query.num1 || 0);
-  const num2 = Number(req.query.num2 || 0);
+  const num1 = parseFloat(req.query.num1);
+  const num2 = parseFloat(req.query.num2);
+  if (isNaN(num1) || isNaN(num2)) {
+    return res.status(400).send(`
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <title>Invalid Input</title>
+          <style>
+            body { font-family: sans-serif; text-align: center; margin-top: 50px; color: red; }
+          </style>
+        </head>
+        <body>
+          <h1>❌ Invalid input!</h1>
+          <p>Please enter valid numbers (decimals and negatives are allowed).</p>
+          <a href="/">🔙 Try Again</a>
+        </body>
+      </html>
+    `);
+  }
   const result = num1 + num2;
 
   res.send(`
@@ -106,6 +124,10 @@ app.get('/status', (req, res) => {
   res.json({ status: 'live', timestamp: new Date().toISOString() });
 });
 
-app.listen(port, () => {
-  console.log(`Server is running on http://localhost:${port}`);
-});
+if (require.main === module) {
+  app.listen(port, () => {
+    console.log(`Server is running on http://localhost:${port}`);
+  });
+}
+
+module.exports = app;
