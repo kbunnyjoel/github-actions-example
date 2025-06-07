@@ -110,7 +110,7 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-        
+
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v3
         with:
@@ -126,18 +126,64 @@ jobs:
           VPC_ID=$(aws ec2 describe-vpcs --filters "Name=tag:Name,Values=eks-vpc" --query "Vpcs[0].VpcId" --output text)
           echo "VPC ID: $VPC_ID"
           
-          # Release all Elastic IPs in the VPC
+          # Delete all load balancers in the VPC
+          echo "Deleting load balancers..."
+          LBS=$(aws elb describe-load-balancers --query "LoadBalancerDescriptions[?VPCId=='$VPC_ID'].LoadBalancerName" --output text)
+          for LB in $LBS; do
+            echo "Deleting load balancer $LB..."
+            aws elb delete-load-balancer --load-balancer-name $LB || true
+          done
+          
+          # Delete all target groups
+          echo "Deleting target groups..."
+          TGS=$(aws elbv2 describe-target-groups --query "TargetGroups[*].TargetGroupArn" --output text)
+          for TG in $TGS; do
+            echo "Deleting target group $TG..."
+            aws elbv2 delete-target-group --target-group-arn $TG || true
+          done
+          
+          # Get all subnets in the VPC
+          SUBNETS=$(aws ec2 describe-subnets --filters "Name=vpc-id,Values=$VPC_ID" --query "Subnets[*].SubnetId" --output text)
+          echo "Subnets: $SUBNETS"
+          
+          for SUBNET in $SUBNETS; do
+            echo "Cleaning up resources in subnet $SUBNET..."
+            
+            # Get all network interfaces in the subnet
+            NETWORK_INTERFACES=$(aws ec2 describe-network-interfaces --filters "Name=subnet-id,Values=$SUBNET" --query "NetworkInterfaces[*].NetworkInterfaceId" --output text)
+            
+            # Delete each network interface
+            for NI in $NETWORK_INTERFACES; do
+              echo "Checking network interface $NI..."
+              
+              # Check if the interface is attached
+              ATTACHMENT=$(aws ec2 describe-network-interfaces --network-interface-ids $NI --query "NetworkInterfaces[0].Attachment.AttachmentId" --output text)
+              
+              if [ "$ATTACHMENT" != "None" ] && [ ! -z "$ATTACHMENT" ]; then
+                echo "Detaching network interface $NI (attachment $ATTACHMENT)..."
+                aws ec2 detach-network-interface --attachment-id $ATTACHMENT --force || true
+                sleep 5
+              fi
+              
+              echo "Deleting network interface $NI..."
+              aws ec2 delete-network-interface --network-interface-id $NI || true
+            done
+          done
+          
+          # Release all Elastic IPs
           echo "Releasing Elastic IPs..."
-          ALLOCATION_IDS=$(aws ec2 describe-addresses --filters "Name=domain,Values=vpc" --query "Addresses[?AssociationId!=null].AllocationId" --output text)
+          ALLOCATION_IDS=$(aws ec2 describe-addresses --query "Addresses[?AllocationId!=null].AllocationId" --output text)
           for ALLOC_ID in $ALLOCATION_IDS; do
             echo "Releasing Elastic IP $ALLOC_ID..."
             aws ec2 disassociate-address --allocation-id $ALLOC_ID || true
+            sleep 2
             aws ec2 release-address --allocation-id $ALLOC_ID || true
           done
           
           # Wait for resources to be released
           echo "Waiting for resources to be released..."
-          sleep 30
+          sleep 60
+
 
       - name: Terraform Init
         run: |
