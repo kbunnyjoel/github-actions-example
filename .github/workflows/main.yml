@@ -547,11 +547,9 @@ jobs:
       - name: Commit generated ArgoCD Application manifests
         env:
           # Use PAT if GITHUB_TOKEN doesn't have push rights to main or if main is protected
-          # GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GH_TOKEN: ${{ secrets.PERSONAL_ACCESS_TOKEN }} # Assuming this PAT has repo write access
-        with:
-          # This replaces the create-pull-request action.
-          # It commits directly to the branch the workflow is running on (e.g., 'main' after a PR merge).
+        run: |
+          # Commits directly to the branch the workflow is running on (e.g., 'main' after a PR merge).
           git config --global user.name 'github-actions[bot]'
           git config --global user.email 'github-actions[bot]@users.noreply.github.com'
           git add k8s/argocd/applications/
