@@ -4,7 +4,7 @@ const app = express();
 const port = process.env.PORT || 3000;
 
 // --- Live Reload Setup (for development) ---
-if (process.env.NODE_ENV !== 'production') {
+if (process.env.NODE_ENV === 'development') { // Only run in development
   const livereload = require('livereload');
   const connectLiveReload = require('connect-livereload');
 
@@ -30,6 +30,7 @@ app.set('views', path.join(__dirname, 'views'));
 // Serve static files from 'public' directory
 app.use(express.static(path.join(__dirname, 'public')));
 app.use(express.urlencoded({ extended: true }));
+app.use(express.json()); // Add this line to parse JSON request bodies
 
 // Render the form
 app.get('/', (req, res) => {
@@ -38,19 +39,36 @@ app.get('/', (req, res) => {
 
 // Handle form submission
 app.post('/add', (req, res) => {
-  const { num1: num1Str, num2: num2Str } = req.body;
-  const num1 = parseFloat(num1Str);
-  const num2 = parseFloat(num2Str);
+  const { num1, num2 } = req.body;
 
-  if (isNaN(num1) || isNaN(num2)) {
-    // If inputs are not valid numbers, re-render with an error message
-    return res.render('index', { error: 'Invalid input. Please enter numbers only.' });
+  if (
+    num1 === undefined || num2 === undefined ||
+    num1 === null || num2 === null ||
+    num1 === '' || num2 === ''
+  ) {
+    return res.status(400).json({ error: 'Both num1 and num2 are required and cannot be empty or missing.' });
   }
 
-  const result = num1 + num2;
-  res.render('index', { result: result });
+  const parsedNum1 = parseFloat(num1);
+  const parsedNum2 = parseFloat(num2);
+
+  const result = parsedNum1 + parsedNum2;
+
+  if (Number.isNaN(result)) {
+    return res.status(200).json({ result: NaN });
+  }
+
+  if (!Number.isFinite(result)) {
+    return res.status(200).json({ result: null });
+  }
+
+  const roundedResult = Math.round(result * 100000) / 100000;
+  return res.status(200).json({ result: roundedResult });
 });
 
-app.listen(port, () => {
+const server = app.listen(port, () => {
   console.log(`Server is running on http://localhost:${port}`);
 });
+
+// Export the app for supertest and server for explicit closing if needed
+module.exports = { app, server };
