@@ -21,7 +21,7 @@ on:
 
 env:
   APP_NAME: ${{ github.event.repository.name }}
-  REGISTRY: docker.io/your-dockerhub-username
+  REGISTRY: docker.io/${{ secrets.DOCKER_USERNAME }}
 
 jobs:
   buil-and-test:
@@ -102,6 +102,52 @@ jobs:
             sleep 2
           done
           echo "App did not become ready" && exit 1
+
+  destroy-infrastructure:
+    if: github.event.inputs.destroy == 'true'
+    needs: [deploy-argocd]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v3
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ap-southeast-2
+
+      - name: Clean up resources before destroying infrastructure
+        run: |
+          echo "Cleaning up resources in VPC..."
+          
+          # Get VPC ID
+          VPC_ID=$(aws ec2 describe-vpcs --filters "Name=tag:Name,Values=eks-vpc" --query "Vpcs[0].VpcId" --output text)
+          echo "VPC ID: $VPC_ID"
+          
+          # Release all Elastic IPs in the VPC
+          echo "Releasing Elastic IPs..."
+          ALLOCATION_IDS=$(aws ec2 describe-addresses --filters "Name=domain,Values=vpc" --query "Addresses[?AssociationId!=null].AllocationId" --output text)
+          for ALLOC_ID in $ALLOCATION_IDS; do
+            echo "Releasing Elastic IP $ALLOC_ID..."
+            aws ec2 disassociate-address --allocation-id $ALLOC_ID || true
+            aws ec2 release-address --allocation-id $ALLOC_ID || true
+          done
+          
+          # Wait for resources to be released
+          echo "Waiting for resources to be released..."
+          sleep 30
+
+      - name: Terraform Init
+        run: |
+          cd terraform
+          terraform init
+
+      - name: Terraform Destroy
+        run: |
+          cd terraform
+          terraform destroy -auto-approve
 
   terraform-eks:
     if: ${{ github.event.inputs.run_terraform == 'true' }}

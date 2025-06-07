@@ -1,9 +1,12 @@
 replicaCount: 1
 
 image:
-  repository: nginx
-  tag: latest
+  repository: your-docker-registry/your-nodejs-app # To be overridden by CI/CD
+  tag: "" # To be overridden by CI/CD with a specific version/commit SHA
   pullPolicy: IfNotPresent
+
+containerPort: 3000 # The port your Node.js application listens on inside the container
+
 
 service:
   name: nodejs-service
@@ -13,4 +16,35 @@ service:
 
 ingress:
   enabled: true
+  className: "nginx" # Specify your IngressClass if needed, e.g., "nginx", "alb"
   host: nodejs.bunnycloud.xyz
+  # tls:
+  #   - secretName: nodejs-tls-secret # Name of the Kubernetes secret containing TLS cert and key
+  #     hosts:
+  #       - nodejs.bunnycloud.xyz
+
+resources: {}
+  # We usually recommend not to specify default resources and to leave this as a conscious
+  # choice for the user. This also increases chances charts run on environments with
+  # constrained resources, such as Minikube. If you do want to specify resources, uncomment the
+  # following lines, adjust them as necessary, and remove the curly braces after 'resources:'.
+  # limits:
+  #   cpu: 100m
+  #   memory: 128Mi
+  # requests:
+  #   cpu: 100m
+  #   memory: 128Mi
+
+livenessProbe:
+  httpGet:
+    path: /status # Example path, adjust to your app's health check endpoint
+    port: http # Refers to the containerPort
+  initialDelaySeconds: 15
+  periodSeconds: 20
+
+readinessProbe:
+  httpGet:
+    path: /readyz # Example path, adjust to your app's readiness endpoint
+    port: http # Refers to the containerPort
+  initialDelaySeconds: 5
+  periodSeconds: 10
