@@ -16,7 +16,7 @@ spec:
         replicaCount: 1 # Default replica count, can be overridden
         image:
           repository: 1073286/my-node-app # Docker image repository (e.g., yourdockerhubusername/my-node-app)
-          tag: 96ac0326bb2e9bb157eb499875a76c5d00d06333 # Docker image tag (e.g., commit SHA or version)
+          tag: 02c744a9199a7d0a8721be94e549371cdb2acbc3 # Docker image tag (e.g., commit SHA or version)
           pullPolicy: IfNotPresent
 
         containerPort: 3000 # The port your Node.js application listens on inside the container
@@ -54,7 +54,7 @@ spec:
 
         readinessProbe:
           httpGet:
-            path: /readyz # Your application's readiness probe endpoint
+            path: /status # Your application's readiness probe endpoint
             port: http    # This should refer to a named port in your Deployment spec
           initialDelaySeconds: 5
           periodSeconds: 10
