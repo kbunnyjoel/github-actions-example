@@ -32,6 +32,11 @@ app.use(express.static(path.join(__dirname, 'public')));
 app.use(express.urlencoded({ extended: true }));
 app.use(express.json()); // Add this line to parse JSON request bodies
 
+// Health check endpoint
+app.get('/status', (req, res) => {
+  res.status(200).json({ status: 'ok' });
+});
+
 // Render the form
 app.get('/', (req, res) => {
   res.render('index');
