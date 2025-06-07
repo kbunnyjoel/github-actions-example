@@ -21,7 +21,7 @@ on:
 
 env:
   APP_NAME: ${{ github.event.repository.name }}
-  REGISTRY: docker.io/your-dockerhub-username
+  REGISTRY: docker.io/${{ secrets.DOCKER_USERNAME }}
 
 jobs:
   buil-and-test:
@@ -163,10 +163,6 @@ jobs:
         with:
           name: deployment-key
           path: terraform/keys/deployment_key.pem
-
-      - name: Terraform Destroy
-        if: github.event.inputs.destroy == 'true'
-        run: terraform destroy -auto-approve
           
       - name: Install kubectl and check EKS status
         if: github.event.inputs.destroy != 'true'
@@ -185,6 +181,114 @@ jobs:
           kubectl get componentstatuses
           echo "Listing kube-system pods..."
           kubectl get pods -n kube-system
+  
+  destroy-infrastructure:
+    if: github.event.inputs.destroy == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v3
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ap-southeast-2
+
+      - name: Install required tools
+        run: |
+          curl -LO "https://dl.k8s.io/release/v1.29.2/bin/linux/amd64/kubectl"
+          chmod +x kubectl && sudo mv kubectl /usr/local/bin/
+          aws eks update-kubeconfig --region ap-southeast-2 --name github-actions-eks-example || true
+
+      - name: Clean up Kubernetes resources
+        run: |
+          echo "Cleaning up Kubernetes resources..."
+          kubectl delete ingress --all --all-namespaces || true
+          kubectl delete service --all -n argocd || true
+          kubectl delete service --all -n ingress-nginx || true
+          kubectl delete deployment --all -n argocd || true
+          kubectl delete deployment --all -n ingress-nginx || true
+          kubectl delete namespace argocd || true
+          kubectl delete namespace ingress-nginx || true
+          sleep 30
+
+      - name: Clean up AWS resources
+        run: |
+          echo "Cleaning up AWS resources..."
+          
+          # Get VPC ID
+          VPC_ID=$(aws ec2 describe-vpcs --filters "Name=tag:Name,Values=eks-vpc" --query "Vpcs[0].VpcId" --output text || echo "")
+          if [ -z "$VPC_ID" ] || [ "$VPC_ID" == "None" ]; then
+            echo "VPC not found, skipping cleanup"
+            exit 0
+          fi
+          echo "VPC ID: $VPC_ID"
+          
+          # Delete all load balancers
+          echo "Deleting load balancers..."
+          aws elbv2 describe-load-balancers --query "LoadBalancers[*].LoadBalancerArn" --output text | tr '\t' '\n' | while read LB; do
+            if [ ! -z "$LB" ]; then
+              echo "Deleting load balancer $LB..."
+              aws elbv2 delete-load-balancer --load-balancer-arn $LB || true
+            fi
+          done
+          
+          # Wait for load balancers to be deleted
+          echo "Waiting for load balancers to be deleted..."
+          sleep 60
+          
+          # Release all Elastic IPs
+          echo "Releasing Elastic IPs..."
+          aws ec2 describe-addresses --query "Addresses[*].AllocationId" --output text | tr '\t' '\n' | while read ALLOC_ID; do
+            if [ ! -z "$ALLOC_ID" ]; then
+              echo "Releasing Elastic IP $ALLOC_ID..."
+              aws ec2 disassociate-address --allocation-id $ALLOC_ID || true
+              sleep 2
+              aws ec2 release-address --allocation-id $ALLOC_ID || true
+            fi
+          done
+          
+          # Get all subnets in the VPC
+          SUBNETS=$(aws ec2 describe-subnets --filters "Name=vpc-id,Values=$VPC_ID" --query "Subnets[*].SubnetId" --output text)
+          echo "Subnets: $SUBNETS"
+          
+          # Delete all network interfaces in each subnet
+          for SUBNET in $SUBNETS; do
+            echo "Cleaning up resources in subnet $SUBNET..."
+            aws ec2 describe-network-interfaces --filters "Name=subnet-id,Values=$SUBNET" --query "NetworkInterfaces[*].NetworkInterfaceId" --output text | tr '\t' '\n' | while read NI; do
+              if [ ! -z "$NI" ]; then
+                echo "Checking network interface $NI..."
+                ATTACHMENT=$(aws ec2 describe-network-interfaces --network-interface-ids $NI --query "NetworkInterfaces[0].Attachment.AttachmentId" --output text)
+                if [ "$ATTACHMENT" != "None" ] && [ ! -z "$ATTACHMENT" ]; then
+                  echo "Detaching network interface $NI (attachment $ATTACHMENT)..."
+                  aws ec2 detach-network-interface --attachment-id $ATTACHMENT --force || true
+                  sleep 5
+                fi
+                echo "Deleting network interface $NI..."
+                aws ec2 delete-network-interface --network-interface-id $NI || true
+              fi
+            done
+          done
+          
+          # Wait for resources to be released
+          echo "Waiting for resources to be released..."
+          sleep 60
+
+      - name: Install Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.11.0
+
+      - name: Terraform Init
+        working-directory: terraform
+        run: terraform init
+
+      - name: Terraform Destroy
+        working-directory: terraform
+        run: terraform destroy -auto-approve
+
       
   deploy-argocd:
     if: github.event.inputs.run_terraform == 'true' && github.event.inputs.destroy != 'true'
@@ -506,6 +610,8 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y python3 python3-pip
           pip3 install jinja2-cli
+      # Ensure yq is installed if you need it for other YAML processing
+      # sudo wget https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64 -O /usr/bin/yq && sudo chmod +x /usr/bin/yq
       - name: Detect new app folders
         id: detect
         run: |
@@ -513,25 +619,52 @@ jobs:
       - name: Generate manifests
         run: |
           mkdir -p k8s/argocd/applications
-          for app in $(echo '${{ steps.detect.outputs.apps }}' | jq -r '.[]'); do
+          APPS_JSON='${{ steps.detect.outputs.apps }}'
+    
+          echo "$APPS_JSON" | jq -r '.[]' | while read app; do
             OUTFILE="k8s/argocd/applications/${app}.yaml"
             echo "Rendering $OUTFILE..."
+    
+            # Define image repository and tag
+            # Assuming your image name is 'my-node-app' for the 'nodejs' app.
+            # Adjust 'my-node-app' if your image name varies or is derived from $app.
+            APP_SPECIFIC_IMAGE_NAME="my-node-app" # Default or specific logic
+            if [ "$app" == "nodejs" ]; then
+              APP_SPECIFIC_IMAGE_NAME="my-node-app" # Explicit for nodejs app
+            fi
+            IMAGE_REPOSITORY="${{ secrets.DOCKER_USERNAME }}/${APP_SPECIFIC_IMAGE_NAME}"
+            IMAGE_TAG="${{ github.sha }}"
+            TARGET_REVISION_BRANCH="main" # Or derive from github.ref
+            DEPLOYMENT_NAMESPACE="$app" # Deploy each app to its own namespace, e.g., 'nodejs'
+    
             jinja2 manifests/templates/argocd-app.yaml.j2 \
               -D app_name="$app" -D chart_path="apps/$app/chart" \
-              -D github_repository="${{ github.repository }}" \
+              -D github_repository_url="${{ github.server_url }}/${{ github.repository }}" \
+              -D target_revision="$TARGET_REVISION_BRANCH" \
+              -D image_repository="$IMAGE_REPOSITORY" \
+              -D image_tag="$IMAGE_TAG" \
+              -D deployment_namespace="$DEPLOYMENT_NAMESPACE" \
               > "$OUTFILE"
+            echo "Generated manifest for $app:"
+            cat "$OUTFILE"
           done
-      - name: Commit & create PR
-        uses: peter-evans/create-pull-request@v5
-        with:
-          token: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
-          commit-message: "Generate ArgoCD Application manifests"
-          branch: auto/argo-apps
-          title: "Generate ArgoCD Application manifests"
-          body: |
-            This PR contains ArgoCD Application manifests for newly detected applications.
-            Each manifest was rendered using the provided Jinja2 template.
-            Please review the generated files under `k8s/argocd/applications/` before merging.
+      - name: Commit generated ArgoCD Application manifests
+        env:
+          # Use PAT if GITHUB_TOKEN doesn't have push rights to main or if main is protected
+          GH_TOKEN: ${{ secrets.PERSONAL_ACCESS_TOKEN }} # Assuming this PAT has repo write access
+        run: |
+          # Commits directly to the branch the workflow is running on (e.g., 'main' after a PR merge).
+          git config --global user.name 'github-actions[bot]'
+          git config --global user.email 'github-actions[bot]@users.noreply.github.com'
+          git add k8s/argocd/applications/
+          # Commit and push only if there are changes
+          if ! git diff --staged --quiet; then
+            git commit -m "Generate/Update ArgoCD Application manifests for ${{ github.sha }}"
+            git push origin HEAD:${{ github.ref_name }} # Push to the current branch
+            echo "Committed and pushed ArgoCD Application manifests to ${{ github.ref_name }}."
+          else
+            echo "No changes to ArgoCD Application manifests to commit."
+          fi
 
   lint-and-deploy-helm:
     if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
@@ -585,12 +718,12 @@ jobs:
         run: |
           echo "Waiting for Node.js pod to be ready..."
           for i in {1..30}; do
-            kubectl get pods -n default | grep nodejs | grep 'Running' && break
+            kubectl get pods -n nodejs -l app.kubernetes.io/name=nodejs --field-selector=status.phase=Running && break # More specific selector
             sleep 10
           done
 
           echo "Port-forwarding service and checking health endpoint..."
-          kubectl port-forward svc/nodejs-app 8080:80 &
+          kubectl port-forward svc/nodejs-service -n nodejs 8080:80 & # Forward to containerPort 8080, service port is 80
           sleep 5
 
           for i in {1..10}; do

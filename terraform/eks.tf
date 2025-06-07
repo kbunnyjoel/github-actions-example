@@ -85,10 +85,6 @@ module "eks" {
     }
   }
 
-  # Add these lines at the module level, not inside eks_managed_node_groups
-  cluster_security_group_tags = {
-    "kubernetes.io/cluster/${var.cluster_name}" = "owned"
-  }
   eks_managed_node_groups = {
     spot-nodes = {
       desired_size   = 1
@@ -104,6 +100,7 @@ module "eks" {
         type = "spot"
       }
 
+      # Add block device mappings with delete_on_termination
       block_device_mappings = {
         xvda = {
           device_name = "/dev/xvda"
@@ -133,13 +130,17 @@ module "eks" {
   authentication_mode                      = "API_AND_CONFIG_MAP"
   enable_irsa                              = true
 
-  # Add IAM policies with least privilege principle
-  create_cluster_security_group = true
-  create_node_security_group    = true
+  # Add these lines for proper cleanup
+  cluster_security_group_tags = {
+    "kubernetes.io/cluster/${var.cluster_name}" = "owned"
+  }
+
   node_security_group_tags = {
     "kubernetes.io/cluster/${var.cluster_name}" = "owned"
   }
+
 }
+
 
 # Configure the VPC CNI add-on to delete ENIs on termination
 resource "aws_eks_addon" "vpc_cni" {
