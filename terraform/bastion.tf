@@ -53,8 +53,7 @@ resource "aws_security_group" "bastion_sg" {
     to_port     = 22
     protocol    = "tcp"
     cidr_blocks = [
-      format("%s/32", chomp(data.http.my_ip.response_body)),
-      "103.224.52.138/32", # Your current IP
+      "${chomp(data.http.my_ip.response_body)}/32", # Your current IP (89.187.162.91/32)
     ]
   }
 
