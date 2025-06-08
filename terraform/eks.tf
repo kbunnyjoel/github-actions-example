@@ -76,13 +76,17 @@ module "eks" {
   vpc_id = module.vpc.vpc_id
 
   # API access settings
-  cluster_endpoint_public_access  = false
+  cluster_endpoint_public_access  = true
   cluster_endpoint_private_access = true
+
+  # Add CloudWatch logging for worker nodes
+  cloudwatch_log_group_kms_key_id        = aws_kms_key.eks.arn
+  cloudwatch_log_group_retention_in_days = 14
 
   # Add cluster security group rules for external DNS
   cluster_security_group_additional_rules = {
     egress_dns_tcp = {
-      description = "Allow DNS resolution (TCP)"
+      description = "Allow DNS TCP"
       protocol    = "tcp"
       from_port   = 53
       to_port     = 53
@@ -90,7 +94,7 @@ module "eks" {
       cidr_blocks = [module.vpc.vpc_cidr_block]
     }
     egress_dns_udp = {
-      description = "Allow DNS resolution (UDP)"
+      description = "Allow DNS UDP"
       protocol    = "udp"
       from_port   = 53
       to_port     = 53
@@ -119,6 +123,14 @@ module "eks" {
       cidr_blocks = ["169.254.169.123/32"] # Amazon Time Sync Service
     }
 
+    ingress_self_all = {
+      description = "Node to node all ports/protocols"
+      protocol    = "-1"
+      from_port   = 0
+      to_port     = 0
+      type        = "ingress"
+      self        = true
+    }
     egress_ntp_udp = {
       description = "Allow NTP UDP"
       protocol    = "udp"
@@ -140,6 +152,24 @@ module "eks" {
       ]
     }
 
+    ingress_cluster_kubelet = {
+      description                   = "Cluster to node kubelet"
+      protocol                      = "tcp"
+      from_port                     = 10250
+      to_port                       = 10250
+      type                          = "ingress"
+      source_cluster_security_group = true
+    }
+
+    egress_https_internet = {
+      description      = "Allow HTTPS to internet for pulling images"
+      protocol         = "tcp"
+      from_port        = 443
+      to_port          = 443
+      type             = "egress"
+      cidr_blocks      = ["0.0.0.0/0"]
+      ipv6_cidr_blocks = ["::/0"]
+    }
     egress_dns_tcp = {
       description = "Allow DNS TCP to VPC DNS"
       protocol    = "tcp"
@@ -171,12 +201,19 @@ module "eks" {
 
   eks_managed_node_groups = {
     spot-nodes = {
-      desired_size   = 1
-      min_size       = 1
-      max_size       = 3
-      instance_types = ["t3a.medium", "t3.medium"]
-      capacity_type  = "SPOT"
-      key_name       = aws_key_pair.deployment_key.key_name
+      desired_size      = 1
+      min_size          = 1
+      max_size          = 3
+      instance_types    = ["t3a.medium", "t3.medium"]
+      capacity_type     = "SPOT"
+      key_name          = aws_key_pair.deployment_key.key_name
+      enable_monitoring = true
+
+      iam_role_additional_policies = {
+        AmazonEC2ContainerRegistryReadOnly = "arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryReadOnly"
+      }
+      # Add CloudWatch agent
+      bootstrap_extra_args = "--kubelet-extra-args '--node-labels=eks.amazonaws.com/nodegroup=spot-nodes,eks.amazonaws.com/nodegroup-image=ami-1234567890abcdef0'"
 
       # Add labels to identify these nodes
       labels = {
@@ -246,6 +283,36 @@ resource "aws_kms_key" "eks" {
   description             = "EKS Secret Encryption Key"
   deletion_window_in_days = 7
   enable_key_rotation     = true
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Sid    = "Enable IAM User Permissions"
+        Effect = "Allow"
+        Principal = {
+          AWS = "arn:aws:iam::${data.aws_caller_identity.current.account_id}:root"
+        }
+        Action   = "kms:*"
+        Resource = "*"
+      },
+      {
+        Sid    = "Allow CloudWatch Logs"
+        Effect = "Allow"
+        Principal = {
+          Service = "logs.${var.aws_region}.amazonaws.com"
+        }
+        Action = [
+          "kms:Encrypt*",
+          "kms:Decrypt*",
+          "kms:ReEncrypt*",
+          "kms:GenerateDataKey*",
+          "kms:Describe*"
+        ]
+        Resource = "*"
+      }
+    ]
+  })
 
   tags = {
     Name        = "eks-secrets-key"
