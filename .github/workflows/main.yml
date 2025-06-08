@@ -211,24 +211,18 @@ jobs:
         run: |
           # Get the EKS cluster security group ID
           CLUSTER_SG=$(aws eks describe-cluster --name github-actions-eks-example --query "cluster.resourcesVpcConfig.clusterSecurityGroupId" --output text)
+          echo "Cluster security group: $CLUSTER_SG"
           
-          # Add rule to allow GitHub Actions IP ranges
+          # Add rules using JSON format
           aws ec2 authorize-security-group-ingress \
             --group-id $CLUSTER_SG \
-            --protocol tcp \
-            --port 443 \
-            --cidr 140.82.112.0/20 \
-            --description "Allow GitHub Actions"
+            --ip-permissions '[{"IpProtocol": "tcp", "FromPort": 443, "ToPort": 443, "IpRanges": [{"CidrIp": "140.82.112.0/20", "Description": "Allow GitHub Actions"}]}]'
           
-          # Add additional GitHub IP ranges if needed
           aws ec2 authorize-security-group-ingress \
             --group-id $CLUSTER_SG \
-            --protocol tcp \
-            --port 443 \
-            --cidr 185.199.108.0/22 \
-            --description "Allow GitHub Actions"
+            --ip-permissions '[{"IpProtocol": "tcp", "FromPort": 443, "ToPort": 443, "IpRanges": [{"CidrIp": "185.199.108.0/22", "Description": "Allow GitHub Actions"}]}]'
         continue-on-error: true  # In case rules already exist
-        
+
       - name: Install kubectl and check EKS status
         if: github.event.inputs.destroy != 'true'
         run: |
