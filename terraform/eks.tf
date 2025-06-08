@@ -208,7 +208,6 @@ module "eks" {
       capacity_type     = "SPOT"
       key_name          = aws_key_pair.deployment_key.key_name
       enable_monitoring = true
-
       iam_role_additional_policies = {
         AmazonEC2ContainerRegistryReadOnly = "arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryReadOnly"
       }
