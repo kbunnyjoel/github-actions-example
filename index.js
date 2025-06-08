@@ -1,111 +1,79 @@
 const express = require('express');
+const path = require('path');
 const app = express();
-const port = 3000;
+const port = process.env.PORT || 3000;
 
-app.use(express.static('public'));
+// --- Live Reload Setup (for development) ---
+if (process.env.NODE_ENV === 'development') { // Only run in development
+  const livereload = require('livereload');
+  const connectLiveReload = require('connect-livereload');
 
-app.get('/', (req, res) => {
-  res.send(`
-    <!DOCTYPE html>
-    <html>
-      <head>
-        <title>🎈 Cool Number Adder 🎈</title>
-        <link rel="icon" href="https://emojiapi.dev/api/v1/rocket/64.png" type="image/png">
-        <style>
-          body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            text-align: center;
-            margin-top: 50px;
-            background: linear-gradient(to right, #74ebd5, #acb6e5);
-            color: #333;
-          }
-          input, button {
-            padding: 15px;
-            margin: 10px;
-            font-size: 1.2em;
-            border-radius: 8px;
-            border: none;
-          }
-          button {
-            background-color: #ff7675;
-            color: white;
-            cursor: pointer;
-          }
-          @keyframes bounce {
-            0% { transform: scale(1); }
-            50% { transform: scale(1.1); }
-            100% { transform: scale(1); }
-          }
-          button:hover {
-            background-color: #d63031;
-            animation: bounce 0.3s ease-in-out;
-          }
-        </style>
-      </head>
-      <body>
-        <h1>🧪 Testing Nodemon Live Reload! 🧪</h1>
-        <form action="/add" method="get">
-          <input type="number" name="num1" placeholder="Enter first number" required>
-          <input type="number" name="num2" placeholder="Enter second number" required>
-          <br>
-          <button type="submit">💥 Add Numbers 💥</button>
-        </form>
-      </body>
-    </html>
-  `);
-});
+  // Create a livereload server instance
+  // It will watch files in 'public' and 'views' directories
+  const liveReloadServer = livereload.createServer();
+  liveReloadServer.watch(path.join(__dirname, 'public'));
+  liveReloadServer.watch(path.join(__dirname, 'views'));
 
-app.get('/add', (req, res) => {
-  const num1 = Number(req.query.num1 || 0);
-  const num2 = Number(req.query.num2 || 0);
-  const result = num1 + num2;
+  // Use connect-livereload middleware to inject the client script
+  app.use(connectLiveReload());
 
-  res.send(`
-    <!DOCTYPE html>
-    <html>
-      <head>
-        <title>🎉 Result</title>
-        <link rel="icon" href="https://emojiapi.dev/api/v1/rocket/64.png" type="image/png">
-        <style>
-          body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            text-align: center;
-            margin-top: 50px;
-            background: linear-gradient(to right, #ffecd2, #fcb69f);
-            color: #2d3436;
-          }
-          .result {
-            font-size: 2em;
-            font-weight: bold;
-            color: #d63031;
-            animation: pop 0.6s ease-out;
-          }
-          @keyframes pop {
-            0% { transform: scale(0.7); opacity: 0; }
-            100% { transform: scale(1); opacity: 1; }
-          }
-          a {
-            display: inline-block;
-            margin-top: 20px;
-            text-decoration: none;
-            color: #0984e3;
-            font-weight: bold;
-          }
-        </style>
-      </head>
-      <body>
-        <h1>🚀 Live Result with Nodemon! 🚀</h1>
-        <p class="result">${num1} + ${num2} = ${result}</p>
-        <a href="/">🔙 Go Back</a>
-      </body>
-    </html>
-  `);
-});
+  // Refresh browser on server restart (after nodemon)
+  liveReloadServer.server.once("connection", () => {
+    setTimeout(() => liveReloadServer.refresh("/"), 100);
+  });
+}
+// --- End Live Reload Setup ---
+// Set view engine to EJS
+app.set('view engine', 'ejs');
+app.set('views', path.join(__dirname, 'views'));
 
+// Serve static files from 'public' directory
+app.use(express.static(path.join(__dirname, 'public')));
+app.use(express.urlencoded({ extended: true }));
+app.use(express.json()); // Add this line to parse JSON request bodies
+
+// Health check endpoint
 app.get('/status', (req, res) => {
-  res.json({ status: 'live', timestamp: new Date().toISOString() });
+  res.status(200).json({ status: 'ok' });
 });
 
-app.listen(port, () => {
-  console.log(`Server is running on http://localhost:${port}`);
+// Render the form
+app.get('/', (req, res) => {
+  res.render('index');
 });
+
+// Handle form submission
+app.post('/add', (req, res) => {
+  const { num1, num2 } = req.body;
+
+  if (
+    num1 === undefined || num2 === undefined ||
+    num1 === null || num2 === null ||
+    num1 === '' || num2 === ''
+  ) {
+    return res.status(400).json({ error: 'Both num1 and num2 are required and cannot be empty or missing.' });
+  }
+
+  const parsedNum1 = parseFloat(num1);
+  const parsedNum2 = parseFloat(num2);
+
+  const result = parsedNum1 + parsedNum2;
+
+  if (Number.isNaN(result)) {
+    return res.status(200).json({ result: NaN });
+  }
+
+  if (!Number.isFinite(result)) {
+    return res.status(200).json({ result: null });
+  }
+
+  const roundedResult = Math.round(result * 100000) / 100000;
+  return res.status(200).json({ result: roundedResult });
+});
+
+const server = app.listen(port, '0.0.0.0', () => {
+  console.log(`Server is running on http://0.0.0.0:${port}`);
+});
+
+// Export the app for supertest and server for explicit closing if needed
+module.exports = { app, server };
