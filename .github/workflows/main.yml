@@ -582,18 +582,19 @@ jobs:
         run: |
           mkdir -p k8s/argocd/applications
           APPS_JSON='${{ steps.detect.outputs.apps }}'
+          
+          # Use repository variables or defaults
+          DOCKER_USERNAME="${{ secrets.DOCKER_USERNAME || '1073286' }}"
+          DEPLOYMENT_NAMESPACE="${{ vars.DEPLOYMENT_NAMESPACE || 'github-actions-example' }}"
 
           echo "$APPS_JSON" | jq -r '.[]' | while read app; do
             OUTFILE="k8s/argocd/applications/${app}.yaml"
             echo "Rendering $OUTFILE..."
 
             # Define image repository and tag
-            # Use app folder name as image name
-            APP_SPECIFIC_IMAGE_NAME="${app}" # Use app folder name as image name
-            IMAGE_REPOSITORY="${{ secrets.DOCKER_USERNAME }}/${APP_SPECIFIC_IMAGE_NAME}"
+            IMAGE_REPOSITORY="${DOCKER_USERNAME}/${app}"
             IMAGE_TAG="${{ github.sha }}"
-            TARGET_REVISION_BRANCH="main" # Or derive from github.ref
-            DEPLOYMENT_NAMESPACE="github-actions-example" # Changed from "$app" to "github-actions-example"
+            TARGET_REVISION_BRANCH="${{ github.ref_name }}"
 
             jinja2 manifests/templates/argocd-app.yaml.j2 \
               -D app_name="$app" -D chart_path="apps/$app/chart" \
@@ -606,6 +607,7 @@ jobs:
             echo "Generated manifest for $app:"
             cat "$OUTFILE"
           done
+
       - name: Commit generated ArgoCD Application manifests
         env:
           # Use PAT if GITHUB_TOKEN doesn't have push rights to main or if main is protected
@@ -679,27 +681,21 @@ jobs:
             echo "No ArgoCD application manifests found in k8s/argocd/applications."
           fi
 
-      - name: Wait for Node.js app to be ready (Example for 'nodejs' app)
+      - name: Wait for Node.js app to be ready
         run: |
-          APP_NAMESPACE="github-actions-example" # Changed from "nodejs" to "github-actions-example"
-          APP_SERVICE_NAME="nodejs-service" # Assuming this is the service name for the nodejs app
+          # Use repository variables or defaults
+          DEPLOYMENT_NAMESPACE="${{ vars.DEPLOYMENT_NAMESPACE || 'github-actions-example' }}"
+          APP_NAME="nodejs"  # This should match the app folder name
 
-          echo "Creating namespace $APP_NAMESPACE if it doesn't exist..."
-          kubectl create namespace $APP_NAMESPACE --dry-run=client -o yaml | kubectl apply -f -
+          echo "Creating namespace $DEPLOYMENT_NAMESPACE if it doesn't exist..."
+          kubectl create namespace $DEPLOYMENT_NAMESPACE --dry-run=client -o yaml | kubectl apply -f -
 
           echo "Waiting for ArgoCD to deploy the application..."
           # Wait for ArgoCD to create resources (up to 5 minutes)
           for i in {1..30}; do
-            if kubectl get deployment -n $APP_NAMESPACE 2>/dev/null | grep -q nodejs; then
-              echo "Deployment found in namespace $APP_NAMESPACE"
+            if kubectl get deployment -n $DEPLOYMENT_NAMESPACE 2>/dev/null | grep -q $APP_NAME; then
+              echo "Deployment found in namespace $DEPLOYMENT_NAMESPACE"
               break
             fi
             echo "Waiting for deployment to be created... ($i/30)"
             sleep 10
-            if [ $i -eq 30 ]; then
-              echo "Warning: Deployment not found after timeout. ArgoCD may still be processing."
-              echo "Checking ArgoCD application status:"
-              kubectl get applications -n argocd
-              echo "Continuing anyway..."
-            fi
-          done
