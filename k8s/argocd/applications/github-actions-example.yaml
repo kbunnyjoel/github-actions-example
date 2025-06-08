@@ -9,14 +9,14 @@ spec:
   project: default # Your ArgoCD project
   source:
     repoURL: https://github.com/kbunnyjoel/github-actions-example # URL of the Git repository where your Helm chart is located
-    targetRevision: main # Git branch/tag/commit to sync from
+    targetRevision: feature/improvements # Git branch/tag/commit to sync from
     path: apps/github-actions-example/chart # Path to the Helm chart within the repository (e.g., apps/nodejs/chart)
     helm:
       values: |
         replicaCount: 1 # Default replica count, can be overridden
         image:
           repository: 1073286/github-actions-example # Docker image repository (e.g., yourdockerhubusername/my-node-app)
-          tag: 1b3477169a96135d30a6e0f0b28f5333d5d7e05d # Docker image tag (e.g., commit SHA or version)
+          tag: a62165aaa3faa7c919343e7b25ed0601735b9e90 # Docker image tag (e.g., commit SHA or version)
           pullPolicy: IfNotPresent
 
         containerPort: 3000 # The port your Node.js application listens on inside the container
