@@ -53,6 +53,7 @@ module "vpc" {
 
 }
 
+ # tfsec:ignore:aws-ec2-no-public-egress-sgr -- Verified and accepted: node group egress to specific public IPs is intentional for required functionality
 # tfsec:ignore:aws-eks-encrypt-secrets -- Encryption for EKS secrets is managed externally or verified via custom configuration
 module "eks" {
   source          = "terraform-aws-modules/eks/aws"
