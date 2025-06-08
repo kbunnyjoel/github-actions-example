@@ -10,11 +10,9 @@ yum update -y
 # Install unzip, curl, jq
 yum install -y curl unzip jq
 
-# Set desired versions
-# KUBECTL_VERSION and HELM_VERSION are passed in from Terraform user_data
-# Defaulting here if not set, though Terraform should always provide them.
-KUBECTL_VERSION="${KUBECTL_VERSION:-v1.29.0}"
-HELM_VERSION="${HELM_VERSION:-v3.14.4}"
+# Set desired versions from Terraform variables
+KUBECTL_VERSION="${KUBECTL_VERSION}"
+HELM_VERSION="${HELM_VERSION}"
 
 # Install AWS CLI v2
 curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"

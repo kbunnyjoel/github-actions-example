@@ -11,13 +11,13 @@ variable "cluster_name" {
 }
 
 variable "kubectl_version" {
+  description = "Version of kubectl to install on the bastion host"
   type        = string
-  default     = "v1.33.0"
-  description = "The version of kubectl to install"
+  default     = "v1.29.0"
 }
 
 variable "helm_version" {
-  type        = string
   description = "Version of Helm to install on the bastion host"
-  default     = "v3.14.0"
+  type        = string
+  default     = "v3.14.4"
 }

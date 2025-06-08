@@ -79,7 +79,7 @@ resource "aws_instance" "bastion" {
   key_name               = aws_key_pair.deployment_key.key_name
   iam_instance_profile   = aws_iam_instance_profile.bastion_profile.name
   user_data = templatefile("${path.module}/bastion_user_data.sh", {
-    KUBECTL_VERSION = var.kubectl_version,
+    KUBECTL_VERSION = var.kubectl_version
     HELM_VERSION    = var.helm_version
   })
 
