@@ -21,3 +21,9 @@ variable "helm_version" {
   type        = string
   default     = "v3.14.4"
 }
+
+variable "create_dns_records" {
+  description = "Whether to create DNS records"
+  type        = bool
+  default     = false
+}

@@ -61,15 +61,12 @@ module "eks" {
   cluster_name    = var.cluster_name
   cluster_version = "1.29"
 
-  # Add these security configurations
-  cluster_encryption_config = [{
-    provider_key_arn = aws_kms_key.eks.arn
+  # Add encryption config here
+  cluster_encryption_config = {
     resources        = ["secrets"]
-  }]
-
-  # Override default security group rules
-  create_node_security_group = true
-
+    provider_key_arn = aws_kms_key.eks.arn
+  }
+  
   # Enable EKS control plane logging
   cluster_enabled_log_types = ["api", "audit", "authenticator", "controllerManager", "scheduler"]
 

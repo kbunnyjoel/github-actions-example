@@ -20,6 +20,7 @@ data "aws_ami" "amazon_linux" {
 }
 
 data "aws_route53_zone" "main" {
+  count        = var.create_dns_records ? 1 : 0
   name         = "bunnycloud.xyz."
   private_zone = false
 }
@@ -120,10 +121,11 @@ resource "aws_eip" "bastion_eip" {
 }
 
 resource "aws_route53_record" "bastion_dns" {
-  zone_id = data.aws_route53_zone.main.zone_id
+  count   = var.create_dns_records ? 1 : 0
+  zone_id = data.aws_route53_zone.main[0].zone_id
   name    = "bastion"
   type    = "A"
-  ttl     = 60 # Reduced TTL for faster propagation
+  ttl     = 60
   records = [aws_eip.bastion_eip.public_ip]
 }
 

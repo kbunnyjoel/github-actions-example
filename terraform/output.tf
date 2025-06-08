@@ -8,8 +8,10 @@ output "eks_cluster_name" {
 }
 
 output "bastion_dns_name" {
-  value = aws_route53_record.bastion_dns.fqdn
+  description = "The DNS name of the bastion host"
+  value       = var.create_dns_records ? aws_route53_record.bastion_dns[0].fqdn : "DNS record not created"
 }
+
 
 # Output bastion Elastic IP
 output "bastion_public_ip" {
