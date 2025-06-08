@@ -110,14 +110,14 @@ module "eks" {
       cidr_blocks = [module.vpc.vpc_cidr_block] # restrict to internal network only
     }
 
-    # Allow specific external access for required services
+    # Allow specific external access for required services to specific IP ranges
     egress_ntp_tcp = {
       description = "Allow NTP TCP"
       protocol    = "tcp"
       from_port   = 123
       to_port     = 123
       type        = "egress"
-      cidr_blocks = ["0.0.0.0/0"]
+      cidr_blocks = ["169.254.169.123/32"] # Amazon Time Sync Service
     }
 
     egress_ntp_udp = {
@@ -126,37 +126,39 @@ module "eks" {
       from_port   = 123
       to_port     = 123
       type        = "egress"
-      cidr_blocks = ["0.0.0.0/0"]
+      cidr_blocks = ["169.254.169.123/32"] # Amazon Time Sync Service
     }
 
-    egress_https = {
-      description = "Allow HTTPS"
+    egress_https_eks = {
+      description = "Allow HTTPS to EKS API"
       protocol    = "tcp"
       from_port   = 443
       to_port     = 443
       type        = "egress"
-      cidr_blocks = ["0.0.0.0/0"]
+      cidr_blocks = [
+        "3.5.140.0/22", # AWS EKS API endpoints for ap-southeast-2
+        "54.66.0.0/16"  # AWS services in ap-southeast-2
+      ]
     }
 
     egress_dns_tcp = {
-      description = "Allow DNS TCP"
+      description = "Allow DNS TCP to VPC DNS"
       protocol    = "tcp"
       from_port   = 53
       to_port     = 53
       type        = "egress"
-      cidr_blocks = ["0.0.0.0/0"]
+      cidr_blocks = ["172.20.0.2/32"] # VPC DNS server
     }
 
     egress_dns_udp = {
-      description = "Allow DNS UDP"
+      description = "Allow DNS UDP to VPC DNS"
       protocol    = "udp"
       from_port   = 53
       to_port     = 53
       type        = "egress"
-      cidr_blocks = ["0.0.0.0/0"]
+      cidr_blocks = ["172.20.0.2/32"] # VPC DNS server
     }
   }
-
 
   eks_managed_node_groups = {
     spot-nodes = {
@@ -211,9 +213,7 @@ module "eks" {
   node_security_group_tags = {
     "kubernetes.io/cluster/${var.cluster_name}" = "owned"
   }
-
 }
-
 
 # Configure the VPC CNI add-on to delete ENIs on termination
 resource "aws_eks_addon" "vpc_cni" {
