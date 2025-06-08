@@ -165,7 +165,6 @@ example.tf
 log.txt
 markdown-link-check*.txt
 modules-dev/
-package-lock.json
 skaff/skaff
 sweeper-bin
 terraform-provider-aws
