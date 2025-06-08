@@ -1,0 +1,2 @@
+exclude:
+  - aws-eks-no-public-cluster-access  # Public access needed for GitHub Actions

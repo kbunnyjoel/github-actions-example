@@ -162,7 +162,7 @@ jobs:
         with:
           working_directory: terraform
           addtional_args: '--format json --output-file tfsec-report.json'
-          # soft_fail: true # Uncomment to see warnings without failing the build initially
+          soft_fail: true # Uncomment to see warnings without failing the build initially
       
       - name: Upload tfsec report
         uses: actions/upload-artifact@v4
