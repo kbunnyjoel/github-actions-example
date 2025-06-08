@@ -426,7 +426,7 @@ jobs:
             --wait
           echo "Waiting for ingress-nginx controller pod to be ready..."
           kubectl rollout status deployment ingress-nginx-controller -n ingress-nginx --timeout=5m
-          
+
       - name: Install Argo CD
         run: |
           echo "Installing ArgoCD..."
@@ -444,7 +444,6 @@ jobs:
           echo "Waiting for ArgoCD deployments to be ready..."
           kubectl wait --for=condition=Available deployment --all -n argocd --timeout=5m
           echo "ArgoCD installed and deployments are ready."
-"
 
       - name: Install ExternalDNS
         # Version pinning is recommended.
