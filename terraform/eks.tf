@@ -46,6 +46,9 @@ module "vpc" {
   create_flow_log_cloudwatch_iam_role             = true
   flow_log_max_aggregation_interval               = 60
   flow_log_cloudwatch_log_group_retention_in_days = 14
+  flow_log_traffic_type                           = "ALL"
+  flow_log_destination_type                       = "cloud-watch-logs"
+
 }
 
 module "eks" {
