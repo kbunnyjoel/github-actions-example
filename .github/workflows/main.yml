@@ -161,8 +161,14 @@ jobs:
         uses: aquasecurity/tfsec-action@v1.0.0 # Use a specific version if preferred
         with:
           working_directory: terraform
+          addtional_args: '--format json --output-file tfsec-report.json'
           # soft_fail: true # Uncomment to see warnings without failing the build initially
       
+      - name: Upload tfsec report
+        uses: actions/upload-artifact@v4
+        with:
+          name: tfsec-report
+          path: terraform/tfsec-report.json
       - name: Terraform Init
         working-directory: terraform
         run: terraform init
