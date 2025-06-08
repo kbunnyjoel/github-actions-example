@@ -513,23 +513,36 @@ jobs:
           # Check if the rule exists
           RULE_EXISTS=$(aws ec2 describe-security-groups --group-ids $SG_ID --query "SecurityGroups[0].IpPermissions[?FromPort==\`8080\` && ToPort==\`8080\` && IpProtocol==\`tcp\`]" --output text)
           
-          # Note: This rule for port 8080 on nodes might be for a direct LoadBalancer service.
-          # If using an Ingress controller (like Nginx or AWS LBC), the relevant ports would be
-          # the NodePorts used by the Ingress controller service, and the ELB it creates should have access to them.
+          # Add the rule if it doesn't exist
+          if [ -z "$RULE_EXISTS" ]; then
+            echo "Adding rule for port 8080..."
+            aws ec2 authorize-security-group-ingress --group-id $SG_ID --protocol tcp --port 8080 --cidr 0.0.0.0/0
+          else
+            echo "Rule for port 8080 already exists."
+          fi
+
           
       # The 'Check domain nameserver delegation' and 'Check Route53 record' steps can remain for verification.
       # The 'Update Nodejs App DNS record' step is removed as ExternalDNS will handle it
       # based on annotations in your Node.js app's Ingress (defined in its Helm chart).
 
-      - name: Verify Node.js App DNS (assuming its Ingress is annotated for external-dns)
+      - name: Verify Node.js App DNS
         run: |
           echo "Waiting for DNS record for nodejs.bunnycloud.xyz to be created by ExternalDNS..."
           for i in {1..20}; do # Wait up to 10 minutes
-            dig +short nodejs.bunnycloud.xyz && break
+            if dig +short nodejs.bunnycloud.xyz | grep -q .; then
+              echo "DNS record found for nodejs.bunnycloud.xyz"
+              break
+            fi
             echo "DNS not propagated yet for nodejs.bunnycloud.xyz... ($i/20)"
             sleep 30
+            if [ $i -eq 20 ]; then
+              echo "Warning: DNS record for nodejs.bunnycloud.xyz not found after timeout."
+              echo "This is not a failure as the app may not be deployed yet."
+            fi
           done
-          dig nodejs.bunnycloud.xyz # Final check
+        continue-on-error: true  # Don't fail the workflow if DNS isn't ready
+
 
       - name: Old Test DNS record (can be removed or adapted) # Renamed this step
         run: |
