@@ -416,22 +416,18 @@ jobs:
           helm repo update
 
       - name: Install NGINX Ingress Controller
-        # Version pinning is recommended. Find latest at https://github.com/kubernetes/ingress-nginx/tree/main/charts/ingress-nginx
         run: |
           echo "Installing NGINX Ingress Controller for AWS..."
           helm upgrade --install ingress-nginx ingress-nginx/ingress-nginx \
             --namespace ingress-nginx --create-namespace \
-            --set controller.service.annotations."service\.beta\.kubernetes\.io/aws-load-balancer-type"="nlb" \ # Example: Using NLB
-            # Example for ACM certificate with NLB, ensure secrets are set if you use this
-            # --set controller.service.annotations."service\.beta\.kubernetes\.io/aws-load-balancer-ssl-cert"="arn:aws:acm:ap-southeast-2:${{ secrets.AWS_ACCOUNT_ID }}:certificate/${{ secrets.ACM_CERT_ID_NLB }}" \
+            --set controller.service.annotations."service\.beta\.kubernetes\.io/aws-load-balancer-type"=nlb \
             --set controller.replicaCount=2 \
-            --version 4.10.1 \ # Pinned to a specific chart version
+            --version 4.10.1 \
             --wait
-          echo "Waiting for ingress-nginx controller pod to be ready..." # This wait might be redundant due to --wait above
+          echo "Waiting for ingress-nginx controller pod to be ready..."
           kubectl rollout status deployment ingress-nginx-controller -n ingress-nginx --timeout=5m
-
+          
       - name: Install Argo CD
-        # Version pinning is recommended. Find latest at https://github.com/argoproj/argo-helm/tree/main/charts/argo-cd
         run: |
           echo "Installing ArgoCD..."
           helm upgrade --install argocd argo/argo-cd \
@@ -439,16 +435,16 @@ jobs:
             --set server.ingress.enabled=true \
             --set server.ingress.ingressClassName=nginx \
             --set server.ingress.hostname=argocd.bunnycloud.xyz \
-            --set server.ingress.annotations."external-dns\.alpha\.kubernetes\.io/hostname"="argocd.bunnycloud.xyz." \
-            --set server.ingress.annotations."kubernetes\.io/ingress\.class"="nginx" \
-            # Add other necessary ArgoCD Helm values here (e.g., config, RBAC)
-            --version 6.11.1 \ # Pinned to a specific chart version
+            --set server.ingress.annotations."external-dns\.alpha\.kubernetes\.io/hostname"=argocd.bunnycloud.xyz. \
+            --set server.ingress.annotations."kubernetes\.io/ingress\.class"=nginx \
+            --version 6.11.1 \
             --wait
           echo "Checking ArgoCD pods status..."
           kubectl get pods -n argocd
-          echo "Waiting for ArgoCD deployments to be ready..." # This wait might be redundant
+          echo "Waiting for ArgoCD deployments to be ready..."
           kubectl wait --for=condition=Available deployment --all -n argocd --timeout=5m
           echo "ArgoCD installed and deployments are ready."
+"
 
       - name: Install ExternalDNS
         # Version pinning is recommended.
