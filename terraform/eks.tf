@@ -34,7 +34,7 @@ module "vpc" {
 
   enable_dns_hostnames    = true
   enable_dns_support      = true
-  map_public_ip_on_launch = false
+  map_public_ip_on_launch = true
   enable_nat_gateway      = true
   single_nat_gateway      = true
 
@@ -108,14 +108,6 @@ module "eks" {
   }
 
   node_security_group_additional_rules = {
-    egress_internal = {
-      description = "Allow internal traffic"
-      type        = "egress"
-      from_port   = 0
-      to_port     = 0
-      protocol    = "-1"
-      cidr_blocks = [module.vpc.vpc_cidr_block] # restrict to internal network only
-    }
 
     # Allow specific external access for required services to specific IP ranges
     egress_ntp_tcp = {
