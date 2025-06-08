@@ -13,6 +13,9 @@ COPY package*.json ./
 # Install project dependencies
 # Use npm ci for cleaner, faster, and more reliable installs in CI/Docker
 RUN npm ci
+RUN rm -r /usr/local/lib/node_modules/npm/node_modules/cross-spawn/
+RUN rm -r /usr/lib/node_modules_20/npm/node_modules/cross-spawn/
+RUN rm -r /usr/local/n/versions/node/18.20.5/lib/node_modules/npm/node_modules/cross-spawn/
 
 # Copy the rest of your application's code into the container
 COPY . .
