@@ -347,7 +347,7 @@ jobs:
       - name: Install Terraform
         uses: hashicorp/setup-terraform@v3
         with:
-          terraform_version: 1.8.3 # Updated to a more recent stable version
+          terraform_version: 1.11.0 # Updated to a more recent stable version
 
       - name: Terraform Init
         working-directory: terraform
