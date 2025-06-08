@@ -704,13 +704,25 @@ jobs:
             fi
           done
 
-          echo "Waiting for $APP_NAMESPACE pod to be ready..."
-          kubectl wait --for=condition=Available deployment --all -n $APP_NAMESPACE --timeout=5m || true
+          echo "Waiting for $APP_NAMESPACE pods to be ready..."
+          kubectl get pods -n $APP_NAMESPACE
+          
+          # Wait for pods to be Running before attempting port-forward
+          for i in {1..30}; do
+            RUNNING_PODS=$(kubectl get pods -n $APP_NAMESPACE -o jsonpath='{.items[?(@.status.phase=="Running")].metadata.name}')
+            if [ ! -z "$RUNNING_PODS" ]; then
+              echo "Running pods found: $RUNNING_PODS"
+              break
+            fi
+            echo "Waiting for pods to be in Running state... ($i/30)"
+            kubectl get pods -n $APP_NAMESPACE
+            sleep 10
+          done
 
           echo "Checking service in namespace $APP_NAMESPACE..."
           kubectl get svc -n $APP_NAMESPACE
 
-          if kubectl get svc $APP_SERVICE_NAME -n $APP_NAMESPACE 2>/dev/null; then
+          if kubectl get svc $APP_SERVICE_NAME -n $APP_NAMESPACE 2>/dev/null && [ ! -z "$RUNNING_PODS" ]; then
             echo "Port-forwarding service $APP_SERVICE_NAME and checking health endpoint..."
             kubectl port-forward svc/$APP_SERVICE_NAME -n $APP_NAMESPACE 8080:80 & 
             PORT_FORWARD_PID=$!
@@ -721,6 +733,8 @@ jobs:
             # Kill the port-forward process
             kill $PORT_FORWARD_PID || true
           else
-            echo "Service $APP_SERVICE_NAME not found in namespace $APP_NAMESPACE. ArgoCD may still be deploying."
+            echo "Service $APP_SERVICE_NAME not found or no running pods in namespace $APP_NAMESPACE."
+            echo "ArgoCD may still be deploying or there might be issues with the deployment."
+            kubectl describe pods -n $APP_NAMESPACE
           fi
         continue-on-error: true  # Don't fail the workflow if the app isn't ready yet
