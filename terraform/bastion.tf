@@ -42,8 +42,9 @@ resource "local_file" "private_key_pem" {
 
 # Bastion security group (allow SSH from your IP)
 resource "aws_security_group" "bastion_sg" {
-  name   = "bastion-sg"
-  vpc_id = module.vpc.vpc_id
+  name        = "bastion-sg"
+  description = "Security group for bastion host allowing SSH access from specific IPs"
+  vpc_id      = module.vpc.vpc_id
 
   ingress {
     description = "SSH from your IP"
@@ -62,6 +63,10 @@ resource "aws_security_group" "bastion_sg" {
     to_port     = 0
     protocol    = "-1"
     cidr_blocks = [module.vpc.vpc_cidr_block]
+  }
+
+  tags = {
+    Name = "bastion-sg"
   }
 }
 
