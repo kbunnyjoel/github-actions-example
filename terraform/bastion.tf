@@ -85,9 +85,9 @@ resource "aws_instance" "bastion" {
   }
 
   metadata_options {
-    http_tokens = "required"
+    http_tokens                 = "required"
     http_put_response_hop_limit = 2
-    http_endpoint = "enabled"
+    http_endpoint               = "enabled"
   }
 
   tags = {

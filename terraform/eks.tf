@@ -48,6 +48,15 @@ module "eks" {
   cluster_name    = var.cluster_name
   cluster_version = "1.29"
 
+  # Add these security configurations
+  cluster_encryption_config = [{
+    provider_key_arn = aws_kms_key.eks.arn
+    resources        = ["secrets"]
+  }]
+
+  # Enable EKS control plane logging
+  cluster_enabled_log_types = ["api", "audit", "authenticator", "controllerManager", "scheduler"]
+
   # Use both private and public subnets for better connectivity
   subnet_ids = concat(module.vpc.private_subnets, module.vpc.public_subnets)
 
@@ -92,9 +101,56 @@ module "eks" {
       from_port   = 0
       to_port     = 0
       protocol    = "-1"
-      cidr_blocks = ["10.0.0.0/16"]  # restrict to internal network only
+      cidr_blocks = [module.vpc.vpc_cidr_block] # restrict to internal network only
+    }
+
+    # Allow specific external access for required services
+    egress_ntp_tcp = {
+      description = "Allow NTP TCP"
+      protocol    = "tcp"
+      from_port   = 123
+      to_port     = 123
+      type        = "egress"
+      cidr_blocks = ["0.0.0.0/0"]
+    }
+
+    egress_ntp_udp = {
+      description = "Allow NTP UDP"
+      protocol    = "udp"
+      from_port   = 123
+      to_port     = 123
+      type        = "egress"
+      cidr_blocks = ["0.0.0.0/0"]
+    }
+
+    egress_https = {
+      description = "Allow HTTPS"
+      protocol    = "tcp"
+      from_port   = 443
+      to_port     = 443
+      type        = "egress"
+      cidr_blocks = ["0.0.0.0/0"]
+    }
+
+    egress_dns_tcp = {
+      description = "Allow DNS TCP"
+      protocol    = "tcp"
+      from_port   = 53
+      to_port     = 53
+      type        = "egress"
+      cidr_blocks = ["0.0.0.0/0"]
+    }
+
+    egress_dns_udp = {
+      description = "Allow DNS UDP"
+      protocol    = "udp"
+      from_port   = 53
+      to_port     = 53
+      type        = "egress"
+      cidr_blocks = ["0.0.0.0/0"]
     }
   }
+
 
   eks_managed_node_groups = {
     spot-nodes = {
@@ -168,4 +224,22 @@ resource "aws_eks_addon" "vpc_cni" {
   })
 
   depends_on = [module.eks]
+}
+
+# Create KMS key for EKS secrets encryption
+resource "aws_kms_key" "eks" {
+  description             = "EKS Secret Encryption Key"
+  deletion_window_in_days = 7
+  enable_key_rotation     = true
+
+  tags = {
+    Name        = "eks-secrets-key"
+    Environment = "dev"
+    Project     = "github-actions-example"
+  }
+}
+
+resource "aws_kms_alias" "eks" {
+  name          = "alias/eks-secrets"
+  target_key_id = aws_kms_key.eks.key_id
 }

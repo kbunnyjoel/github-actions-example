@@ -85,13 +85,25 @@ resource "aws_iam_policy" "cluster_autoscaler_policy" {
           "autoscaling:DescribeAutoScalingGroups",
           "autoscaling:DescribeAutoScalingInstances",
           "autoscaling:DescribeLaunchConfigurations",
-          "autoscaling:DescribeTags",
+          "autoscaling:DescribeTags"
+        ],
+        Effect   = "Allow",
+        Resource = "*" # Describe actions require * resource
+      },
+      {
+        Action = [
           "autoscaling:SetDesiredCapacity",
-          "autoscaling:TerminateInstanceInAutoScalingGroup",
+          "autoscaling:TerminateInstanceInAutoScalingGroup"
+        ],
+        Effect   = "Allow",
+        Resource = "arn:aws:autoscaling:${var.aws_region}:${data.aws_caller_identity.current.account_id}:autoScalingGroup:*:autoScalingGroupName/eks-*"
+      },
+      {
+        Action = [
           "ec2:DescribeLaunchTemplateVersions"
-        ]
-        Effect   = "Allow"
-        Resource = "arn:aws:autoscaling:*:*:autoScalingGroup/*"
+        ],
+        Effect   = "Allow",
+        Resource = "arn:aws:ec2:${var.aws_region}:${data.aws_caller_identity.current.account_id}:launch-template/*"
       }
     ]
   })
