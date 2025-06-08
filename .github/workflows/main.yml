@@ -235,11 +235,12 @@ jobs:
           aws eks update-kubeconfig --region ap-southeast-2 --name github-actions-eks-example
 
           echo "Checking Kubernetes nodes..."
-          kubectl get nodes
+          kubectl get nodes --request-timeout=60s
           echo "Checking component statuses..."
-          kubectl get componentstatuses
+          kubectl get componentstatuses --request-timeout=60s
           echo "Listing kube-system pods..."
-          kubectl get pods -n kube-system
+          kubectl get pods -n kube-system --request-timeout=60s
+
   
   destroy-infrastructure:
     if: github.event.inputs.destroy == 'true'
