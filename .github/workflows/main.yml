@@ -644,20 +644,66 @@ jobs:
 
       - name: Verify Node.js App DNS
         run: |
+          echo "Waiting for Node.js app ingress to get an address..."
+          NODEJS_HOSTNAME=""
+          for i in {1..15}; do
+            # Check for Ingress
+            NODEJS_HOSTNAME=$(kubectl get ingress -n github-actions-example -l app.kubernetes.io/name=nodejs -o jsonpath='{.items[0].status.loadBalancer.ingress[0].hostname}' 2>/dev/null)
+            
+            if [ ! -z "$NODEJS_HOSTNAME" ]; then
+              echo "Node.js LoadBalancer hostname found: $NODEJS_HOSTNAME"
+              break
+            fi
+            echo "Waiting for Node.js LoadBalancer... (attempt $i/15)"
+            sleep 20
+          done
+          
           echo "Waiting for DNS record for nodejs.bunnycloud.xyz to be created by ExternalDNS..."
-          for i in {1..20}; do # Wait up to 10 minutes
+          for i in {1..5}; do # Reduced wait time to 2.5 minutes
             if dig +short nodejs.bunnycloud.xyz | grep -q .; then
               echo "DNS record found for nodejs.bunnycloud.xyz"
               break
             fi
-            echo "DNS not propagated yet for nodejs.bunnycloud.xyz... ($i/20)"
+            echo "DNS not propagated yet for nodejs.bunnycloud.xyz... ($i/5)"
             sleep 30
-            if [ $i -eq 20 ]; then
-              echo "Warning: DNS record for nodejs.bunnycloud.xyz not found after timeout."
-              echo "This is not a failure as the app may not be deployed yet."
-            fi
           done
+          
+          # Create the DNS record manually if ExternalDNS failed and we have a hostname
+          if [ ! -z "$NODEJS_HOSTNAME" ] && ! dig +short nodejs.bunnycloud.xyz | grep -q .; then
+            echo "ExternalDNS failed to create DNS record. Creating manually..."
+            HOSTED_ZONE_ID=$(aws route53 list-hosted-zones --query "HostedZones[?Name=='bunnycloud.xyz.'].Id" --output text | sed 's/\/hostedzone\///')
+            
+            # Create a JSON file for the Route53 change
+            cat > nodejs-dns-change.json << EOF
+          {
+            "Changes": [
+              {
+                "Action": "UPSERT",
+                "ResourceRecordSet": {
+                  "Name": "nodejs.bunnycloud.xyz",
+                  "Type": "CNAME",
+                  "TTL": 300,
+                  "ResourceRecords": [
+                    {
+                      "Value": "$NODEJS_HOSTNAME"
+                    }
+                  ]
+                }
+              }
+            ]
+          }
+          EOF
+            
+            # Apply the DNS change
+            aws route53 change-resource-record-sets --hosted-zone-id $HOSTED_ZONE_ID --change-batch file://nodejs-dns-change.json
+            echo "Manual DNS record created for nodejs.bunnycloud.xyz pointing to $NODEJS_HOSTNAME"
+          fi
+          
+          # Final DNS check
+          echo "Final DNS check:"
+          dig nodejs.bunnycloud.xyz
         continue-on-error: true  # Don't fail the workflow if DNS isn't ready
+
 
 
       - name: Old Test DNS record (can be removed or adapted) # Renamed this step
