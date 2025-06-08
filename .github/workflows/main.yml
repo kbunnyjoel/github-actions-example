@@ -667,18 +667,32 @@ jobs:
       - name: Check and update EKS node security group
         run: |
           SG_ID=$(aws eks describe-cluster --name github-actions-eks-example --region ap-southeast-2 --query "cluster.resourcesVpcConfig.securityGroupIds[0]" --output text)
-          echo "Checking if security group allows inbound traffic on port 8080..."
+          echo "Cluster security group: $SG_ID"
           
-          # Check if the rule exists
-          RULE_EXISTS=$(aws ec2 describe-security-groups --group-ids $SG_ID --query "SecurityGroups[0].IpPermissions[?FromPort==\`8080\` && ToPort==\`8080\` && IpProtocol==\`tcp\`]" --output text)
+          # Check if the rule for port 8080 exists
+          echo "Checking if security group allows inbound traffic on port 8080..."
+          RULE_EXISTS_8080=$(aws ec2 describe-security-groups --group-ids $SG_ID --query "SecurityGroups[0].IpPermissions[?FromPort==\`8080\` && ToPort==\`8080\` && IpProtocol==\`tcp\`]" --output text)
           
           # Add the rule if it doesn't exist
-          if [ -z "$RULE_EXISTS" ]; then
+          if [ -z "$RULE_EXISTS_8080" ]; then
             echo "Adding rule for port 8080..."
-            aws ec2 authorize-security-group-ingress --group-id $SG_ID --protocol tcp --port 8080 --cidr 0.0.0.0/0
+            aws ec2 authorize-security-group-ingress --group-id $SG_ID --protocol tcp --port 8080 --cidr 0.0.0.0/0 || echo "Failed to add rule, it may already exist"
           else
             echo "Rule for port 8080 already exists."
           fi
+          
+          # Check if the rule for port 443 exists
+          echo "Checking if security group allows inbound traffic from GitHub Actions on port 443..."
+          RULE_EXISTS_443=$(aws ec2 describe-security-groups --group-ids $SG_ID --query "SecurityGroups[0].IpPermissions[?FromPort==\`443\` && ToPort==\`443\` && IpProtocol==\`tcp\` && contains(IpRanges[].CidrIp, '140.82.112.0/20')]" --output text)
+          
+          # Skip adding the rule if it already exists
+          if [ -z "$RULE_EXISTS_443" ]; then
+            echo "Adding rule for port 443 from GitHub Actions..."
+            aws ec2 authorize-security-group-ingress --group-id $SG_ID --protocol tcp --port 443 --cidr 140.82.112.0/20 || echo "Failed to add rule, it may already exist"
+          else
+            echo "Rule for port 443 from GitHub Actions already exists."
+          fi
+
 
           
       # The 'Check domain nameserver delegation' and 'Check Route53 record' steps can remain for verification.
