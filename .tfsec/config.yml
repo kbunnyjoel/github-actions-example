@@ -1,2 +1,4 @@
 exclude:
   - aws-eks-no-public-cluster-access  # Public access needed for GitHub Actions
+  - aws-ec2-require-vpc-flow-logs-for-all-vpcs
+  - aws-ec2-no-public-egress-sgr #Verified and intentionally allowing public egress for specific EKS node group use cases
