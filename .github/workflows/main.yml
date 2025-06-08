@@ -704,24 +704,6 @@ jobs:
           dig nodejs.bunnycloud.xyz
         continue-on-error: true  # Don't fail the workflow if DNS isn't ready
 
-
-
-      - name: Old Test DNS record (can be removed or adapted) # Renamed this step
-        run: |
-          echo "Testing DNS record for argocd.bunnycloud.xyz..."
-          dig argocd.bunnycloud.xyz
-          
-          echo "Waiting for DNS propagation..."
-          for i in {1..10}; do
-            IP=$(dig +short argocd.bunnycloud.xyz)
-            if [ ! -z "$IP" ]; then
-              echo "DNS record found: argocd.bunnycloud.xyz -> $IP"
-              break
-            fi
-            echo "Waiting for DNS propagation... (attempt $i/10)"
-            sleep 30
-          done
-
   generate-argo-apps:
     runs-on: ubuntu-latest
     permissions:
