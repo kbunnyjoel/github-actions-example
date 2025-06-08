@@ -11,7 +11,8 @@ WORKDIR /usr/src/app
 COPY package*.json ./
 
 # Install project dependencies
-RUN npm install
+# Use npm ci for cleaner, faster, and more reliable installs in CI/Docker
+RUN npm ci
 
 # Copy the rest of your application's code into the container
 COPY . .
