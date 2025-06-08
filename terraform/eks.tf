@@ -78,7 +78,7 @@ module "eks" {
   # API access settings
   cluster_endpoint_public_access       = true
   cluster_endpoint_private_access      = true
-  cluster_endpoint_public_access_cidrs   = ["0.0.0.0/0"]  # Allow all IPs (for GitHub Actions)
+  cluster_endpoint_public_access_cidrs = ["0.0.0.0/0"] # Allow all IPs (for GitHub Actions)
 
   # Add CloudWatch logging for worker nodes
   cloudwatch_log_group_kms_key_id        = aws_kms_key.eks.arn
