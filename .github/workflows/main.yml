@@ -503,7 +503,7 @@ jobs:
             echo "DNS not propagated yet for argocd.bunnycloud.xyz... ($i/20)"
             sleep 30
           done
-    dig argocd.bunnycloud.xyz # Final check
+          dig argocd.bunnycloud.xyz # Final check
 
       - name: Check and update EKS node security group
         run: |
