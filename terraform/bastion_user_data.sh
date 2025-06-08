@@ -11,8 +11,10 @@ yum update -y
 yum install -y curl unzip jq
 
 # Set desired versions
-KUBECTL_VERSION="v1.29.0"
-HELM_VERSION="v3.14.4"
+# KUBECTL_VERSION and HELM_VERSION are passed in from Terraform user_data
+# Defaulting here if not set, though Terraform should always provide them.
+KUBECTL_VERSION="${KUBECTL_VERSION:-v1.29.0}"
+HELM_VERSION="${HELM_VERSION:-v3.14.4}"
 
 # Install AWS CLI v2
 curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
@@ -23,8 +25,8 @@ rm -rf awscliv2.zip aws
 # Install kubectl
 curl -LO "https://dl.k8s.io/release/${KUBECTL_VERSION}/bin/linux/amd64/kubectl"
 chmod +x kubectl
-sudo mv kubectl /usr/bin/kubectl
-if [ ! -f /usr/bin/kubectl ]; then
+sudo mv kubectl /usr/local/bin/kubectl
+if [ ! -f /usr/local/bin/kubectl ]; then
   echo "ERROR: kubectl installation failed"
   exit 1
 fi
@@ -32,12 +34,11 @@ fi
 # Install Helm
 curl -Lo helm.tar.gz "https://get.helm.sh/helm-${HELM_VERSION}-linux-amd64.tar.gz"
 tar -zxvf helm.tar.gz
-sudo mv linux-amd64/helm /usr/bin/helm
-if [ ! -f /usr/bin/helm ]; then
+sudo mv linux-amd64/helm /usr/local/bin/helm
+if [ ! -f /usr/local/bin/helm ]; then
   echo "ERROR: helm installation failed"
   exit 1
 fi
-chmod +x /usr/bin/helm
 rm -rf helm.tar.gz linux-amd64
 
 # Verify installations
@@ -52,8 +53,6 @@ su - ec2-user -c "
   mv ~/.kube/config ~/.kube/config.bk \
   aws eks update-kubeconfig --region ap-southeast-2 --name github-actions-eks-example --kubeconfig ~/.kube/config && \
   sed -i 's|client.authentication.k8s.io/v1alpha1|client.authentication.k8s.io/v1beta1|g' ~/.kube/config
-  chown ec2-user:ec2-user /home/ec2-user/.kube/config
-  ln -s /usr/bin/kubectl /usr/local/bin/kubectl
 "
 
 # Set environment variables for future sessions

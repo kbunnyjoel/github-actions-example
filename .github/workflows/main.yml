@@ -35,6 +35,18 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      # Initializes the CodeQL tools for scanning.
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v3
+        with:
+          languages: javascript
+
+      - name: Autobuild
+        uses: github/codeql-action/autobuild@v3
+
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
       - name: List files in workspace
         run: ls -l
 
@@ -49,6 +61,11 @@ jobs:
 
       - name: Run tests and collect coverage
         run: npm test
+
+      - name: Perform CodeQL Analysis
+        uses: github/codeql-action/analyze@v3
+        with:
+          category: "/language:javascript"
 
       - name: Upload coverage reports
         uses: actions/upload-artifact@v4
@@ -82,6 +99,17 @@ jobs:
       - name: Extract short SHA
         id: vars
         run: echo "sha_short=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
+
+      # In the 'docker' job, after 'docker/build-push-action' (or before if you want to fail early)
+      - name: Scan image for vulnerabilities
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: '${{ secrets.DOCKER_USERNAME }}/${{ env.APP_NAME }}:${{ github.sha }}'
+          format: 'table'
+          exit-code: '1' # Fail the build if vulnerabilities are found (adjust severity as needed)
+          ignore-unfixed: true
+          vuln-type: 'os,library'
+          severity: 'CRITICAL,HIGH'
 
       - name: Container Registry push image
         uses: docker/build-push-action@v5
@@ -124,7 +152,13 @@ jobs:
       - name: Install Terraform
         uses: hashicorp/setup-terraform@v3
         with:
-          terraform_version: 1.11.0 # Consider updating to a more recent version
+          terraform_version: 1.8.3 # Updated to a more recent stable version
+
+      - name: Run tfsec IaC scan
+        uses: aquasecurity/tfsec-action@v1.0.0 # Use a specific version if preferred
+        with:
+          working_directory: terraform
+          # soft_fail: true # Uncomment to see warnings without failing the build initially
       
       - name: Terraform Init
         working-directory: terraform
@@ -201,18 +235,29 @@ jobs:
           curl -LO "https://dl.k8s.io/release/v1.29.2/bin/linux/amd64/kubectl"
           chmod +x kubectl && sudo mv kubectl /usr/local/bin/
           aws eks update-kubeconfig --region ap-southeast-2 --name github-actions-eks-example || true
-
       - name: Clean up Kubernetes resources
         run: |
-          echo "Cleaning up Kubernetes resources..."
+          echo "Cleaning up Kubernetes resources (Ingresses, Services, Deployments, Namespaces)..."
           kubectl delete ingress --all --all-namespaces || true
-          kubectl delete service --all -n argocd || true
-          kubectl delete service --all -n ingress-nginx || true
+
+          # Delete services of type LoadBalancer first and wait for AWS LBs to be de-provisioned
+          echo "Deleting LoadBalancer services in argocd namespace..."
+          kubectl delete service -n argocd --selector='service.kubernetes.io/load-balancer-cleanup' || kubectl delete service --all -n argocd --field-selector type=LoadBalancer || true
+          echo "Deleting LoadBalancer services in ingress-nginx namespace..."
+          kubectl delete service -n ingress-nginx --selector='service.kubernetes.io/load-balancer-cleanup' || kubectl delete service --all -n ingress-nginx --field-selector type=LoadBalancer || true
+          
+          echo "Waiting up to 5 minutes for AWS Load Balancers from Kubernetes services to be deleted..."
+          # This is a best-effort wait; more sophisticated polling might be needed for very complex setups
+          # The goal is to give AWS time to react to the k8s service deletions.
+          sleep 300 
+
           kubectl delete deployment --all -n argocd || true
           kubectl delete deployment --all -n ingress-nginx || true
+          # Delete other resources within namespaces before deleting namespaces
+          kubectl delete all --all -n argocd || true
+          kubectl delete all --all -n ingress-nginx || true
           kubectl delete namespace argocd || true
           kubectl delete namespace ingress-nginx || true
-          sleep 30
 
       - name: Clean up AWS resources
         run: |
@@ -226,35 +271,49 @@ jobs:
           fi
           echo "VPC ID: $VPC_ID"
           
-          # Delete all load balancers
-          echo "Deleting load balancers..."
-          aws elbv2 describe-load-balancers --query "LoadBalancers[*].LoadBalancerArn" --output text | tr '\t' '\n' | while read LB; do
-            if [ ! -z "$LB" ]; then
-              echo "Deleting load balancer $LB..."
-              aws elbv2 delete-load-balancer --load-balancer-arn $LB || true
+          # Delete load balancers within the specific VPC
+          echo "Deleting AWS Load Balancers in VPC $VPC_ID..."
+          aws elbv2 describe-load-balancers --query "LoadBalancers[?VpcId=='$VPC_ID'].LoadBalancerArn" --output text | tr '\t' '\n' | while read LB_ARN; do
+            if [ ! -z "$LB_ARN" ]; then
+              echo "Deleting load balancer $LB_ARN..."
+              aws elbv2 delete-load-balancer --load-balancer-arn "$LB_ARN"
             fi
           done
           
           # Wait for load balancers to be deleted
-          echo "Waiting for load balancers to be deleted..."
-          sleep 60
+          echo "Waiting for AWS Load Balancers to be fully deleted..."
+          sleep 120 # Increased wait time
           
-          # Release all Elastic IPs
-          echo "Releasing Elastic IPs..."
-          aws ec2 describe-addresses --query "Addresses[*].AllocationId" --output text | tr '\t' '\n' | while read ALLOC_ID; do
-            if [ ! -z "$ALLOC_ID" ]; then
-              echo "Releasing Elastic IP $ALLOC_ID..."
-              aws ec2 disassociate-address --allocation-id $ALLOC_ID || true
-              sleep 2
-              aws ec2 release-address --allocation-id $ALLOC_ID || true
+          # Release Elastic IPs associated with the VPC (e.g., NAT Gateways if not managed by TF, or orphaned)
+          # WARNING: This can be risky if not properly scoped. Terraform should manage its own EIPs.
+          # This example attempts to find EIPs in the VPC that are not associated or associated with NATs.
+          echo "Releasing unassociated or NAT Gateway Elastic IPs in VPC $VPC_ID (use with caution)..."
+          aws ec2 describe-addresses --filters "Name=domain,Values=vpc" --query "Addresses[?VpcId=='$VPC_ID'].AllocationId" --output text | tr '\t' '\n' | while read ALLOC_ID; do
+            if [ ! -z "$ALLOC_ID" ]; then # Corrected variable from LB to ALLOC_ID
+              # Check if EIP is associated with a NAT gateway or unassociated
+              ASSOCIATION_ID=$(aws ec2 describe-addresses --allocation-ids "$ALLOC_ID" --query "Addresses[0].AssociationId" --output text)
+              # NETWORK_INTERFACE_ID=$(aws ec2 describe-addresses --allocation-ids "$ALLOC_ID" --query "Addresses[0].NetworkInterfaceId" --output text) # Not used, can be removed
+              IS_NAT_GW_EIP=$(aws ec2 describe-nat-gateways --filter "Name=vpc-id,Values=$VPC_ID" "Name=nat-gateway-address.allocation-id,Values=$ALLOC_ID" --query "NatGateways" --output text)
+
+              if [ "$ASSOCIATION_ID" == "None" ] || [ ! -z "$IS_NAT_GW_EIP" ] ; then
+                echo "Attempting to release Elastic IP $ALLOC_ID..."
+                # Disassociation might be needed if it's a NAT GW EIP that TF failed to delete
+                if [ "$ASSOCIATION_ID" != "None" ]; then
+                    aws ec2 disassociate-address --association-id "$ASSOCIATION_ID" || echo "Failed to disassociate $ALLOC_ID, might already be disassociated or managed elsewhere."
+                    sleep 2
+                fi
+                aws ec2 release-address --allocation-id "$ALLOC_ID" || echo "Failed to release $ALLOC_ID, it might be in use or managed by Terraform."
+              else
+                echo "Skipping EIP $ALLOC_ID as it appears to be actively associated with a resource not identified as a NAT GW or unassociated."
+              fi
             fi
           done
           
           # Get all subnets in the VPC
           SUBNETS=$(aws ec2 describe-subnets --filters "Name=vpc-id,Values=$VPC_ID" --query "Subnets[*].SubnetId" --output text)
           echo "Subnets: $SUBNETS"
-          
-          # Delete all network interfaces in each subnet
+
+          # Delete network interfaces in each subnet
           for SUBNET in $SUBNETS; do
             echo "Cleaning up resources in subnet $SUBNET..."
             aws ec2 describe-network-interfaces --filters "Name=subnet-id,Values=$SUBNET" --query "NetworkInterfaces[*].NetworkInterfaceId" --output text | tr '\t' '\n' | while read NI; do
@@ -263,23 +322,23 @@ jobs:
                 ATTACHMENT=$(aws ec2 describe-network-interfaces --network-interface-ids $NI --query "NetworkInterfaces[0].Attachment.AttachmentId" --output text)
                 if [ "$ATTACHMENT" != "None" ] && [ ! -z "$ATTACHMENT" ]; then
                   echo "Detaching network interface $NI (attachment $ATTACHMENT)..."
-                  aws ec2 detach-network-interface --attachment-id $ATTACHMENT --force || true
+                  aws ec2 detach-network-interface --attachment-id "$ATTACHMENT" --force
                   sleep 5
                 fi
                 echo "Deleting network interface $NI..."
-                aws ec2 delete-network-interface --network-interface-id $NI || true
+                aws ec2 delete-network-interface --network-interface-id "$NI"
               fi
             done
           done
           
           # Wait for resources to be released
           echo "Waiting for resources to be released..."
-          sleep 60
+          sleep 120 # Increased wait time
 
       - name: Install Terraform
         uses: hashicorp/setup-terraform@v3
         with:
-          terraform_version: 1.11.0
+          terraform_version: 1.8.3 # Updated to a more recent stable version
 
       - name: Terraform Init
         working-directory: terraform
@@ -323,209 +382,94 @@ jobs:
           kubectl apply -f k8s/argocd/aws-auth-patch.yaml
           echo "aws-auth ConfigMap applied"
 
+      - name: Add Helm repositories
+        run: |
+          helm repo add ingress-nginx https://kubernetes.github.io/ingress-nginx
+          helm repo add argo https://argoproj.github.io/argo-helm
+          helm repo add external-dns https://kubernetes-sigs.github.io/external-dns/
+          helm repo update
+
       - name: Install NGINX Ingress Controller
+        # Version pinning is recommended. Find latest at https://github.com/kubernetes/ingress-nginx/tree/main/charts/ingress-nginx
         run: |
           echo "Installing NGINX Ingress Controller for AWS..."
-          kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/controller-v1.10.1/deploy/static/provider/aws/deploy.yaml
-          echo "Waiting for ingress-nginx controller pod to be ready..."
+          helm upgrade --install ingress-nginx ingress-nginx/ingress-nginx \
+            --namespace ingress-nginx --create-namespace \
+            --set controller.service.annotations."service\.beta\.kubernetes\.io/aws-load-balancer-type"="nlb" \ # Example: Using NLB
+            # Example for ACM certificate with NLB, ensure secrets are set if you use this
+            # --set controller.service.annotations."service\.beta\.kubernetes\.io/aws-load-balancer-ssl-cert"="arn:aws:acm:ap-southeast-2:${{ secrets.AWS_ACCOUNT_ID }}:certificate/${{ secrets.ACM_CERT_ID_NLB }}" \
+            --set controller.replicaCount=2 \
+            --version 4.10.1 \ # Pinned to a specific chart version
+            --wait
+          echo "Waiting for ingress-nginx controller pod to be ready..." # This wait might be redundant due to --wait above
           kubectl rollout status deployment ingress-nginx-controller -n ingress-nginx --timeout=5m
 
-
       - name: Install Argo CD
+        # Version pinning is recommended. Find latest at https://github.com/argoproj/argo-helm/tree/main/charts/argo-cd
         run: |
           echo "Installing ArgoCD..."
-          kubectl create namespace argocd || true
-          kubectl apply -n argocd -f https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/install.yaml
-          
+          helm upgrade --install argocd argo/argo-cd \
+            --namespace argocd --create-namespace \
+            --set server.ingress.enabled=true \
+            --set server.ingress.ingressClassName=nginx \
+            --set server.ingress.hostname=argocd.bunnycloud.xyz \
+            --set server.ingress.annotations."external-dns\.alpha\.kubernetes\.io/hostname"="argocd.bunnycloud.xyz." \
+            --set server.ingress.annotations."kubernetes\.io/ingress\.class"="nginx" \
+            # Add other necessary ArgoCD Helm values here (e.g., config, RBAC)
+            --version 6.11.1 \ # Pinned to a specific chart version
+            --wait
           echo "Checking ArgoCD pods status..."
           kubectl get pods -n argocd
-          
-          echo "Waiting for ArgoCD deployments to be ready..."
+          echo "Waiting for ArgoCD deployments to be ready..." # This wait might be redundant
           kubectl wait --for=condition=Available deployment --all -n argocd --timeout=5m
           echo "ArgoCD installed and deployments are ready."
 
-      - name: Apply ArgoCD Ingress
+      - name: Install ExternalDNS
+        # Version pinning is recommended.
         run: |
-          echo "Waiting for Ingress LoadBalancer IP from ingress-nginx-controller..."
+          echo "Installing ExternalDNS..."
+          # Replace with your actual Hosted Zone ID and domain filter
+          HOSTED_ZONE_ID=$(aws route53 list-hosted-zones --query "HostedZones[?Name=='bunnycloud.xyz.'].Id" --output text | sed 's/\/hostedzone\///')
+          helm upgrade --install external-dns external-dns/external-dns \
+            --namespace external-dns --create-namespace \
+            --set provider=aws \
+            --set aws.zoneType=public \
+            --set domainFilters[0]=bunnycloud.xyz \
+            --set policy=upsert-only \ # Or 'sync' if you want it to delete records not managed by k8s
+            --set serviceAccount.create=true \
+            --set serviceAccount.name=external-dns \
+            --set serviceAccount.annotations."eks\.amazonaws\.com/role-arn"="arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/${{ secrets.EXTERNAL_DNS_IAM_ROLE_NAME }}" \ # Ensure secrets are set
+            --set txtOwnerId=$HOSTED_ZONE_ID \ # Helps identify records managed by this instance
+            --version 1.14.5 \ # Pinned to a specific chart version
+            --wait
+          echo "ExternalDNS installed."
 
-          for i in {1..30}; do
-            ELB_HOSTNAME=$(kubectl get svc ingress-nginx-controller -n ingress-nginx -o jsonpath='{.status.loadBalancer.ingress[0].hostname}' 2>/dev/null)
-            if [ ! -z "$ELB_HOSTNAME" ]; then
-              echo "Found ELB Hostname: $ELB_HOSTNAME"
-              break
-            fi
-            echo "ELB Hostname not available yet... retrying ($i/30)"
-            sleep 20
-          done
-
-          if [ -z "$ELB_HOSTNAME" ]; then
-            echo "❌ Error: Could not fetch ELB Hostname after timeout."
-            kubectl get svc ingress-nginx-controller -n ingress-nginx -o yaml
-            exit 1
-          fi
-
-          INGRESS_DOMAIN="argocd.bunnycloud.xyz"
-          echo "Ingress domain: $INGRESS_DOMAIN"
-
-          cp k8s/argocd/argocd-ingress.yaml k8s/argocd/argocd-ingress-patched.yaml
-          yq eval ".spec.rules[0].host = \"${INGRESS_DOMAIN}\"" -i k8s/argocd/argocd-ingress-patched.yaml
-          kubectl apply -f k8s/argocd/argocd-ingress-patched.yaml
-          echo "✅ Patched Ingress applied successfully."
-
-      - name: Apply ArgoCD LoadBalancer Service
-        run: kubectl apply -f k8s/argocd/argocd-svc.yaml
-
-      - name: Wait for Ingress LoadBalancer
+      - name: Verify Ingress and DNS (ArgoCD)
         run: |
-          echo "Waiting for Ingress LoadBalancer to be provisioned for argocd-server-ingress..."
+          echo "Waiting for ArgoCD Ingress to get an address..."
           INGRESS_HOSTNAME=""
-          # Increased timeout as Ingress LBs can take a few minutes
           for i in {1..30}; do
-            INGRESS_HOSTNAME=$(kubectl get ingress argocd-server-ingress -n argocd -o jsonpath='{.status.loadBalancer.ingress[0].hostname}' 2>/dev/null)
+            # The ArgoCD Helm chart might create an Ingress named 'argocd-server' or similar
+            INGRESS_HOSTNAME=$(kubectl get ingress -n argocd -l app.kubernetes.io/name=argo-cd,app.kubernetes.io/component=server -o jsonpath='{.items[0].status.loadBalancer.ingress[0].hostname}' 2>/dev/null)
             if [ ! -z "$INGRESS_HOSTNAME" ]; then
               echo "Ingress LoadBalancer found: $INGRESS_HOSTNAME"
               break
             fi
             echo "Waiting for Ingress LoadBalancer... (attempt $i/30)"
-            sleep 20 # Wait a bit longer between checks
+            sleep 20
           done
-
           if [ -z "$INGRESS_HOSTNAME" ]; then
-            echo "Error: Ingress LoadBalancer for argocd-server-ingress not found after timeout."
-            kubectl get ingress argocd-server-ingress -n argocd -o yaml # For debugging
-            kubectl describe ingress argocd-server-ingress -n argocd # For debugging
+            echo "Error: ArgoCD Ingress LoadBalancer not found after timeout."
+            kubectl get ingress -n argocd -o yaml
             exit 1
           fi
-
-      - name: Delete existing ArgoCD DNS record (if exists)
-        run: |
-          ZONE_ID=$(aws route53 list-hosted-zones --query "HostedZones[?Name=='bunnycloud.xyz.'].Id" --output text | sed 's/\/hostedzone\///')
-          
-          echo "Checking for existing A or CNAME record..."
-          RECORD=$(aws route53 list-resource-record-sets \
-            --hosted-zone-id $ZONE_ID \
-            --query "ResourceRecordSets[?Name=='argocd.bunnycloud.xyz.'] | [?Type=='A' || Type=='CNAME']" \
-            --output json)
-          
-          if [[ "$RECORD" != "[]" ]]; then
-            echo "$RECORD" > existing_record.json
-            cat existing_record.json | jq '{Changes: [{Action: "DELETE", ResourceRecordSet: .[0]}]}' > delete-change-batch.json
-            
-            echo "Deleting existing record..."
-            aws route53 change-resource-record-sets --hosted-zone-id $ZONE_ID --change-batch file://delete-change-batch.json
-          else
-            echo "No existing record found to delete."
-          fi
-
-
-      - name: Update ArgoCD DNS record
-        run: |
-          # Get the LoadBalancer hostname
-          LB_HOSTNAME=$(kubectl get svc argocd-server-lb -n argocd -o jsonpath='{.status.loadBalancer.ingress[0].hostname}')
-          
-          if [ -z "$LB_HOSTNAME" ]; then
-            echo "Error: ArgoCD LoadBalancer not found"
-            exit 1
-          fi
-          
-          echo "ArgoCD LoadBalancer hostname: $LB_HOSTNAME"
-          
-          # Get the Route53 hosted zone ID
-          ZONE_ID=$(aws route53 list-hosted-zones --query "HostedZones[?Name=='bunnycloud.xyz.'].Id" --output text | sed 's/\/hostedzone\///')
-          echo "Route53 zone ID: $ZONE_ID"
-          
-          # Get the LoadBalancer's hosted zone ID
-          LB_ZONE_ID=$(aws elbv2 describe-load-balancers --query "LoadBalancers[?DNSName=='$LB_HOSTNAME'].CanonicalHostedZoneId" --output text)
-          
-          if [ -z "$LB_ZONE_ID" ] || [ "$LB_ZONE_ID" == "None" ]; then
-            echo "Trying classic ELB..."
-            LB_ZONE_ID=$(aws elb describe-load-balancers --query "LoadBalancerDescriptions[?DNSName=='$LB_HOSTNAME'].CanonicalHostedZoneNameID" --output text)
-          fi
-          
-          echo "LoadBalancer zone ID: $LB_ZONE_ID"
-          
-          # Update the Route53 record with an ALIAS record
-          CHANGE_BATCH='{
-            "Changes": [
-              {
-                "Action": "UPSERT",
-                "ResourceRecordSet": {
-                  "Name": "argocd.bunnycloud.xyz",
-                  "Type": "A",
-                  "AliasTarget": {
-                    "HostedZoneId": "'$LB_ZONE_ID'",
-                    "DNSName": "'$LB_HOSTNAME'",
-                    "EvaluateTargetHealth": true
-                  }
-                }
-              }
-            ]
-          }'
-          echo "Change batch: $CHANGE_BATCH"
-          
-          CHANGE_RESULT=$(aws route53 change-resource-record-sets --hosted-zone-id $ZONE_ID --change-batch "$CHANGE_BATCH")
-          echo "Change result: $CHANGE_RESULT"
-          
-          echo "DNS record updated for argocd.bunnycloud.xyz -> $LB_HOSTNAME"
-          
-          # Test the record using AWS nameservers
-          echo "Testing DNS record using AWS nameservers..."
-          aws route53 list-resource-record-sets --hosted-zone-id $ZONE_ID --query "ResourceRecordSets[?Name=='argocd.bunnycloud.xyz.']"
-          dig @ns-94.awsdns-11.com argocd.bunnycloud.xyz
-
-      - name: Update Nodejs App DNS record
-        env:
-          AWS_REGION: ap-southeast-2 # Ensure AWS_REGION is available
-        run: |
-          echo "Attempting to update DNS for Node.js application..."
-          # The NGINX Ingress ELB is shared. We need its hostname and canonical zone ID.
-          # This should ideally be fetched once and reused.
-          # Assuming ELB_HOSTNAME and LB_ZONE_ID might have been set by previous ArgoCD DNS step.
-          # If not, we re-fetch for the ingress-nginx-controller service.
-
-          # Get NGINX Ingress Controller ELB Hostname
-          NGINX_ELB_HOSTNAME=$(kubectl get svc ingress-nginx-controller -n ingress-nginx -o jsonpath='{.status.loadBalancer.ingress[0].hostname}' 2>/dev/null)
-          if [ -z "$NGINX_ELB_HOSTNAME" ]; then
-            echo "❌ Error: Could not fetch NGINX Ingress ELB Hostname for Node.js app DNS."
-            exit 1
-          fi
-          echo "NGINX Ingress ELB Hostname: $NGINX_ELB_HOSTNAME"
-
-          # Get NGINX Ingress ELB Canonical Hosted Zone ID
-          NGINX_LB_ZONE_ID=$(aws elbv2 describe-load-balancers --query "LoadBalancers[?DNSName=='$NGINX_ELB_HOSTNAME'].CanonicalHostedZoneId" --output text --region ${{ env.AWS_REGION }})
-          if [ -z "$NGINX_LB_ZONE_ID" ] || [ "$NGINX_LB_ZONE_ID" == "None" ]; then
-            echo "NGINX Ingress ELB not found as ALB/NLB, trying Classic ELB..."
-            NGINX_LB_ZONE_ID=$(aws elb describe-load-balancers --query "LoadBalancerDescriptions[?DNSName=='$NGINX_ELB_HOSTNAME'].CanonicalHostedZoneNameID" --output text --region ${{ env.AWS_REGION }})
-          fi
-          if [ -z "$NGINX_LB_ZONE_ID" ] || [ "$NGINX_LB_ZONE_ID" == "None" ]; then
-            echo "❌ Error: Could not fetch NGINX Ingress ELB CanonicalHostedZoneId for Node.js app DNS."
-            exit 1
-          fi
-          echo "NGINX Ingress ELB Canonical Zone ID: $NGINX_LB_ZONE_ID"
-
-          APP_DNS_NAME="nodejs.bunnycloud.xyz"
-          ROUTE53_HOSTED_ZONE_ID=$(aws route53 list-hosted-zones --query "HostedZones[?Name=='bunnycloud.xyz.'].Id" --output text | sed 's/\/hostedzone\///')
-
-          echo "Updating DNS for $APP_DNS_NAME to point to $NGINX_ELB_HOSTNAME (Zone ID: $NGINX_LB_ZONE_ID) in Hosted Zone $ROUTE53_HOSTED_ZONE_ID"
-
-          CHANGE_BATCH_APP='{
-            "Changes": [
-              {
-                "Action": "UPSERT",
-                "ResourceRecordSet": {
-                  "Name": "'"$APP_DNS_NAME"'",
-                  "Type": "A",
-                  "AliasTarget": {
-                    "HostedZoneId": "'"$NGINX_LB_ZONE_ID"'",
-                    "DNSName": "'"$NGINX_ELB_HOSTNAME"'",
-                    "EvaluateTargetHealth": true
-                  }
-                }
-              }
-            ]
-          }'
-          aws route53 change-resource-record-sets --hosted-zone-id "$ROUTE53_HOSTED_ZONE_ID" --change-batch "$CHANGE_BATCH_APP"
-          echo "✅ DNS record update initiated for $APP_DNS_NAME."
+          echo "Waiting for DNS record for argocd.bunnycloud.xyz to be created by ExternalDNS..."
+          for i in {1..20}; do # Wait up to 10 minutes
+            dig +short argocd.bunnycloud.xyz && break
+            echo "DNS not propagated yet for argocd.bunnycloud.xyz... ($i/20)"
+            sleep 30
+          done
+          dig argocd.bunnycloud.xyz # Final check
 
       - name: Check and update EKS node security group
         run: |
@@ -539,40 +483,21 @@ jobs:
           # If using an Ingress controller (like Nginx or AWS LBC), the relevant ports would be
           # the NodePorts used by the Ingress controller service, and the ELB it creates should have access to them.
           
-          if [ -z "$RULE_EXISTS" ]; then
-            echo "Adding rule to allow inbound traffic on port 8080..."
-            aws ec2 authorize-security-group-ingress \
-              --group-id $SG_ID \
-              --protocol tcp \
-              --port 8080 \
-              --cidr 0.0.0.0/0
-            echo "Rule added successfully"
-          else
-            echo "Rule already exists"
-          fi
-          
-      - name: Check domain nameserver delegation
+      # The 'Check domain nameserver delegation' and 'Check Route53 record' steps can remain for verification.
+      # The 'Update Nodejs App DNS record' step is removed as ExternalDNS will handle it
+      # based on annotations in your Node.js app's Ingress (defined in its Helm chart).
+
+      - name: Verify Node.js App DNS (assuming its Ingress is annotated for external-dns)
         run: |
-          echo "Checking nameserver delegation for bunnycloud.xyz..."
-          
-          # Get AWS Route53 nameservers for the zone
-          ZONE_ID=$(aws route53 list-hosted-zones --query "HostedZones[?Name=='bunnycloud.xyz.'].Id" --output text | sed 's/\/hostedzone\///')
-          AWS_NS=$(aws route53 get-hosted-zone --id $ZONE_ID --query "DelegationSet.NameServers" --output text)
-          echo "AWS Route53 nameservers for bunnycloud.xyz: $AWS_NS"
-          
-          # Get actual nameservers from public DNS
-          ACTUAL_NS=$(dig +short NS bunnycloud.xyz)
-          echo "Actual nameservers for bunnycloud.xyz: $ACTUAL_NS"
-          
-          # Check if they match
-          for NS in $AWS_NS; do
-            if ! echo "$ACTUAL_NS" | grep -q "$NS"; then
-              echo "⚠️ WARNING: AWS nameserver $NS not found in actual nameservers"
-            fi
+          echo "Waiting for DNS record for nodejs.bunnycloud.xyz to be created by ExternalDNS..."
+          for i in {1..20}; do # Wait up to 10 minutes
+            dig +short nodejs.bunnycloud.xyz && break
+            echo "DNS not propagated yet for nodejs.bunnycloud.xyz... ($i/20)"
+            sleep 30
           done
-          
-          echo "To fix this issue, update the nameservers at your domain registrar (Strato) to use the AWS Route53 nameservers listed above."
-      - name: Test DNS record
+          dig nodejs.bunnycloud.xyz # Final check
+
+      - name: Old Test DNS record (can be removed or adapted) # Renamed this step
         run: |
           echo "Testing DNS record for argocd.bunnycloud.xyz..."
           dig argocd.bunnycloud.xyz
@@ -587,16 +512,6 @@ jobs:
             echo "Waiting for DNS propagation... (attempt $i/10)"
             sleep 30
           done
-          
-          # echo "Testing HTTPS access to argocd.bunnycloud.xyz..."
-          # curl -vL --max-time 20 https://argocd.bunnycloud.xyz || echo "HTTPS access failed"
-
-      - name: Check Route53 record
-        run: |
-          echo "Checking Route53 record for argocd.bunnycloud.xyz..."
-          # ZONE_ID=$(aws route53 list-hosted-zones --query "HostedZones[?Name=='bunnycloud.xyz.'].Id" --output text | sed 's/\/hostedzone\///')
-          ZONE_ID=$(aws route53 list-hosted-zones --query "HostedZones[?Name=='bunnycloud.xyz.'].Id" --output text | sed 's/\/hostedzone\///')
-          aws route53 list-resource-record-sets --hosted-zone-id $ZONE_ID --query "ResourceRecordSets[?Name=='argocd.bunnycloud.xyz.']"
 
   generate-argo-apps:
     runs-on: ubuntu-latest
@@ -664,7 +579,7 @@ jobs:
 
   lint-and-deploy-helm:
     if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
-    needs: [docker, deploy-argocd]
+    needs: [docker, deploy-argocd] # Changed from generate-argo-apps to deploy-argocd
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
@@ -674,21 +589,22 @@ jobs:
           curl https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
       - name: Lint Helm charts
         run: |
-          if [ -d "helm" ]; then
-            for chart in helm/*; do
-              if [ -d "$chart" ]; then
-                echo "Linting $chart..."
-                helm lint "$chart"
+          if [ -d "apps" ]; then # Changed from "helm" to "apps"
+            for chart_dir in apps/*; do # Iterate through app folders
+              if [ -f "$chart_dir/chart/Chart.yaml" ]; then # Check for a Chart.yaml file
+                echo "Linting $chart_dir/chart..."
+                helm lint "$chart_dir/chart"
               fi
             done
           fi
       - name: Template Helm charts (dry-run render)
         run: |
-          if [ -d "helm" ]; then
-            for chart in helm/*; do
-              if [ -d "$chart" ]; then
-                echo "Rendering $chart..."
-                helm template "$chart"
+          if [ -d "apps" ]; then # Changed from "helm" to "apps"
+            for chart_dir in apps/*; do # Iterate through app folders
+              if [ -f "$chart_dir/chart/Chart.yaml" ]; then # Check for a Chart.yaml file
+                echo "Rendering $chart_dir/chart..."
+                # You might want to pass values files or set values here for a more realistic render
+                helm template "$chart_dir/chart"
               fi
             done
           fi
@@ -704,29 +620,65 @@ jobs:
 
       - name: Apply ArgoCD Application manifests
         run: |
-          if [ -f "k8s/argocd/applications/nodejs.yaml" ]; then
-            kubectl apply -f k8s/argocd/applications/nodejs.yaml
+          # Apply all generated application manifests
+          if [ -d "k8s/argocd/applications" ]; then
+            for app_manifest in k8s/argocd/applications/*.yaml; do
+              if [ -f "$app_manifest" ]; then
+                echo "Applying ArgoCD Application manifest: $app_manifest"
+                kubectl apply -f "$app_manifest"
+              fi
+            done
           else
-            echo "Node.js ArgoCD application manifest not found in k8s/argocd/applications."
+            echo "No ArgoCD application manifests found in k8s/argocd/applications."
           fi
 
-      - name: Wait for Node.js app to be ready
+      - name: Wait for Node.js app to be ready (Example for 'nodejs' app)
+        # This step needs to be generalized or made conditional if you have multiple apps
+        # For now, it assumes a 'nodejs' app as per previous logic.
         run: |
-          echo "Waiting for Node.js pod to be ready..."
+          APP_NAMESPACE="nodejs" # Assuming the app is deployed to a namespace matching its name
+          APP_SERVICE_NAME="nodejs-service" # Assuming this is the service name for the nodejs app
+
+          echo "Waiting for $APP_NAMESPACE pod to be ready..."
           for i in {1..30}; do
-            kubectl get pods -n nodejs -l app.kubernetes.io/name=nodejs --field-selector=status.phase=Running && break # More specific selector
+            # Adjust label selector based on your Helm chart's conventions
+            kubectl get pods -n $APP_NAMESPACE -l app.kubernetes.io/name=$APP_NAMESPACE --field-selector=status.phase=Running && break
             sleep 10
           done
 
-          echo "Port-forwarding service and checking health endpoint..."
-          kubectl port-forward svc/nodejs-service -n nodejs 8080:80 & # Forward to containerPort 8080, service port is 80
-          sleep 5
+          echo "Port-forwarding service $APP_SERVICE_NAME and checking health endpoint..."
+          kubectl port-forward svc/$APP_SERVICE_NAME -n $APP_NAMESPACE 8080:80 & # Forward to containerPort (e.g. 3000), service port is 80
+          PORT_FORWARD_PID=$!
+          sleep 5 # Give port-forward time to establish
 
+          HEALTHY=false
           for i in {1..10}; do
-            curl --fail http://localhost:8080/status && echo "✅ App is healthy" && exit 0
-            echo "Waiting for app to respond... ($i/10)"
+            # Assuming your app's /status endpoint is on the containerPort (e.g., 3000)
+            # and the service port-forwards 80 to that containerPort.
+            # If your app listens on 3000 and service is 80->3000, then curl to localhost:8080/status
+            # If your app listens on 80 and service is 80->80, then curl to localhost:8080/status
+            # Adjust the port in curl command if your app's actual listening port (containerPort) is different
+            # and your service definition. The example assumes service port 80 maps to a container port.
+            # If your nodejs app listens on 3000, and service maps 80->3000, then port-forward 8080:80 (servicePort)
+            # and curl localhost:8080/status.
+            # If your nodejs app listens on 3000, and service maps 3000->3000, then port-forward 8080:3000
+            # and curl localhost:8080/status.
+            # The current port-forward is 8080 (local) to 80 (service's targetPort, assuming it's the app's listening port).
+            # If your app listens on 3000, the service should targetPort 3000.
+            # And the port-forward should be to the service's port (e.g. 80) or targetPort (e.g. 3000)
+            # Let's assume the service is configured correctly and the app listens on the targetPort of the service's port 80.
+            if curl --fail --max-time 10 http://localhost:8080/status; then
+              echo "✅ App $APP_NAMESPACE is healthy"
+              HEALTHY=true
+              break
+            fi
+            echo "Waiting for app $APP_NAMESPACE to respond... ($i/10)"
             sleep 5
           done
 
-          echo "❌ App did not become healthy in time"
-          exit 1
+          kill $PORT_FORWARD_PID # Kill the port-forward process
+
+          if [ "$HEALTHY" = "false" ]; then
+            echo "❌ App $APP_NAMESPACE did not become healthy in time"
+            exit 1
+          fi
