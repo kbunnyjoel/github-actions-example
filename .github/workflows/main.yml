@@ -466,30 +466,44 @@ jobs:
 
       - name: Verify Ingress and DNS (ArgoCD)
         run: |
-          echo "Waiting for ArgoCD Ingress to get an address..."
-          INGRESS_HOSTNAME=""
+          echo "Waiting for ArgoCD Ingress or Service to get an address..."
+          HOSTNAME=""
           for i in {1..30}; do
-            # The ArgoCD Helm chart might create an Ingress named 'argocd-server' or similar
-            INGRESS_HOSTNAME=$(kubectl get ingress -n argocd -l app.kubernetes.io/name=argo-cd,app.kubernetes.io/component=server -o jsonpath='{.items[0].status.loadBalancer.ingress[0].hostname}' 2>/dev/null)
+            # Check for Ingress
+            INGRESS_HOSTNAME=$(kubectl get ingress -n argocd -l app.kubernetes.io/name=argocd-server -o jsonpath='{.items[0].status.loadBalancer.ingress[0].hostname}' 2>/dev/null)
+            
+            # If Ingress not found, check for LoadBalancer Service
+            if [ -z "$INGRESS_HOSTNAME" ]; then
+              INGRESS_HOSTNAME=$(kubectl get svc -n argocd argocd-server -o jsonpath='{.status.loadBalancer.ingress[0].hostname}' 2>/dev/null)
+            fi
+            
             if [ ! -z "$INGRESS_HOSTNAME" ]; then
-              echo "Ingress LoadBalancer found: $INGRESS_HOSTNAME"
+              echo "LoadBalancer hostname found: $INGRESS_HOSTNAME"
               break
             fi
-            echo "Waiting for Ingress LoadBalancer... (attempt $i/30)"
+            echo "Waiting for LoadBalancer... (attempt $i/30)"
             sleep 20
           done
+          
           if [ -z "$INGRESS_HOSTNAME" ]; then
-            echo "Error: ArgoCD Ingress LoadBalancer not found after timeout."
-            kubectl get ingress -n argocd -o yaml
+            echo "Error: ArgoCD LoadBalancer not found after timeout."
+            echo "Checking Ingress resources:"
+            kubectl get ingress -n argocd -o wide
+            echo "Checking Service resources:"
+            kubectl get svc -n argocd -o wide
             exit 1
           fi
+          
           echo "Waiting for DNS record for argocd.bunnycloud.xyz to be created by ExternalDNS..."
           for i in {1..20}; do # Wait up to 10 minutes
-            dig +short argocd.bunnycloud.xyz && break
+            if dig +short argocd.bunnycloud.xyz | grep -q .; then
+              echo "DNS record found for argocd.bunnycloud.xyz"
+              break
+            fi
             echo "DNS not propagated yet for argocd.bunnycloud.xyz... ($i/20)"
             sleep 30
           done
-          dig argocd.bunnycloud.xyz # Final check
+    dig argocd.bunnycloud.xyz # Final check
 
       - name: Check and update EKS node security group
         run: |
