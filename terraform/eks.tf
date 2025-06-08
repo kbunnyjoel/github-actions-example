@@ -63,6 +63,9 @@ module "eks" {
     resources        = ["secrets"]
   }]
 
+  # Override default security group rules
+  create_node_security_group = true
+
   # Enable EKS control plane logging
   cluster_enabled_log_types = ["api", "audit", "authenticator", "controllerManager", "scheduler"]
 
@@ -160,6 +163,16 @@ module "eks" {
       to_port     = 53
       type        = "egress"
       cidr_blocks = ["172.20.0.2/32"] # VPC DNS server
+    }
+
+    egress_all = {
+      description      = "Override default rule allowing internet access"
+      protocol         = "-1"
+      from_port        = 0
+      to_port          = 0
+      type             = "egress"
+      cidr_blocks      = [module.vpc.vpc_cidr_block]
+      ipv6_cidr_blocks = null
     }
   }
 
