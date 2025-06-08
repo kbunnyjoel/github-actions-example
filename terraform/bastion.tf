@@ -60,7 +60,7 @@ resource "aws_security_group" "bastion_sg" {
     from_port   = 0
     to_port     = 0
     protocol    = "-1"
-    cidr_blocks = ["0.0.0.0/0"]
+    cidr_blocks = [module.vpc.vpc_cidr_block]
   }
 }
 
@@ -81,6 +81,13 @@ resource "aws_instance" "bastion" {
     delete_on_termination = true
     volume_size           = 8
   }
+
+  metadata_options {
+    http_tokens = "required"
+    http_put_response_hop_limit = 2
+    http_endpoint = "enabled"
+  }
+
   tags = {
     Name = "bastion-host"
   }
