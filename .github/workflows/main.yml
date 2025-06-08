@@ -446,7 +446,6 @@ jobs:
           echo "ArgoCD installed and deployments are ready."
 
       - name: Install ExternalDNS
-        # Version pinning is recommended.
         run: |
           echo "Installing ExternalDNS..."
           # Replace with your actual Hosted Zone ID and domain filter
@@ -456,12 +455,12 @@ jobs:
             --set provider=aws \
             --set aws.zoneType=public \
             --set domainFilters[0]=bunnycloud.xyz \
-            --set policy=upsert-only \ # Or 'sync' if you want it to delete records not managed by k8s
+            --set policy=upsert-only \
             --set serviceAccount.create=true \
             --set serviceAccount.name=external-dns \
-            --set serviceAccount.annotations."eks\.amazonaws\.com/role-arn"="arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/${{ secrets.EXTERNAL_DNS_IAM_ROLE_NAME }}" \ # Ensure secrets are set
-            --set txtOwnerId=$HOSTED_ZONE_ID \ # Helps identify records managed by this instance
-            --version 1.14.5 \ # Pinned to a specific chart version
+            --set serviceAccount.annotations."eks\.amazonaws\.com/role-arn"="arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/${{ secrets.EXTERNAL_DNS_IAM_ROLE_NAME }}" \
+            --set txtOwnerId=$HOSTED_ZONE_ID \
+            --version 1.14.5 \
             --wait
           echo "ExternalDNS installed."
 
