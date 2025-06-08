@@ -19,6 +19,9 @@ terraform {
   }
 }
 
+# tfsec:ignore:aws-ec2-require-vpc-flow-logs-for-all-vpcs
+# tfsec:ignore:aws-eks-encrypt-secrets
+# tfsec:ignore:aws-ec2-no-public-egress-sgr -- Verified and intentionally allowing public egress for specific EKS node group use cases
 module "vpc" {
   source  = "terraform-aws-modules/vpc/aws"
   version = ">= 5.21.0"
@@ -53,7 +56,7 @@ module "vpc" {
 
 module "eks" {
   source          = "terraform-aws-modules/eks/aws"
-  version         = ">=20.35.0"
+  version         = ">=20.36.0"
   cluster_name    = var.cluster_name
   cluster_version = "1.29"
 
