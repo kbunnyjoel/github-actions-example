@@ -54,7 +54,7 @@ module "eks" {
   vpc_id = module.vpc.vpc_id
 
   # API access settings
-  cluster_endpoint_public_access  = true
+  cluster_endpoint_public_access  = false
   cluster_endpoint_private_access = true
 
   # Add cluster security group rules for external DNS
@@ -65,7 +65,7 @@ module "eks" {
       from_port   = 53
       to_port     = 53
       type        = "egress"
-      cidr_blocks = ["0.0.0.0/0"]
+      cidr_blocks = [module.vpc.vpc_cidr_block]
     }
     egress_dns_udp = {
       description = "Allow DNS resolution (UDP)"
@@ -73,7 +73,7 @@ module "eks" {
       from_port   = 53
       to_port     = 53
       type        = "egress"
-      cidr_blocks = ["0.0.0.0/0"]
+      cidr_blocks = [module.vpc.vpc_cidr_block]
     }
     egress_https = {
       description = "Allow HTTPS outbound"
@@ -81,7 +81,7 @@ module "eks" {
       from_port   = 443
       to_port     = 443
       type        = "egress"
-      cidr_blocks = ["0.0.0.0/0"]
+      cidr_blocks = [module.vpc.vpc_cidr_block]
     }
   }
 
