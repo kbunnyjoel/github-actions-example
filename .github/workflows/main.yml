@@ -25,6 +25,10 @@ env:
 
 jobs:
   buil-and-test:
+    permissions:
+      actions: read # Default permission for GITHUB_TOKEN
+      contents: read # To checkout the repository
+      security-events: write # Required for CodeQL to upload SARIF results
     runs-on: ubuntu-latest
 
     strategy:
