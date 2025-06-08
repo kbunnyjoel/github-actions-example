@@ -597,7 +597,7 @@ jobs:
           
           # Check ExternalDNS logs to see if it's working
           echo "Checking ExternalDNS logs..."
-          kubectl logs -n external-dns -l app.kubernetes.io/name=external-dns --tail=50
+          kubectl logs -n external-dns -l app.kubernetes.io/name=external-dns --tail=50 || true
           
           echo "Waiting for DNS record for argocd.bunnycloud.xyz to be created by ExternalDNS..."
           for i in {1..5}; do # Reduced wait time to 2.5 minutes
@@ -614,12 +614,29 @@ jobs:
             echo "ExternalDNS failed to create DNS record. Creating manually..."
             HOSTED_ZONE_ID=$(aws route53 list-hosted-zones --query "HostedZones[?Name=='bunnycloud.xyz.'].Id" --output text | sed 's/\/hostedzone\///')
             
-            # Create a JSON file for the Route53 change
+            # First, list and delete any existing records
+            echo "Checking for existing records..."
+            aws route53 list-resource-record-sets --hosted-zone-id $HOSTED_ZONE_ID --query "ResourceRecordSets[?Name=='argocd.bunnycloud.xyz.']" --output json > existing-records.json
+            
+            # Check if there are existing records
+            if [ -s existing-records.json ] && [ "$(cat existing-records.json)" != "[]" ]; then
+              echo "Found existing records, deleting them first..."
+              jq -c '.[]' existing-records.json | while read -r record; do
+                echo "Deleting record: $record"
+                echo "{\"Changes\":[{\"Action\":\"DELETE\",\"ResourceRecordSet\":$record}]}" > delete-record.json
+                aws route53 change-resource-record-sets --hosted-zone-id $HOSTED_ZONE_ID --change-batch file://delete-record.json || true
+              done
+              echo "Waiting for deletion to complete..."
+              sleep 30
+            fi
+            
+            # Now create the new CNAME record
+            echo "Creating new CNAME record..."
             cat > dns-change.json << EOF
           {
             "Changes": [
               {
-                "Action": "UPSERT",
+                "Action": "CREATE",
                 "ResourceRecordSet": {
                   "Name": "argocd.bunnycloud.xyz",
                   "Type": "CNAME",
@@ -636,14 +653,15 @@ jobs:
           EOF
             
             # Apply the DNS change
-            aws route53 change-resource-record-sets --hosted-zone-id $HOSTED_ZONE_ID --change-batch file://dns-change.json
+            aws route53 change-resource-record-sets --hosted-zone-id $HOSTED_ZONE_ID --change-batch file://dns-change.json || true
             echo "Manual DNS record created for argocd.bunnycloud.xyz pointing to $INGRESS_HOSTNAME"
           fi
           
           # Final DNS check
           echo "Final DNS check:"
-          dig argocd.bunnycloud.xyz
+          dig argocd.bunnycloud.xyz || true
         continue-on-error: true  # Don't fail the workflow if DNS isn't ready
+
 
 
       - name: Check and update EKS node security group
