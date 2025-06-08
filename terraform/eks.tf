@@ -66,7 +66,7 @@ module "eks" {
     resources        = ["secrets"]
     provider_key_arn = aws_kms_key.eks.arn
   }
-  
+
   # Enable EKS control plane logging
   cluster_enabled_log_types = ["api", "audit", "authenticator", "controllerManager", "scheduler"]
 
