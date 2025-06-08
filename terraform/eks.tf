@@ -92,7 +92,7 @@ module "eks" {
       from_port   = 0
       to_port     = 0
       protocol    = "-1"
-      cidr_blocks = [module.vpc.vpc_cidr_block]
+      cidr_blocks = ["10.0.0.0/16"]  # restrict to internal network only
     }
   }
 

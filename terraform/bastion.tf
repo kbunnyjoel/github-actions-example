@@ -57,6 +57,7 @@ resource "aws_security_group" "bastion_sg" {
   }
 
   egress {
+    description = "Allow outbound traffic to VPC CIDR"
     from_port   = 0
     to_port     = 0
     protocol    = "-1"
@@ -80,6 +81,7 @@ resource "aws_instance" "bastion" {
   root_block_device {
     delete_on_termination = true
     volume_size           = 8
+    encrypted             = true
   }
 
   metadata_options {

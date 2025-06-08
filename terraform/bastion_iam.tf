@@ -35,7 +35,7 @@ resource "aws_iam_policy" "eks_access_policy" {
           "sts:AssumeRole",
           "sts:GetCallerIdentity"
         ]
-        Resource = "*"
+        Resource = "arn:aws:eks:${var.region}:${data.aws_caller_identity.current.account_id}:cluster/${var.cluster_name}"
       }
     ]
   })

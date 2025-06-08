@@ -91,7 +91,7 @@ resource "aws_iam_policy" "cluster_autoscaler_policy" {
           "ec2:DescribeLaunchTemplateVersions"
         ]
         Effect   = "Allow"
-        Resource = "*"
+        Resource = "arn:aws:autoscaling:*:*:autoScalingGroup/*"
       }
     ]
   })
