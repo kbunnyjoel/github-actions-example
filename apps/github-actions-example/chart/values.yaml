@@ -17,7 +17,7 @@ service:
 ingress:
   enabled: true
   className: "nginx" # Specify your IngressClass if needed, e.g., "nginx", "alb"
-  host: nodejs.bunnycloud.xyz
+  host: github-actions-example.bunnycloud.xyz
   # tls:
   #   - secretName: nodejs-tls-secret # Name of the Kubernetes secret containing TLS cert and key
   #     hosts:
