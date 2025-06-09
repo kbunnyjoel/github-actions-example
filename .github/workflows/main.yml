@@ -770,6 +770,8 @@ jobs:
           else
             echo "Rule for port 443 from GitHub Actions already exists."
           fi
+        continue-on-error: true  # Don't fail the workflow if rule already exists
+
           
       # The 'Check domain nameserver delegation' and 'Check Route53 record' steps can remain for verification.
       # The 'Update Nodejs App DNS record' step is removed as ExternalDNS will handle it
