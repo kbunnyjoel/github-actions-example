@@ -20,9 +20,9 @@ resource "aws_route53_record" "cert_validation" {
   # The count = var.create_dns_records ? 1 : 0 on your data source needs to be considered.
   # If data.aws_route53_zone.main is conditional, this resource should also be conditional.
   # For simplicity, assuming data.aws_route53_zone.main[0] is always available when this is desired.
-  count   = var.create_dns_records ? 1 : 0 # Match conditionality if needed
+  count = var.create_dns_records ? 1 : 0 # Match conditionality if needed
 
-  zone_id = data.aws_route53_zone.this.zone_id 
+  zone_id = data.aws_route53_zone.this.zone_id
   name    = element(aws_acm_certificate.this.domain_validation_options.*.resource_record_name, 0)
   type    = element(aws_acm_certificate.this.domain_validation_options.*.resource_record_type, 0)
   records = [element(aws_acm_certificate.this.domain_validation_options.*.resource_record_value, 0)]
@@ -30,9 +30,9 @@ resource "aws_route53_record" "cert_validation" {
 }
 
 # Waits for the ACM certificate to be validated using the DNS record.
-resource "aws_acm_certificate_validation" "cert" {
+resource "aws_acm_certificate_validation" "this" {
   # Match conditionality if needed, similar to aws_route53_record.cert_validation
-  count = var.create_dns_records ? 1 : 0 
+  count = var.create_dns_records ? 1 : 0
 
   certificate_arn         = aws_acm_certificate.cert.arn
   validation_record_fqdns = [aws_route53_record.cert_validation[0].fqdn] # Use the FQDN of the created record

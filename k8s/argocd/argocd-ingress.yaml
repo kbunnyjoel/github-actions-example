@@ -4,7 +4,7 @@ metadata:
   name: argocd-server
   namespace: argocd
   annotations:
-    service.beta.kubernetes.io/aws-load-balancer-ssl-cert: arn:aws:acm:ap-southeast-2:806210429052:certificate/48eb29f5-5d67-4165-a3a0-e9623f1a61f3
+    service.beta.kubernetes.io/aws-load-balancer-ssl-cert: ${aws_acm_certificate.this.arn}
     service.beta.kubernetes.io/aws-load-balancer-backend-protocol: http
     service.beta.kubernetes.io/aws-load-balancer-ssl-ports: "443"
 spec:

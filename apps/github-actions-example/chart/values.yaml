@@ -18,8 +18,7 @@ ingress:
   enabled: true
   className: "nginx" # Specify your IngressClass if needed, e.g., "nginx", "alb"
   host: github-actions-example.bunnycloud.xyz
-  ingress:
-    sslCertArn: arn:aws:acm:ap-southeast-2:806210429052:certificate/48eb29f5-5d67-4165-a3a0-e9623f1a61f3
+  sslCertArn: arn:aws:acm:ap-southeast-2:806210429052:certificate/48eb29f5-5d67-4165-a3a0-e9623f1a61f3
 
 resources: {}
   # We usually recommend not to specify default resources and to leave this as a conscious
