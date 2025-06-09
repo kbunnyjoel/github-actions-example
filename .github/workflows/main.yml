@@ -614,10 +614,6 @@ jobs:
             echo "DNS record for argocd.bunnycloud.xyz found and propagated."
           fi
          
-            # Apply the DNS change
-            aws route53 change-resource-record-sets --hosted-zone-id $HOSTED_ZONE_ID --change-batch file://dns-change.json || true
-            echo "Manual DNS record created for argocd.bunnycloud.xyz pointing to $INGRESS_HOSTNAME"
-          
           # Final DNS check
           echo "Final DNS check:"
           dig argocd.bunnycloud.xyz || true
