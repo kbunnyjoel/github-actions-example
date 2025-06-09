@@ -787,13 +787,14 @@ jobs:
           # Use repository variables or defaults
           DOCKER_USERNAME="${{ secrets.DOCKER_USERNAME || '1073286' }}"
           DEPLOYMENT_NAMESPACE="${{ vars.DEPLOYMENT_NAMESPACE || 'github-actions-example' }}"
+          IMAGE_NAME="github-actions-example"  # Use a consistent image name
 
           echo "$APPS_JSON" | jq -r '.[]' | while read app; do
             OUTFILE="k8s/argocd/applications/${app}.yaml"
             echo "Rendering $OUTFILE..."
 
             # Define image repository and tag
-            IMAGE_REPOSITORY="${DOCKER_USERNAME}/${app}"
+            IMAGE_REPOSITORY="${DOCKER_USERNAME}/${IMAGE_NAME}"  # Use the consistent image name
             IMAGE_TAG="${{ github.sha }}"
             TARGET_REVISION_BRANCH="${{ github.ref_name }}"
 
@@ -808,6 +809,7 @@ jobs:
             echo "Generated manifest for $app:"
             cat "$OUTFILE"
           done
+
 
       - name: Commit generated ArgoCD Application manifests
         env:
@@ -885,7 +887,7 @@ jobs:
       - name: Wait for Node.js app to be ready
         run: |
           APP_NAMESPACE="github-actions-example"
-          APP_SERVICE_NAME="nodejs-service"
+          APP_NAME="github-actions-example"  # Use the consistent app name
 
           echo "Creating namespace $APP_NAMESPACE if it doesn't exist..."
           kubectl create namespace $APP_NAMESPACE --dry-run=client -o yaml | kubectl apply -f -
@@ -893,7 +895,7 @@ jobs:
           echo "Waiting for ArgoCD to deploy the application..."
           # Wait for ArgoCD to create resources (up to 5 minutes)
           for i in {1..30}; do
-            if kubectl get deployment -n $APP_NAMESPACE 2>/dev/null | grep -q nodejs; then
+            if kubectl get deployment -n $APP_NAMESPACE 2>/dev/null | grep -q "$APP_NAME"; then
               echo "Deployment found in namespace $APP_NAMESPACE"
               break
             fi
