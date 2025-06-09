@@ -113,6 +113,24 @@ module "eks" {
   }
 
   node_security_group_additional_rules = {
+    # Allow ingress HTTP/HTTPS for ingress controller
+    ingress_http = {
+      description = "Allow HTTP ingress"
+      protocol    = "tcp"
+      from_port   = 80
+      to_port     = 80
+      type        = "ingress"
+      cidr_blocks = ["0.0.0.0/0"]
+    }
+    
+    ingress_https = {
+      description = "Allow HTTPS ingress"
+      protocol    = "tcp"
+      from_port   = 443
+      to_port     = 443
+      type        = "ingress"
+      cidr_blocks = ["0.0.0.0/0"]
+    }
 
     # Allow specific external access for required services to specific IP ranges
     egress_ntp_tcp = {

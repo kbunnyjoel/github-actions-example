@@ -616,15 +616,20 @@ jobs:
             echo "No Node.js hostname found. Using ArgoCD hostname as fallback..."
             NODEJS_HOSTNAME=$(kubectl get svc argocd-server -n argocd -o jsonpath='{.status.loadBalancer.ingress[0].hostname}' 2>/dev/null)
             if [ -z "$NODEJS_HOSTNAME" ]; then
-              echo "Error: Could not find any hostname to use"
-              kubectl get ingress -n github-actions-example
-              kubectl get svc -n github-actions-example
-              exit 1
+              echo "Warning: Could not find any hostname to use"
+              echo "Checking resources in namespace:"
+              kubectl get ingress,svc -n github-actions-example
+              echo "Continuing without hostname..."
             fi
           fi
           
-          echo "Using hostname for DNS record: $NODEJS_HOSTNAME"
-          echo "ExternalDNS will automatically create DNS records based on ingress annotations."
+          if [ ! -z "$NODEJS_HOSTNAME" ]; then
+            echo "Using hostname for DNS record: $NODEJS_HOSTNAME"
+            echo "ExternalDNS will automatically create DNS records based on ingress annotations."
+          else
+            echo "No hostname found. DNS records will be created when resources are available."
+          fi
+        continue-on-error: true  # Don't fail the workflow if the app isn't ready yet
   generate-argo-apps:
     runs-on: ubuntu-latest
     permissions:
