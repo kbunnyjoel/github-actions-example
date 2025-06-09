@@ -831,24 +831,24 @@ jobs:
           # Create a new CNAME record
           echo "Creating new CNAME record for nodejs.bunnycloud.xyz..."
           cat > nodejs-dns-create.json << EOF
-        {
-          "Changes": [
-            {
-              "Action": "CREATE",
-              "ResourceRecordSet": {
-                "Name": "nodejs.bunnycloud.xyz",
-                "Type": "CNAME",
-                "TTL": 300,
-                "ResourceRecords": [
-                  {
-                    "Value": "$NODEJS_HOSTNAME"
-                  }
-                ]
+          {
+            "Changes": [
+              {
+                "Action": "CREATE",
+                "ResourceRecordSet": {
+                  "Name": "nodejs.bunnycloud.xyz",
+                  "Type": "CNAME",
+                  "TTL": 300,
+                  "ResourceRecords": [
+                    {
+                      "Value": "$NODEJS_HOSTNAME"
+                    }
+                  ]
+                }
               }
-            }
-          ]
-        }
-        EOF
+            ]
+          }
+          EOF
           
           # Apply the DNS change
           aws route53 change-resource-record-sets --hosted-zone-id $HOSTED_ZONE_ID --change-batch file://nodejs-dns-create.json || true
