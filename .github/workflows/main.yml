@@ -442,13 +442,11 @@ jobs:
           echo "Installing ArgoCD..."
           helm upgrade --install argocd argo/argo-cd \
             --namespace argocd --create-namespace \
-            --set server.ingress.enabled=true \
-            --set server.ingress.ingressClassName=nginx \
-            --set server.ingress.hostname=argocd.bunnycloud.xyz \
-            --set server.ingress.annotations."external-dns\.alpha\.kubernetes\.io/hostname"=argocd.bunnycloud.xyz. \
-            --set server.ingress.annotations."kubernetes\.io/ingress\.class"=nginx \
-            --set server.ingress.annotations."nginx\.ingress\.kubernetes\.io/ssl-redirect"=true \
-            --set server.ingress.annotations."nginx\.ingress\.kubernetes\.io/force-ssl-redirect"=true \
+            --set server.service.type=LoadBalancer \
+            --set server.service.annotations."service\.beta\.kubernetes\.io/aws-load-balancer-ssl-cert"="${{ env.ACM_CERTIFICATE_ARN }}" \
+            --set server.service.annotations."service\.beta\.kubernetes\.io/aws-load-balancer-backend-protocol"="http" \
+            --set server.service.annotations."service\.beta\.kubernetes\.io/aws-load-balancer-ssl-ports"="https" \
+            --set server.service.ports.https=443 \
             --version 6.11.1 \
             --wait
           echo "Checking ArgoCD pods status..."
