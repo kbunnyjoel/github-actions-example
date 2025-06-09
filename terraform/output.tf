@@ -27,3 +27,8 @@ output "route53_zone_id" {
   description = "ID of the Route53 hosted zone for bunnycloud.xyz"
   value       = data.aws_route53_zone.bunnycloud.zone_id
 }
+
+output "external_dns_role_arn" {
+  description = "ARN of the IAM role for ExternalDNS"
+  value       = aws_iam_role.external_dns.arn
+}
