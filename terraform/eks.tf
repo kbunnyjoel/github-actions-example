@@ -122,7 +122,7 @@ module "eks" {
       type        = "ingress"
       cidr_blocks = ["0.0.0.0/0"]
     }
-    
+
     ingress_https = {
       description = "Allow HTTPS ingress"
       protocol    = "tcp"
