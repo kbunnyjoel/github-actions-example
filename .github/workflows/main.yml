@@ -469,6 +469,84 @@ jobs:
           echo "ArgoCD installation completed."
         continue-on-error: true  # Don't fail the workflow if installation fails
 
+      - name: Verify and fix ArgoCD DNS
+        run: |
+          echo "Checking ArgoCD LoadBalancer hostname..."
+          ARGOCD_HOSTNAME=$(kubectl get svc argocd-server -n argocd -o jsonpath='{.status.loadBalancer.ingress[0].hostname}' 2>/dev/null)
+          
+          if [ -z "$ARGOCD_HOSTNAME" ]; then
+            echo "ArgoCD LoadBalancer hostname not found. Checking ingress..."
+            ARGOCD_HOSTNAME=$(kubectl get ingress -n argocd -o jsonpath='{.items[0].status.loadBalancer.ingress[0].hostname}' 2>/dev/null)
+          fi
+          
+          if [ -z "$ARGOCD_HOSTNAME" ]; then
+            echo "Error: Could not find ArgoCD hostname"
+            kubectl get svc -n argocd
+            kubectl get ingress -n argocd
+            exit 1
+          fi
+          
+          echo "ArgoCD hostname: $ARGOCD_HOSTNAME"
+          
+          echo "Checking DNS record for argocd.bunnycloud.xyz..."
+          HOSTED_ZONE_ID=$(aws route53 list-hosted-zones --query "HostedZones[?Name=='bunnycloud.xyz.'].Id" --output text | sed 's/\/hostedzone\///')
+          
+          # Delete any existing records
+          echo "Deleting any existing records for argocd.bunnycloud.xyz..."
+          EXISTING_RECORDS=$(aws route53 list-resource-record-sets --hosted-zone-id $HOSTED_ZONE_ID --query "ResourceRecordSets[?Name=='argocd.bunnycloud.xyz.']")
+          
+          if [ "$EXISTING_RECORDS" != "[]" ]; then
+            # Get the first record
+            RECORD_TYPE=$(aws route53 list-resource-record-sets --hosted-zone-id $HOSTED_ZONE_ID --query "ResourceRecordSets[?Name=='argocd.bunnycloud.xyz.'][0].Type" --output text)
+            
+            # Create a change batch to delete the existing record
+            cat > argocd-dns-delete.json << EOF
+          {
+            "Changes": [
+              {
+                "Action": "DELETE",
+                "ResourceRecordSet": $(aws route53 list-resource-record-sets --hosted-zone-id $HOSTED_ZONE_ID --query "ResourceRecordSets[?Name=='argocd.bunnycloud.xyz.'][0]")
+              }
+            ]
+          }
+          EOF
+            
+            # Apply the deletion
+            aws route53 change-resource-record-sets --hosted-zone-id $HOSTED_ZONE_ID --change-batch file://argocd-dns-delete.json
+            echo "Waiting for deletion to complete..."
+            sleep 30
+          fi
+          
+          # Create a new CNAME record
+          echo "Creating new CNAME record for argocd.bunnycloud.xyz..."
+          cat > argocd-dns-create.json << EOF
+        {
+          "Changes": [
+            {
+              "Action": "CREATE",
+              "ResourceRecordSet": {
+                "Name": "argocd.bunnycloud.xyz",
+                "Type": "CNAME",
+                "TTL": 300,
+                "ResourceRecords": [
+                  {
+                    "Value": "$ARGOCD_HOSTNAME"
+                  }
+                ]
+              }
+            }
+          ]
+        }
+        EOF
+          
+          # Apply the DNS change
+          aws route53 change-resource-record-sets --hosted-zone-id $HOSTED_ZONE_ID --change-batch file://argocd-dns-create.json
+          echo "Manual DNS record created for argocd.bunnycloud.xyz pointing to $ARGOCD_HOSTNAME"
+          
+          echo "Final DNS check:"
+          dig argocd.bunnycloud.xyz
+        continue-on-error: true  # Don't fail the workflow if DNS isn't ready
+
 
       - name: Install ExternalDNS
         run: |
