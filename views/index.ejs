@@ -9,7 +9,7 @@
 <body>
     <div class="container">
         <h1>✨ The Amazing Adder ✨</h1>
-        <form action="/add" method="POST">
+        <form id="add-form">
             <input type="text" name="num1" placeholder="Enter first number" required>
             <span>+</span>
             <input type="text" name="num2" placeholder="Enter second number" required>
@@ -27,5 +27,50 @@
     <footer>
         <p><small>Powered by EJS & Express</small></p>
     </footer>
+    <script>
+        document.getElementById('add-form').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            const num1Input = document.querySelector('[name="num1"]');
+            const num2Input = document.querySelector('[name="num2"]');
+            const container = document.querySelector('.container');
+
+            const num1 = num1Input.value;
+            const num2 = num2Input.value;
+
+            try {
+                const res = await fetch('/add', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ num1, num2 })
+                });
+
+                const data = await res.json();
+
+                // Remove previous result if any
+                const existingResult = document.querySelector('.result-output');
+                if (existingResult) {
+                    existingResult.remove();
+                }
+
+                const output = document.createElement('h2');
+                output.className = 'result-output';
+                if (data.result !== undefined) {
+                    output.textContent = `Result: ${data.result}`;
+                } else if (data.error) {
+                    output.classList.add('error');
+                    output.textContent = data.error;
+                }
+
+                container.appendChild(output);
+
+                // Clear input fields
+                num1Input.value = '';
+                num2Input.value = '';
+
+            } catch (err) {
+                console.error('Request failed', err);
+            }
+        });
+    </script>
 </body>
 </html>

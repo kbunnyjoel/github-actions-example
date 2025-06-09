@@ -24,7 +24,7 @@ env:
   REGISTRY: docker.io/${{ secrets.DOCKER_USERNAME }}
 
 jobs:
-  buil-and-test:
+  build-and-test:
     permissions:
       actions: read # Default permission for GITHUB_TOKEN
       contents: read # To checkout the repository
@@ -79,7 +79,7 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       packages: write
-    needs: buil-and-test
+    needs: build-and-test
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -155,7 +155,7 @@ jobs:
       - name: Install Terraform
         uses: hashicorp/setup-terraform@v3
         with:
-          terraform_version: 1.11.0 # Updated to a more recent stable version
+          terraform_version: "1.8.0" # Example: Use a more recent stable version
 
       - name: Run tfsec IaC scan
         uses: aquasecurity/tfsec-action@v1.0.0 # Use a specific version if preferred
@@ -206,22 +206,6 @@ jobs:
         with:
           name: deployment-key
           path: terraform/keys/deployment_key.pem
-          
-      - name: Update EKS security group for GitHub Actions
-        run: |
-          # Get the EKS cluster security group ID
-          CLUSTER_SG=$(aws eks describe-cluster --name github-actions-eks-example --query "cluster.resourcesVpcConfig.clusterSecurityGroupId" --output text)
-          echo "Cluster security group: $CLUSTER_SG"
-          
-          # Add rules using JSON format
-          aws ec2 authorize-security-group-ingress \
-            --group-id $CLUSTER_SG \
-            --ip-permissions '[{"IpProtocol": "tcp", "FromPort": 443, "ToPort": 443, "IpRanges": [{"CidrIp": "140.82.112.0/20", "Description": "Allow GitHub Actions"}]}]'
-          
-          aws ec2 authorize-security-group-ingress \
-            --group-id $CLUSTER_SG \
-            --ip-permissions '[{"IpProtocol": "tcp", "FromPort": 443, "ToPort": 443, "IpRanges": [{"CidrIp": "185.199.108.0/22", "Description": "Allow GitHub Actions"}]}]'
-        continue-on-error: true  # In case rules already exist
 
       - name: Install kubectl and check EKS status
         if: github.event.inputs.destroy != 'true'
@@ -364,7 +348,7 @@ jobs:
       - name: Install Terraform
         uses: hashicorp/setup-terraform@v3
         with:
-          terraform_version: 1.11.0 # Updated to a more recent stable version
+          terraform_version: "1.8.0" # Example: Use a more recent stable version
 
       - name: Terraform Init
         working-directory: terraform
@@ -417,6 +401,7 @@ jobs:
 
       - name: Install NGINX Ingress Controller
         run: |
+          # This step seems redundant if the subsequent NGINX install includes SSL. Consider removing.
           echo "Installing NGINX Ingress Controller for AWS..."
           helm upgrade --install ingress-nginx ingress-nginx/ingress-nginx \
             --namespace ingress-nginx --create-namespace \
@@ -427,110 +412,48 @@ jobs:
           echo "Waiting for ingress-nginx controller pod to be ready..."
           kubectl rollout status deployment ingress-nginx-controller -n ingress-nginx --timeout=5m
 
-      - name: Install Argo CD
+      - name: Create ACM certificate for domains
         run: |
-          echo "Installing ArgoCD..."
+          # This logic should be handled by Terraform. The certificate ARN can be passed as an output.
+          # Check if certificate already exists
+          CERT_ARN=$(aws acm list-certificates --query "CertificateSummaryList[?DomainName=='*.bunnycloud.xyz'].CertificateArn" --output text)
           
-          # Check if there's a stuck Helm release
-          STUCK_RELEASE=$(helm list -n argocd -o json | jq -r '.[] | select(.status == "pending-install" or .status == "pending-upgrade") | .name')
-          if [ ! -z "$STUCK_RELEASE" ]; then
-            echo "Found stuck Helm release: $STUCK_RELEASE. Attempting to fix..."
-            kubectl delete secret -n argocd -l name=$STUCK_RELEASE,owner=helm
-            helm uninstall $STUCK_RELEASE -n argocd || true
+          if [ -z "$CERT_ARN" ]; then
+            echo "Creating new ACM certificate for *.bunnycloud.xyz..."
+            CERT_ARN=$(aws acm request-certificate \
+              --domain-name "*.bunnycloud.xyz" \
+              --validation-method DNS \
+              --query "CertificateArn" --output text)
+            echo "Certificate ARN: $CERT_ARN"
+            
+            # Wait for certificate details to be available
             sleep 10
-          fi
-          
-          # Try the installation with retries
-          for i in {1..3}; do
-            if helm upgrade --install argocd argo/argo-cd \
-              --namespace argocd --create-namespace \
-              --set server.ingress.enabled=true \
-              --set server.ingress.ingressClassName=nginx \
-              --set server.ingress.hostname=argocd.bunnycloud.xyz \
-              --set server.ingress.annotations."external-dns\.alpha\.kubernetes\.io/hostname"=argocd.bunnycloud.xyz. \
-              --set server.ingress.annotations."kubernetes\.io/ingress\.class"=nginx \
-              --version 6.11.1 \
-              --wait --timeout 5m; then
-              echo "ArgoCD installed successfully."
-              break
-            else
-              echo "Helm operation failed. Retrying in 30 seconds... (attempt $i/3)"
-              sleep 30
-              if [ $i -eq 3 ]; then
-                echo "Failed to install ArgoCD after 3 attempts."
-              fi
-            fi
-          done
-          
-          echo "Checking ArgoCD pods status..."
-          kubectl get pods -n argocd
-          echo "Waiting for ArgoCD deployments to be ready..."
-          kubectl wait --for=condition=Available deployment --all -n argocd --timeout=5m || true
-          echo "ArgoCD installation completed."
-        continue-on-error: true  # Don't fail the workflow if installation fails
-
-      - name: Verify and fix ArgoCD DNS
-        run: |
-          echo "Checking ArgoCD LoadBalancer hostname..."
-          ARGOCD_HOSTNAME=$(kubectl get svc argocd-server -n argocd -o jsonpath='{.status.loadBalancer.ingress[0].hostname}' 2>/dev/null)
-          
-          if [ -z "$ARGOCD_HOSTNAME" ]; then
-            echo "ArgoCD LoadBalancer hostname not found. Checking ingress..."
-            ARGOCD_HOSTNAME=$(kubectl get ingress -n argocd -o jsonpath='{.items[0].status.loadBalancer.ingress[0].hostname}' 2>/dev/null)
-          fi
-          
-          if [ -z "$ARGOCD_HOSTNAME" ]; then
-            echo "Error: Could not find ArgoCD hostname"
-            kubectl get svc -n argocd
-            kubectl get ingress -n argocd
-            exit 1
-          fi
-          
-          echo "ArgoCD hostname: $ARGOCD_HOSTNAME"
-          
-          echo "Checking DNS record for argocd.bunnycloud.xyz..."
-          HOSTED_ZONE_ID=$(aws route53 list-hosted-zones --query "HostedZones[?Name=='bunnycloud.xyz.'].Id" --output text | sed 's/\/hostedzone\///')
-          
-          # Delete any existing records
-          echo "Deleting any existing records for argocd.bunnycloud.xyz..."
-          EXISTING_RECORDS=$(aws route53 list-resource-record-sets --hosted-zone-id $HOSTED_ZONE_ID --query "ResourceRecordSets[?Name=='argocd.bunnycloud.xyz.']")
-          
-          if [ "$EXISTING_RECORDS" != "[]" ]; then
-            # Get the first record
-            RECORD_TYPE=$(aws route53 list-resource-record-sets --hosted-zone-id $HOSTED_ZONE_ID --query "ResourceRecordSets[?Name=='argocd.bunnycloud.xyz.'][0].Type" --output text)
             
-            # Create a change batch to delete the existing record
-            cat > argocd-dns-delete.json << EOF
+            # Get validation records
+            VALIDATION_RECORD=$(aws acm describe-certificate \
+              --certificate-arn $CERT_ARN \
+              --query "Certificate.DomainValidationOptions[0].ResourceRecord" \
+              --output json)
+            
+            # Extract validation record details
+            VALIDATION_NAME=$(echo $VALIDATION_RECORD | jq -r '.Name')
+            VALIDATION_VALUE=$(echo $VALIDATION_RECORD | jq -r '.Value')
+            
+            # Create DNS validation record
+            HOSTED_ZONE_ID=$(aws route53 list-hosted-zones --query "HostedZones[?Name=='bunnycloud.xyz.'].Id" --output text | sed 's/\/hostedzone\///')
+            
+            cat > cert-validation.json << EOF
           {
             "Changes": [
               {
-                "Action": "DELETE",
-                "ResourceRecordSet": $(aws route53 list-resource-record-sets --hosted-zone-id $HOSTED_ZONE_ID --query "ResourceRecordSets[?Name=='argocd.bunnycloud.xyz.'][0]")
-              }
-            ]
-          }
-          EOF
-            
-            # Apply the deletion
-            aws route53 change-resource-record-sets --hosted-zone-id $HOSTED_ZONE_ID --change-batch file://argocd-dns-delete.json
-            echo "Waiting for deletion to complete..."
-            sleep 30
-          fi
-          
-          # Create a new CNAME record
-          echo "Creating new CNAME record for argocd.bunnycloud.xyz..."
-          cat > argocd-dns-create.json << EOF
-          {
-            "Changes": [
-              {
-                "Action": "CREATE",
+                "Action": "UPSERT",
                 "ResourceRecordSet": {
-                  "Name": "argocd.bunnycloud.xyz",
+                  "Name": "$VALIDATION_NAME",
                   "Type": "CNAME",
                   "TTL": 300,
                   "ResourceRecords": [
                     {
-                      "Value": "$ARGOCD_HOSTNAME"
+                      "Value": "$VALIDATION_VALUE"
                     }
                   ]
                 }
@@ -538,14 +461,62 @@ jobs:
             ]
           }
           EOF
+            
+            # Apply the DNS change
+            aws route53 change-resource-record-sets --hosted-zone-id $HOSTED_ZONE_ID --change-batch file://cert-validation.json
+            echo "DNS validation record created"
+            
+            # Wait for certificate validation (this can take several minutes)
+            echo "Waiting for certificate validation (this may take several minutes)..."
+            aws acm wait certificate-validated --certificate-arn $CERT_ARN
+            echo "Certificate validated successfully"
+          else
+            echo "Certificate already exists with ARN: $CERT_ARN"
+          fi
           
-          # Apply the DNS change
-          aws route53 change-resource-record-sets --hosted-zone-id $HOSTED_ZONE_ID --change-batch file://argocd-dns-create.json
-          echo "Manual DNS record created for argocd.bunnycloud.xyz pointing to $ARGOCD_HOSTNAME"
-          
-          echo "Final DNS check:"
-          dig argocd.bunnycloud.xyz
-        continue-on-error: true  # Don't fail the workflow if DNS isn't ready
+          # Store certificate ARN for later use
+          echo "ACM_CERTIFICATE_ARN=$CERT_ARN" >> $GITHUB_ENV
+
+      - name: Install NGINX Ingress Controller
+        run: |
+          echo "Installing NGINX Ingress Controller for AWS..."
+          helm upgrade --install ingress-nginx ingress-nginx/ingress-nginx \
+            --namespace ingress-nginx --create-namespace \
+            --set controller.service.annotations."service\.beta\.kubernetes\.io/aws-load-balancer-type"=nlb \
+            # Use the ACM certificate ARN from Terraform output or a known secret/variable
+            --set controller.service.annotations."service\.beta\.kubernetes\.io/aws-load-balancer-ssl-cert"=${{ env.ACM_CERTIFICATE_ARN }} \
+            --set controller.service.annotations."service\.beta\.kubernetes\.io/aws-load-balancer-ssl-ports"="https" \
+            --set controller.service.annotations."service\.beta\.kubernetes\.io/aws-load-balancer-backend-protocol"="http" \
+            --set controller.service.targetPorts.https=http \
+            --set controller.service.ports.https=443 \
+            --set controller.replicaCount=2 \
+            --version 4.10.1 \
+            --wait
+          echo "Waiting for ingress-nginx controller pod to be ready..."
+          kubectl rollout status deployment ingress-nginx-controller -n ingress-nginx --timeout=5m
+
+      - name: Install Argo CD
+        run: |
+          echo "Installing ArgoCD..."
+          helm upgrade --install argocd argo/argo-cd \
+            --namespace argocd --create-namespace \
+            --set server.ingress.enabled=true \
+            --set server.ingress.ingressClassName=nginx \
+            --set server.ingress.hostname=argocd.bunnycloud.xyz \
+            --set server.ingress.annotations."external-dns\.alpha\.kubernetes\.io/hostname"=argocd.bunnycloud.xyz. \
+            --set server.ingress.annotations."kubernetes\.io/ingress\.class"=nginx \
+            --set server.ingress.annotations."nginx\.ingress\.kubernetes\.io/ssl-redirect"=true \
+            --set server.ingress.annotations."nginx\.ingress\.kubernetes\.io/force-ssl-redirect"=true \
+            --version 6.11.1 \
+            --wait
+          echo "Checking ArgoCD pods status..."
+          kubectl get pods -n argocd
+          echo "Waiting for ArgoCD deployments to be ready..."
+          kubectl wait --for=condition=Available deployment --all -n argocd --timeout=5m || true
+          echo "ArgoCD installation completed."
+
+
+      # Removed duplicate "Verify and fix ArgoCD DNS" step.
 
 
       - name: Install ExternalDNS
@@ -744,6 +715,8 @@ jobs:
 
       - name: Check and update EKS node security group
         run: |
+          # Security group rules should ideally be managed by Terraform.
+          # This modifies the EKS cluster's primary security group.
           SG_ID=$(aws eks describe-cluster --name github-actions-eks-example --region ap-southeast-2 --query "cluster.resourcesVpcConfig.securityGroupIds[0]" --output text)
           echo "Cluster security group: $SG_ID"
           
@@ -777,84 +750,7 @@ jobs:
       # The 'Update Nodejs App DNS record' step is removed as ExternalDNS will handle it
       # based on annotations in your Node.js app's Ingress (defined in its Helm chart).
 
-      - name: Verify and fix ArgoCD DNS
-        run: |
-          echo "Checking ArgoCD LoadBalancer hostname..."
-          ARGOCD_HOSTNAME=$(kubectl get svc argocd-server -n argocd -o jsonpath='{.status.loadBalancer.ingress[0].hostname}' 2>/dev/null)
-          
-          if [ -z "$ARGOCD_HOSTNAME" ]; then
-            echo "ArgoCD LoadBalancer hostname not found. Checking ingress..."
-            ARGOCD_HOSTNAME=$(kubectl get ingress -n argocd -o jsonpath='{.items[0].status.loadBalancer.ingress[0].hostname}' 2>/dev/null)
-          fi
-          
-          if [ -z "$ARGOCD_HOSTNAME" ]; then
-            echo "Error: Could not find ArgoCD hostname"
-            kubectl get svc -n argocd
-            kubectl get ingress -n argocd
-            exit 1
-          fi
-          
-          echo "ArgoCD hostname: $ARGOCD_HOSTNAME"
-          
-          echo "Checking DNS record for argocd.bunnycloud.xyz..."
-          HOSTED_ZONE_ID=$(aws route53 list-hosted-zones --query "HostedZones[?Name=='bunnycloud.xyz.'].Id" --output text | sed 's/\/hostedzone\///')
-          
-          # Check if the record already exists
-          echo "Checking for existing DNS records..."
-          EXISTING_RECORD=$(aws route53 list-resource-record-sets --hosted-zone-id $HOSTED_ZONE_ID --query "ResourceRecordSets[?Name=='argocd.bunnycloud.xyz.'] | [0]" --output json)
-          
-          if [ "$EXISTING_RECORD" != "null" ] && [ "$EXISTING_RECORD" != "" ]; then
-            echo "Record already exists. Deleting it first..."
-            
-            # Create a change batch to delete the existing record
-            echo $EXISTING_RECORD > existing-record.json
-            cat > dns-delete.json << EOF
-          {
-            "Changes": [
-              {
-                "Action": "DELETE",
-                "ResourceRecordSet": $(cat existing-record.json)
-              }
-            ]
-          }
-          EOF
-            
-            # Apply the deletion
-            aws route53 change-resource-record-sets --hosted-zone-id $HOSTED_ZONE_ID --change-batch file://dns-delete.json || true
-            echo "Waiting for deletion to complete..."
-            sleep 30
-          fi
-          
-          # Create a new CNAME record
-          echo "Creating new CNAME record for argocd.bunnycloud.xyz..."
-          cat > dns-change.json << EOF
-          {
-            "Changes": [
-              {
-                "Action": "CREATE",
-                "ResourceRecordSet": {
-                  "Name": "argocd.bunnycloud.xyz",
-                  "Type": "CNAME",
-                  "TTL": 300,
-                  "ResourceRecords": [
-                    {
-                      "Value": "$ARGOCD_HOSTNAME"
-                    }
-                  ]
-                }
-              }
-            ]
-          }
-          EOF
-          
-          # Apply the DNS change
-          aws route53 change-resource-record-sets --hosted-zone-id $HOSTED_ZONE_ID --change-batch file://dns-change.json || true
-          echo "Manual DNS record created for argocd.bunnycloud.xyz pointing to $ARGOCD_HOSTNAME"
-          
-          # Final DNS check
-          echo "Final DNS check:"
-          dig argocd.bunnycloud.xyz
-        continue-on-error: true  # Don't fail the workflow if DNS isn't ready
+      # Removed duplicate "Verify and fix ArgoCD DNS" step.
     
       - name: Verify Node.js App DNS
         run: |

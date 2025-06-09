@@ -18,3 +18,13 @@ output "bastion_public_ip" {
   description = "The static Elastic IP address of the bastion host."
   value       = aws_eip.bastion_eip.public_ip
 }
+
+output "external_dns_role_arn" {
+  value = aws_iam_role.external_dns.arn
+}
+
+# Output the certificate ARN for use in other resources (e.g., ALB Listener, CloudFront)
+output "acm_certificate_arn" {
+  description = "ARN of the ACM certificate"
+  value       = var.create_dns_records ? aws_acm_certificate_validation.cert[0].certificate_arn : null
+}
