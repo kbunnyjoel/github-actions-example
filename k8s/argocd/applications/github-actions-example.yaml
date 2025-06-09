@@ -16,7 +16,7 @@ spec:
         replicaCount: 1 # Default replica count, can be overridden
         image:
           repository: 1073286/github-actions-example # Docker image repository (e.g., yourdockerhubusername/my-node-app)
-          tag: 0d10a5005a0fa5533893ccdba70c27922bc4fada # Docker image tag (e.g., commit SHA or version)
+          tag: 89c4932011a01d48fb112b472104a7ff17b09a0b # Docker image tag (e.g., commit SHA or version)
           pullPolicy: IfNotPresent
 
         containerPort: 3000 # The port your Node.js application listens on inside the container
@@ -28,13 +28,13 @@ spec:
           targetPort: 3000 # Port on the pod to forward traffic to (should match containerPort)
 
         ingress:
-          enabled: true
-          className: "nginx" # Your Ingress controller's class name (e.g., "nginx", "alb")
+          enabled: True
+          className: "nginx" # Your Ingress controller's class name
           host: "github-actions-example.bunnycloud.xyz" # Dynamically set hostname
-          # tls: # Uncomment and configure if you manage TLS certificates
-          #   - secretName: "github-actions-example-tls-secret" # Name of the Kubernetes secret containing TLS cert and key
-          #     hosts:
-          #       - "github-actions-example.bunnycloud.xyz"
+          tls:
+            - secretName: "github-actions-example-tls"
+              hosts:
+                - "github-actions-example.bunnycloud.xyz"
 
         # Define resource requests and limits for your application pods
         resources: {} # Leave empty to use Helm chart defaults or override as needed
