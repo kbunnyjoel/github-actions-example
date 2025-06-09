@@ -11,13 +11,12 @@ resource "aws_security_group_rule" "allow_https" {
   security_group_id = module.eks.cluster_security_group_id
 }
 
-# In eks_sg_rules.tf, change:
 resource "aws_security_group_rule" "allow_argocd" {
   description       = "Allow ArgoCD UI access"
   type              = "ingress"
   from_port         = 8080
   to_port           = 8080
   protocol          = "tcp"
-  cidr_blocks       = ["YOUR_OFFICE_IP/32"] # Replace with specific IP ranges
+  cidr_blocks       = ["203.0.113.0/24"] # Replace with your actual office IP range
   security_group_id = module.eks.cluster_security_group_id
 }

@@ -399,19 +399,6 @@ jobs:
           helm repo add external-dns https://kubernetes-sigs.github.io/external-dns/
           helm repo update
 
-      - name: Install NGINX Ingress Controller
-        run: |
-          # This step seems redundant if the subsequent NGINX install includes SSL. Consider removing.
-          echo "Installing NGINX Ingress Controller for AWS..."
-          helm upgrade --install ingress-nginx ingress-nginx/ingress-nginx \
-            --namespace ingress-nginx --create-namespace \
-            --set controller.service.annotations."service\.beta\.kubernetes\.io/aws-load-balancer-type"=nlb \
-            --set controller.replicaCount=2 \
-            --version 4.10.1 \
-            --wait
-          echo "Waiting for ingress-nginx controller pod to be ready..."
-          kubectl rollout status deployment ingress-nginx-controller -n ingress-nginx --timeout=5m
-
       - name: Get ACM certificate ARN from Terraform
         run: |
           # Get the certificate ARN from Terraform output
@@ -432,14 +419,13 @@ jobs:
           echo "Using certificate ARN: $CERT_ARN"
           echo "ACM_CERTIFICATE_ARN=$CERT_ARN" >> $GITHUB_ENV
 
-      - name: Install NGINX Ingress Controller
+      - name: Install NGINX Ingress Controller with SSL
         run: |
-          echo "Installing NGINX Ingress Controller for AWS..."
+          echo "Installing NGINX Ingress Controller for AWS with SSL..."
           helm upgrade --install ingress-nginx ingress-nginx/ingress-nginx \
             --namespace ingress-nginx --create-namespace \
             --set controller.service.annotations."service\.beta\.kubernetes\.io/aws-load-balancer-type"=nlb \
-            # Use the ACM certificate ARN from Terraform output or a known secret/variable
-            --set controller.service.annotations."service\.beta\.kubernetes\.io/aws-load-balancer-ssl-cert"=${{ env.ACM_CERTIFICATE_ARN }} \
+            --set controller.service.annotations."service\.beta\.kubernetes\.io/aws-load-balancer-ssl-cert"="${{ env.ACM_CERTIFICATE_ARN }}" \
             --set controller.service.annotations."service\.beta\.kubernetes\.io/aws-load-balancer-ssl-ports"="https" \
             --set controller.service.annotations."service\.beta\.kubernetes\.io/aws-load-balancer-backend-protocol"="http" \
             --set controller.service.targetPorts.https=http \
@@ -447,6 +433,7 @@ jobs:
             --set controller.replicaCount=2 \
             --version 4.10.1 \
             --wait
+          
           echo "Waiting for ingress-nginx controller pod to be ready..."
           kubectl rollout status deployment ingress-nginx-controller -n ingress-nginx --timeout=5m
 
@@ -613,53 +600,23 @@ jobs:
             sleep 30
           done
           
-          # Create the DNS record manually if ExternalDNS failed
+          # Let ExternalDNS handle DNS records - just log status
           if ! dig +short argocd.bunnycloud.xyz | grep -q .; then
-            echo "ExternalDNS failed to create DNS record. Creating manually..."
-            HOSTED_ZONE_ID=$(aws route53 list-hosted-zones --query "HostedZones[?Name=='bunnycloud.xyz.'].Id" --output text | sed 's/\/hostedzone\///')
+            echo "DNS record for argocd.bunnycloud.xyz not found yet. ExternalDNS should create it automatically."
+            echo "Checking ExternalDNS logs for troubleshooting:"
+            kubectl logs -n external-dns -l app.kubernetes.io/name=external-dns --tail=20 || true
             
-            # First, list and delete any existing records
-            echo "Checking for existing records..."
-            aws route53 list-resource-record-sets --hosted-zone-id $HOSTED_ZONE_ID --query "ResourceRecordSets[?Name=='argocd.bunnycloud.xyz.']" --output json > existing-records.json
+            echo "Verifying ArgoCD ingress has proper annotations:"
+            kubectl get ingress -n argocd -o yaml | grep -A5 annotations || true
             
-            # Check if there are existing records
-            if [ -s existing-records.json ] && [ "$(cat existing-records.json)" != "[]" ]; then
-              echo "Found existing records, deleting them first..."
-              jq -c '.[]' existing-records.json | while read -r record; do
-                echo "Deleting record: $record"
-                echo "{\"Changes\":[{\"Action\":\"DELETE\",\"ResourceRecordSet\":$record}]}" > delete-record.json
-                aws route53 change-resource-record-sets --hosted-zone-id $HOSTED_ZONE_ID --change-batch file://delete-record.json || true
-              done
-              echo "Waiting for deletion to complete..."
-              sleep 30
-            fi
-            
-            # Now create the new CNAME record
-            echo "Creating new CNAME record..."
-            cat > dns-change.json << EOF
-          {
-            "Changes": [
-              {
-                "Action": "CREATE",
-                "ResourceRecordSet": {
-                  "Name": "argocd.bunnycloud.xyz",
-                  "Type": "CNAME",
-                  "TTL": 300,
-                  "ResourceRecords": [
-                    {
-                      "Value": "$INGRESS_HOSTNAME"
-                    }
-                  ]
-                }
-              }
-            ]
-          }
-          EOF
-            
+            echo "DNS propagation may take some time. Continuing..."
+          else
+            echo "DNS record for argocd.bunnycloud.xyz found and propagated."
+          fi
+         
             # Apply the DNS change
             aws route53 change-resource-record-sets --hosted-zone-id $HOSTED_ZONE_ID --change-batch file://dns-change.json || true
             echo "Manual DNS record created for argocd.bunnycloud.xyz pointing to $INGRESS_HOSTNAME"
-          fi
           
           # Final DNS check
           echo "Final DNS check:"
