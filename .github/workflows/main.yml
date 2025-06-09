@@ -155,7 +155,7 @@ jobs:
       - name: Install Terraform
         uses: hashicorp/setup-terraform@v3
         with:
-          terraform_version: "1.8.0" # Example: Use a more recent stable version
+          terraform_version: "1.11.0" # Example: Use a more recent stable version
 
       - name: Run tfsec IaC scan
         uses: aquasecurity/tfsec-action@v1.0.0 # Use a specific version if preferred
@@ -348,7 +348,7 @@ jobs:
       - name: Install Terraform
         uses: hashicorp/setup-terraform@v3
         with:
-          terraform_version: "1.8.0" # Example: Use a more recent stable version
+          terraform_version: "1.11.0" # Example: Use a more recent stable version
 
       - name: Terraform Init
         working-directory: terraform
@@ -412,69 +412,24 @@ jobs:
           echo "Waiting for ingress-nginx controller pod to be ready..."
           kubectl rollout status deployment ingress-nginx-controller -n ingress-nginx --timeout=5m
 
-      - name: Create ACM certificate for domains
+      - name: Get ACM certificate ARN from Terraform
         run: |
-          # This logic should be handled by Terraform. The certificate ARN can be passed as an output.
-          # Check if certificate already exists
-          CERT_ARN=$(aws acm list-certificates --query "CertificateSummaryList[?DomainName=='*.bunnycloud.xyz'].CertificateArn" --output text)
+          # Get the certificate ARN from Terraform output
+          cd terraform
+          CERT_ARN=$(terraform output -raw acm_certificate_arn || echo "")
           
           if [ -z "$CERT_ARN" ]; then
-            echo "Creating new ACM certificate for *.bunnycloud.xyz..."
-            CERT_ARN=$(aws acm request-certificate \
-              --domain-name "*.bunnycloud.xyz" \
-              --validation-method DNS \
-              --query "CertificateArn" --output text)
-            echo "Certificate ARN: $CERT_ARN"
+            echo "Warning: Could not get certificate ARN from Terraform output"
+            # Fallback to looking up the certificate
+            CERT_ARN=$(aws acm list-certificates --query "CertificateSummaryList[?DomainName=='*.bunnycloud.xyz'].CertificateArn" --output text)
             
-            # Wait for certificate details to be available
-            sleep 10
-            
-            # Get validation records
-            VALIDATION_RECORD=$(aws acm describe-certificate \
-              --certificate-arn $CERT_ARN \
-              --query "Certificate.DomainValidationOptions[0].ResourceRecord" \
-              --output json)
-            
-            # Extract validation record details
-            VALIDATION_NAME=$(echo $VALIDATION_RECORD | jq -r '.Name')
-            VALIDATION_VALUE=$(echo $VALIDATION_RECORD | jq -r '.Value')
-            
-            # Create DNS validation record
-            HOSTED_ZONE_ID=$(aws route53 list-hosted-zones --query "HostedZones[?Name=='bunnycloud.xyz.'].Id" --output text | sed 's/\/hostedzone\///')
-            
-            cat > cert-validation.json << EOF
-          {
-            "Changes": [
-              {
-                "Action": "UPSERT",
-                "ResourceRecordSet": {
-                  "Name": "$VALIDATION_NAME",
-                  "Type": "CNAME",
-                  "TTL": 300,
-                  "ResourceRecords": [
-                    {
-                      "Value": "$VALIDATION_VALUE"
-                    }
-                  ]
-                }
-              }
-            ]
-          }
-          EOF
-            
-            # Apply the DNS change
-            aws route53 change-resource-record-sets --hosted-zone-id $HOSTED_ZONE_ID --change-batch file://cert-validation.json
-            echo "DNS validation record created"
-            
-            # Wait for certificate validation (this can take several minutes)
-            echo "Waiting for certificate validation (this may take several minutes)..."
-            aws acm wait certificate-validated --certificate-arn $CERT_ARN
-            echo "Certificate validated successfully"
-          else
-            echo "Certificate already exists with ARN: $CERT_ARN"
+            if [ -z "$CERT_ARN" ]; then
+              echo "Error: No certificate found for *.bunnycloud.xyz"
+              exit 1
+            fi
           fi
           
-          # Store certificate ARN for later use
+          echo "Using certificate ARN: $CERT_ARN"
           echo "ACM_CERTIFICATE_ARN=$CERT_ARN" >> $GITHUB_ENV
 
       - name: Install NGINX Ingress Controller
@@ -713,37 +668,17 @@ jobs:
 
 
 
-      - name: Check and update EKS node security group
+      # Security group rules are now managed by Terraform in eks_sg_rules.tf
+      - name: Verify EKS security group rules
         run: |
-          # Security group rules should ideally be managed by Terraform.
-          # This modifies the EKS cluster's primary security group.
+          echo "Verifying EKS security group rules (now managed by Terraform)..."
           SG_ID=$(aws eks describe-cluster --name github-actions-eks-example --region ap-southeast-2 --query "cluster.resourcesVpcConfig.securityGroupIds[0]" --output text)
           echo "Cluster security group: $SG_ID"
           
-          # Check if the rule for port 8080 exists
-          echo "Checking if security group allows inbound traffic on port 8080..."
-          RULE_EXISTS_8080=$(aws ec2 describe-security-groups --group-ids $SG_ID --query "SecurityGroups[0].IpPermissions[?FromPort==\`8080\` && ToPort==\`8080\` && IpProtocol==\`tcp\`]" --output text)
-          
-          # Add the rule if it doesn't exist
-          if [ -z "$RULE_EXISTS_8080" ]; then
-            echo "Adding rule for port 8080..."
-            aws ec2 authorize-security-group-ingress --group-id $SG_ID --protocol tcp --port 8080 --cidr 0.0.0.0/0 || echo "Rule may already exist"
-          else
-            echo "Rule for port 8080 already exists."
-          fi
-          
-          # Check if the rule for port 443 exists
-          echo "Checking if security group allows inbound traffic from GitHub Actions on port 443..."
-          RULE_EXISTS_443=$(aws ec2 describe-security-groups --group-ids $SG_ID --query "SecurityGroups[0].IpPermissions[?FromPort==\`443\` && ToPort==\`443\` && IpProtocol==\`tcp\`].IpRanges[?CidrIp==\`140.82.112.0/20\`].CidrIp" --output text)
-          
-          # Skip adding the rule if it already exists
-          if [ -z "$RULE_EXISTS_443" ]; then
-            echo "Adding rule for port 443 from GitHub Actions..."
-            aws ec2 authorize-security-group-ingress --group-id $SG_ID --protocol tcp --port 443 --cidr 140.82.112.0/20 || echo "Rule may already exist"
-          else
-            echo "Rule for port 443 from GitHub Actions already exists."
-          fi
-        continue-on-error: true  # Don't fail the workflow if rule already exists
+          # Just verify the rules exist
+          echo "Checking if security group allows required inbound traffic..."
+          aws ec2 describe-security-groups --group-ids $SG_ID --query "SecurityGroups[0].IpPermissions[?FromPort==\`443\` || FromPort==\`8080\`]" --output table
+        continue-on-error: true  # Don't fail the workflow if verification fails
 
           
       # The 'Check domain nameserver delegation' and 'Check Route53 record' steps can remain for verification.
