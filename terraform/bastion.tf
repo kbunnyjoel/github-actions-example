@@ -57,14 +57,6 @@ resource "aws_security_group" "bastion_sg" {
     ]
   }
 
-  egress {
-    description = "Allow outbound traffic to VPC CIDR"
-    from_port   = 0
-    to_port     = 0
-    protocol    = "-1"
-    cidr_blocks = [module.vpc.vpc_cidr_block]
-  }
-
   tags = {
     Name = "bastion-sg"
   }
@@ -78,10 +70,7 @@ resource "aws_instance" "bastion" {
   vpc_security_group_ids = [aws_security_group.bastion_sg.id]
   key_name               = aws_key_pair.deployment_key.key_name
   iam_instance_profile   = aws_iam_instance_profile.bastion_profile.name
-  user_data = templatefile("${path.module}/bastion_user_data.sh", {
-    KUBECTL_VERSION = var.kubectl_version
-    HELM_VERSION    = var.helm_version
-  })
+  user_data = templatefile("${path.module}/bastion_user_data.sh", {})
 
   root_block_device {
     delete_on_termination = true

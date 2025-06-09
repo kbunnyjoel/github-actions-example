@@ -4,7 +4,10 @@ kind: Ingress
 metadata:
   name: {{ .Chart.Name }}-ingress
   annotations:
+    metadata:
+  annotations:
     nginx.ingress.kubernetes.io/rewrite-target: /
+    nginx.ingress.kubernetes.io/force-ssl-redirect: "false"
 spec:
   ingressClassName: nginx
   rules:
