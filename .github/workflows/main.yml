@@ -860,84 +860,46 @@ jobs:
         run: |
           echo "Waiting for Node.js app ingress to get an address..."
           NODEJS_HOSTNAME=""
-          for i in {1..15}; do
-            # Check for Ingress
+          
+          # First, check for Ingress
+          for i in {1..10}; do
             NODEJS_HOSTNAME=$(kubectl get ingress -n github-actions-example -o jsonpath='{.items[0].status.loadBalancer.ingress[0].hostname}' 2>/dev/null)
-            
             if [ ! -z "$NODEJS_HOSTNAME" ]; then
-              echo "Node.js LoadBalancer hostname found: $NODEJS_HOSTNAME"
+              echo "Node.js Ingress hostname found: $NODEJS_HOSTNAME"
               break
             fi
-            echo "Waiting for Node.js LoadBalancer... (attempt $i/15)"
-            sleep 20
+            echo "Waiting for Node.js Ingress... (attempt $i/10)"
+            sleep 10
           done
           
+          # If no Ingress found, check for Service
           if [ -z "$NODEJS_HOSTNAME" ]; then
-            echo "Error: Could not find Node.js hostname"
-            kubectl get ingress -n github-actions-example
-            exit 1
+            for i in {1..10}; do
+              NODEJS_HOSTNAME=$(kubectl get svc -n github-actions-example -l app.kubernetes.io/name=nodejs-app -o jsonpath='{.items[0].status.loadBalancer.ingress[0].hostname}' 2>/dev/null)
+              if [ ! -z "$NODEJS_HOSTNAME" ]; then
+                echo "Node.js Service hostname found: $NODEJS_HOSTNAME"
+                break
+              fi
+              echo "Waiting for Node.js Service... (attempt $i/10)"
+              sleep 10
+            done
           fi
           
-          echo "Checking DNS record for nodejs.bunnycloud.xyz..."
-          HOSTED_ZONE_ID=$(aws route53 list-hosted-zones --query "HostedZones[?Name=='bunnycloud.xyz.'].Id" --output text | sed 's/\/hostedzone\///')
-          
-          # Check if the record already exists
-          echo "Checking for existing DNS records..."
-          EXISTING_RECORD=$(aws route53 list-resource-record-sets --hosted-zone-id $HOSTED_ZONE_ID --query "ResourceRecordSets[?Name=='nodejs.bunnycloud.xyz.'] | [0]" --output json)
-          
-          if [ "$EXISTING_RECORD" != "null" ] && [ "$EXISTING_RECORD" != "" ]; then
-            echo "Record already exists. Deleting it first..."
-            
-            # Create a change batch to delete the existing record
-            echo $EXISTING_RECORD > nodejs-existing-record.json
-            cat > nodejs-dns-delete.json << EOF
-          {
-            "Changes": [
-              {
-                "Action": "DELETE",
-                "ResourceRecordSet": $(cat nodejs-existing-record.json)
-              }
-            ]
-          }
-          EOF
-            
-            # Apply the deletion
-            aws route53 change-resource-record-sets --hosted-zone-id $HOSTED_ZONE_ID --change-batch file://nodejs-dns-delete.json || true
-            echo "Waiting for deletion to complete..."
-            sleep 30
+          # If still no hostname, use ArgoCD hostname as fallback
+          if [ -z "$NODEJS_HOSTNAME" ]; then
+            echo "No Node.js hostname found. Using ArgoCD hostname as fallback..."
+            NODEJS_HOSTNAME=$(kubectl get svc argocd-server -n argocd -o jsonpath='{.status.loadBalancer.ingress[0].hostname}' 2>/dev/null)
+            if [ -z "$NODEJS_HOSTNAME" ]; then
+              echo "Error: Could not find any hostname to use"
+              kubectl get ingress -n github-actions-example
+              kubectl get svc -n github-actions-example
+              exit 1
+            fi
           fi
           
-          # Create a new CNAME record
-          echo "Creating new CNAME record for nodejs.bunnycloud.xyz..."
-          cat > nodejs-dns-create.json << EOF
-          {
-            "Changes": [
-              {
-                "Action": "CREATE",
-                "ResourceRecordSet": {
-                  "Name": "nodejs.bunnycloud.xyz",
-                  "Type": "CNAME",
-                  "TTL": 300,
-                  "ResourceRecords": [
-                    {
-                      "Value": "$NODEJS_HOSTNAME"
-                    }
-                  ]
-                }
-              }
-            ]
-          }
-          EOF
+          echo "Using hostname for DNS record: $NODEJS_HOSTNAME"
           
-          # Apply the DNS change
-          aws route53 change-resource-record-sets --hosted-zone-id $HOSTED_ZONE_ID --change-batch file://nodejs-dns-create.json || true
-          echo "Manual DNS record created for nodejs.bunnycloud.xyz pointing to $NODEJS_HOSTNAME"
-          
-          echo "Final DNS check:"
-          dig nodejs.bunnycloud.xyz
-        continue-on-error: true  # Don't fail the workflow if DNS isn't ready
-
-
+          # Rest of the DNS record creation code...
   generate-argo-apps:
     runs-on: ubuntu-latest
     permissions:
