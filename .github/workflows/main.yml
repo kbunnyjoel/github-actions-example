@@ -459,83 +459,27 @@ jobs:
       # Removed duplicate "Verify and fix ArgoCD DNS" step.
 
 
-      - name: Install ExternalDNS
+      - name: Get ExternalDNS role ARN from Terraform
         run: |
-          echo "Installing ExternalDNS..."
-          # Get AWS account ID from current credentials
-          AWS_ACCOUNT_ID=$(aws sts get-caller-identity --query "Account" --output text)
-          echo "Using AWS Account ID: $AWS_ACCOUNT_ID"
+          echo "Getting ExternalDNS role ARN from Terraform..."
+          cd terraform
+          ROLE_ARN=$(terraform output -raw external_dns_role_arn || echo "")
           
-          # Create IAM role for ExternalDNS if it doesn't exist
-          ROLE_NAME="eks-external-dns-role"
-          if ! aws iam get-role --role-name $ROLE_NAME 2>/dev/null; then
-            echo "Creating IAM role for ExternalDNS..."
-            
-            # Create trust policy document
-            cat > trust-policy.json << EOF
-          {
-            "Version": "2012-10-17",
-            "Statement": [
-              {
-                "Effect": "Allow",
-                "Principal": {
-                  "Federated": "arn:aws:iam::${AWS_ACCOUNT_ID}:oidc-provider/oidc.eks.ap-southeast-2.amazonaws.com/id/$(aws eks describe-cluster --name github-actions-eks-example --query "cluster.identity.oidc.issuer" --output text | cut -d'/' -f5)"
-                },
-                "Action": "sts:AssumeRoleWithWebIdentity",
-                "Condition": {
-                  "StringEquals": {
-                    "oidc.eks.ap-southeast-2.amazonaws.com/id/$(aws eks describe-cluster --name github-actions-eks-example --query "cluster.identity.oidc.issuer" --output text | cut -d'/' -f5):sub": "system:serviceaccount:external-dns:external-dns"
-                  }
-                }
-              }
-            ]
-          }
-          EOF
-            
-            # Create policy document
-            cat > policy.json << EOF
-          {
-            "Version": "2012-10-17",
-            "Statement": [
-              {
-                "Effect": "Allow",
-                "Action": [
-                  "route53:ChangeResourceRecordSets"
-                ],
-                "Resource": [
-                  "arn:aws:route53:::hostedzone/*"
-                ]
-              },
-              {
-                "Effect": "Allow",
-                "Action": [
-                  "route53:ListHostedZones",
-                  "route53:ListResourceRecordSets"
-                ],
-                "Resource": [
-                  "*"
-                ]
-              }
-            ]
-          }
-          EOF
-            
-            # Create role and attach policy
-            aws iam create-role --role-name $ROLE_NAME --assume-role-policy-document file://trust-policy.json
-            aws iam put-role-policy --role-name $ROLE_NAME --policy-name "AllowExternalDNSUpdates" --policy-document file://policy.json
-            
-            echo "IAM role created: $ROLE_NAME"
-          else
-            echo "IAM role already exists: $ROLE_NAME"
+          if [ -z "$ROLE_ARN" ]; then
+            echo "Warning: Could not get ExternalDNS role ARN from Terraform output"
+            # Fallback to looking up the role
+            AWS_ACCOUNT_ID=$(aws sts get-caller-identity --query "Account" --output text)
+            ROLE_NAME="eks-external-dns-role"
+            ROLE_ARN="arn:aws:iam::${AWS_ACCOUNT_ID}:role/${ROLE_NAME}"
           fi
           
-          # Get the role ARN
-          ROLE_ARN="arn:aws:iam::${AWS_ACCOUNT_ID}:role/${ROLE_NAME}"
-          echo "Using role ARN: $ROLE_ARN"
+          echo "Using ExternalDNS role ARN: $ROLE_ARN"
+          echo "EXTERNAL_DNS_ROLE_ARN=$ROLE_ARN" >> $GITHUB_ENV
           
           # Get hosted zone ID
-          HOSTED_ZONE_ID=$(aws route53 list-hosted-zones --query "HostedZones[?Name=='bunnycloud.xyz.'].Id" --output text | sed 's/\/hostedzone\///')
+          HOSTED_ZONE_ID=$(terraform output -raw route53_zone_id || aws route53 list-hosted-zones --query "HostedZones[?Name=='bunnycloud.xyz.'].Id" --output text | sed 's/\/hostedzone\///')
           echo "Using hosted zone ID: $HOSTED_ZONE_ID"
+          echo "HOSTED_ZONE_ID=$HOSTED_ZONE_ID" >> $GITHUB_ENV
           
           # Install ExternalDNS
           helm upgrade --install external-dns external-dns/external-dns \
@@ -546,7 +490,7 @@ jobs:
             --set policy=upsert-only \
             --set serviceAccount.create=true \
             --set serviceAccount.name=external-dns \
-            --set serviceAccount.annotations."eks\.amazonaws\.com/role-arn"="${ROLE_ARN}" \
+            --set serviceAccount.annotations."eks\.amazonaws\.com/role-arn"="${EXTERNAL_DNS_ROLE_ARN}" \
             --set txtOwnerId=$HOSTED_ZONE_ID \
             --version 1.14.5 \
             --wait
@@ -680,8 +624,7 @@ jobs:
           fi
           
           echo "Using hostname for DNS record: $NODEJS_HOSTNAME"
-          
-          # Rest of the DNS record creation code...
+          echo "ExternalDNS will automatically create DNS records based on ingress annotations."
   generate-argo-apps:
     runs-on: ubuntu-latest
     permissions:
