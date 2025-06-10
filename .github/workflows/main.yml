@@ -820,8 +820,22 @@ jobs:
             exit 0
           fi
           
+          # Check if this is a Network Load Balancer
+          LB_TYPE=$(aws elbv2 describe-load-balancers --load-balancer-arns $LB_ARN --query "LoadBalancers[0].Type" --output text)
+          
+          if [ "$LB_TYPE" == "network" ]; then
+            echo "This is a Network Load Balancer (NLB), which doesn't use security groups."
+            echo "NLBs allow all traffic by default, so no security group configuration is needed."
+            exit 0
+          fi
+          
           # Get the security group ID
           SG_ID=$(aws elbv2 describe-load-balancers --load-balancer-arns $LB_ARN --query "LoadBalancers[0].SecurityGroups[0]" --output text)
+          
+          if [ -z "$SG_ID" ] || [ "$SG_ID" == "None" ]; then
+            echo "Warning: Could not find security group for load balancer."
+            exit 0
+          fi
           
           echo "Load balancer security group: $SG_ID"
           
@@ -835,6 +849,7 @@ jobs:
             echo "Security group already allows HTTPS traffic."
           fi
         continue-on-error: true  # Don't fail the workflow if security group check fails
+
 
       - name: Verify SSL/TLS for Node.js application
         run: |
