@@ -1,18 +1,34 @@
-output "kubeconfig_command" {
-  description = "Configure kubectl access"
-  value       = "aws eks update-kubeconfig --region=${var.aws_region} --name=${var.cluster_name}"
-}
-output "eks_cluster_name" {
-  description = "EKS Cluster name"
-  value       = module.eks.cluster_id
+output "cluster_endpoint" {
+  description = "Endpoint for EKS control plane"
+  value       = module.eks.cluster_endpoint
 }
 
-output "bastion_dns_name" {
-  value = aws_route53_record.bastion_dns.fqdn
+output "cluster_security_group_id" {
+  description = "Security group ID attached to the EKS cluster"
+  value       = module.eks.cluster_security_group_id
 }
 
-# Output bastion Elastic IP
-output "bastion_public_ip" {
-  description = "The static Elastic IP address of the bastion host."
-  value       = aws_eip.bastion_eip.public_ip
+output "region" {
+  description = "AWS region"
+  value       = var.aws_region
+}
+
+output "cluster_name" {
+  description = "Kubernetes Cluster Name"
+  value       = module.eks.cluster_name
+}
+
+output "acm_certificate_arn" {
+  description = "ARN of the ACM certificate for *.bunnycloud.xyz"
+  value       = aws_acm_certificate.wildcard_certificate.arn
+}
+
+output "route53_zone_id" {
+  description = "ID of the Route53 hosted zone for bunnycloud.xyz"
+  value       = data.aws_route53_zone.bunnycloud.zone_id
+}
+
+output "external_dns_role_arn" {
+  description = "ARN of the IAM role for ExternalDNS"
+  value       = aws_iam_role.external_dns.arn
 }

@@ -19,3 +19,15 @@ resource "aws_security_group_rule" "eks_from_bastion" {
   source_security_group_id = aws_security_group.bastion_sg.id
   description              = "Allow EKS to receive traffic from bastion"
 }
+
+# Allow the bastion host to access the internet
+# Allow the bastion host to access the internet
+resource "aws_security_group_rule" "bastion_to_internet" {
+  type              = "egress"
+  from_port         = 0
+  to_port           = 0
+  protocol          = "-1"
+  security_group_id = aws_security_group.bastion_sg.id
+  cidr_blocks       = ["0.0.0.0/0"]
+  description       = "Allow bastion to reach the internet"
+}

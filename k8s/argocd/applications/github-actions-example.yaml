@@ -1,7 +1,7 @@
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
-  name: nodejs
+  name: github-actions-example
   namespace: argocd # Your ArgoCD installation namespace
   finalizers:
     - resources-finalizer.argocd.argoproj.io # Ensures Kubernetes resources are deleted when the ArgoCD Application is deleted
@@ -9,32 +9,32 @@ spec:
   project: default # Your ArgoCD project
   source:
     repoURL: https://github.com/kbunnyjoel/github-actions-example # URL of the Git repository where your Helm chart is located
-    targetRevision: main # Git branch/tag/commit to sync from
-    path: apps/nodejs/chart # Path to the Helm chart within the repository (e.g., apps/nodejs/chart)
+    targetRevision: feature/improvements # Git branch/tag/commit to sync from
+    path: apps/github-actions-example/chart # Path to the Helm chart within the repository (e.g., apps/nodejs/chart)
     helm:
       values: |
         replicaCount: 1 # Default replica count, can be overridden
         image:
-          repository: 1073286/nodejs # Docker image repository (e.g., yourdockerhubusername/my-node-app)
-          tag: 4f8cd56aab3ee09b2b376e9267874ab95efcbadf # Docker image tag (e.g., commit SHA or version)
+          repository: 1073286/github-actions-example # Docker image repository (e.g., yourdockerhubusername/my-node-app)
+          tag: 30f34974a93e2aa67ed5f6c89bbd265033ed02e3 # Docker image tag (e.g., commit SHA or version)
           pullPolicy: IfNotPresent
 
         containerPort: 3000 # The port your Node.js application listens on inside the container
 
         service:
-          name: nodejs-service # Dynamically set service name
+          name: github-actions-example-service # Dynamically set service name
           type: ClusterIP
           port: 80 # Service port
           targetPort: 3000 # Port on the pod to forward traffic to (should match containerPort)
 
         ingress:
-          enabled: true
-          className: "nginx" # Your Ingress controller's class name (e.g., "nginx", "alb")
-          host: "nodejs.bunnycloud.xyz" # Dynamically set hostname
-          # tls: # Uncomment and configure if you manage TLS certificates
-          #   - secretName: "nodejs-tls-secret" # Name of the Kubernetes secret containing TLS cert and key
-          #     hosts:
-          #       - "nodejs.bunnycloud.xyz"
+          enabled: True
+          className: "nginx" # Your Ingress controller's class name
+          host: "github-actions-example.bunnycloud.xyz" # Dynamically set hostname
+          tls:
+            - secretName: "github-actions-example-tls"
+              hosts:
+                - "github-actions-example.bunnycloud.xyz"
 
         # Define resource requests and limits for your application pods
         resources: {} # Leave empty to use Helm chart defaults or override as needed
@@ -60,7 +60,7 @@ spec:
           periodSeconds: 10
   destination:
     server: https://kubernetes.default.svc # Target Kubernetes API server
-    namespace: nodejs # Namespace to deploy the application into (e.g., "nodejs")
+    namespace: github-actions-example # Namespace to deploy the application into (e.g., "nodejs")
   syncPolicy:
     automated:
       prune: true # Automatically delete resources that are no longer defined in Git

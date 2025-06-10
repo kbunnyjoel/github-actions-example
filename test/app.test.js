@@ -27,8 +27,9 @@ describe('Addition API', () => {
       .expect('Content-Type', /json/)
       .expect(200);
 
-    if (Number.isNaN(expected)) {
-      expect(Number.isNaN(response.body.result)).toBe(true);
+    if (Number.isNaN(expected) || !Number.isFinite(expected)) {
+      // NaN, Infinity, -Infinity are serialized as null in JSON
+      expect(response.body.result).toBeNull();
     } else {
       expect(response.body.result).toBeCloseTo(expected, 5);
     }

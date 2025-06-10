@@ -28,13 +28,13 @@ spec:
           targetPort: 3000 # Port on the pod to forward traffic to (should match containerPort)
 
         ingress:
-          enabled: true
-          className: "nginx" # Your Ingress controller's class name (e.g., "nginx", "alb")
+          enabled: {{ ingress_enabled | default(true) }}
+          className: "{{ ingress_className | default('nginx') }}" # Your Ingress controller's class name
           host: "{{ app_name }}.bunnycloud.xyz" # Dynamically set hostname
-          # tls: # Uncomment and configure if you manage TLS certificates
-          #   - secretName: "{{ app_name }}-tls-secret" # Name of the Kubernetes secret containing TLS cert and key
-          #     hosts:
-          #       - "{{ app_name }}.bunnycloud.xyz"
+          tls:
+            - secretName: "{{ app_name }}-tls"
+              hosts:
+                - "{{ app_name }}.bunnycloud.xyz"
 
         # Define resource requests and limits for your application pods
         resources: {} # Leave empty to use Helm chart defaults or override as needed
