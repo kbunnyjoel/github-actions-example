@@ -245,30 +245,6 @@ jobs:
           curl -LO "https://dl.k8s.io/release/v1.29.2/bin/linux/amd64/kubectl"
           chmod +x kubectl && sudo mv kubectl /usr/local/bin/
           aws eks update-kubeconfig --region ap-southeast-2 --name github-actions-eks-example || true
-      - name: Clean up Kubernetes resources
-        run: |
-          echo "Cleaning up Kubernetes resources (Ingresses, Services, Deployments, Namespaces)..."
-          kubectl delete ingress --all --all-namespaces --ignore-not-found=true
-
-          # Delete services of type LoadBalancer first and wait for AWS LBs to be de-provisioned
-          echo "Deleting LoadBalancer services in argocd namespace..."
-          kubectl delete service -n argocd --field-selector type=LoadBalancer --ignore-not-found=true
-          echo "Deleting LoadBalancer services in ingress-nginx namespace..."
-          kubectl delete service -n ingress-nginx --field-selector type=LoadBalancer --ignore-not-found=true
-          
-          echo "Waiting up to 5 minutes for AWS Load Balancers from Kubernetes services to be deleted..."
-          # This is a best-effort wait; more sophisticated polling might be needed for very complex setups
-          # The goal is to give AWS time to react to the k8s service deletions.
-          # sleep 300 
-
-          kubectl delete deployment --all -n argocd --ignore-not-found=true
-          kubectl delete deployment --all -n ingress-nginx --ignore-not-found=true
-          # Delete other resources within namespaces before deleting namespaces
-          kubectl delete all --all -n argocd --ignore-not-found=true
-          kubectl delete all --all -n ingress-nginx --ignore-not-found=true
-          kubectl delete namespace argocd --ignore-not-found=true
-          kubectl delete namespace ingress-nginx --ignore-not-found=true
-
       - name: Clean up AWS resources
         run: |
           echo "Cleaning up AWS resources..."
