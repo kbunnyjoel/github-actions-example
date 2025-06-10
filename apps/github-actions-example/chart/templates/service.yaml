@@ -1,18 +1,16 @@
 apiVersion: v1
 kind: Service
 metadata:
-  name: {{ .Values.service.name }}
-  annotations:
-    service.beta.kubernetes.io/aws-load-balancer-ssl-cert: {{ .Values.ingress.sslCertArn }}
-    service.beta.kubernetes.io/aws-load-balancer-backend-protocol: http
-    service.beta.kubernetes.io/aws-load-balancer-ssl-ports: "443"
-    service.beta.kubernetes.io/aws-load-balancer-healthcheck-path: /status
+  name: {{ .Values.service.name | default (include "nodejs.fullname" .) }}
   labels:
-    app: {{ .Chart.Name }}
+    {{- include "nodejs.labels" . | nindent 4 }}
+  {{- with .Values.service.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
 spec:
-  type: LoadBalancer
+  type: {{ .Values.service.type }}
   ports:
-    - port: {{ .Values.service.port }}
-      targetPort:  {{ .Values.service.targetPort }}
+    {{- toYaml .Values.service.ports | nindent 4 }}
   selector:
-    app: {{ .Chart.Name }}
+    {{- include "nodejs.selectorLabels" . | nindent 4 }}

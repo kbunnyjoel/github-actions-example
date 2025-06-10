@@ -9,16 +9,20 @@ containerPort: 3000 # The port your Node.js application listens on inside the co
 
 
 service:
-  name: nodejs-service-https
-  type: LoadBalancer # Use LoadBalancer for external access, or ClusterIP for internal access
-  port: 443
-  targetPort: 3000
+  name: {{ app_name }}-service # Dynamically set service name
+  type: LoadBalancer
+  annotations: {}  # Will be populated by Jinja template
+  ports:
+    - name: http
+      port: 80
+      targetPort: 3000
+      protocol: TCP
+    - name: https
+      port: 443
+      targetPort: 3000
+      protocol: TCP
 
-ingress:
-  enabled: true
-  className: "nginx" # Specify your IngressClass if needed, e.g., "nginx", "alb"
-  host: github-actions-example.bunnycloud.xyz
-  sslCertArn: "${aws_acm_certificate.this.arn}"
+
 
 resources: {}
   # We usually recommend not to specify default resources and to leave this as a conscious
@@ -35,13 +39,13 @@ resources: {}
 livenessProbe:
   httpGet:
     path: /status # Example path, adjust to your app's health check endpoint
-    port: http # Refers to the containerPort
+    port: {{ .Values.containerPort }}
   initialDelaySeconds: 15
   periodSeconds: 20
 
 readinessProbe:
   httpGet:
     path: /readyz # Example path, adjust to your app's readiness endpoint
-    port: http # Refers to the containerPort
+    port: {{ .Values.containerPort }}
   initialDelaySeconds: 5
   periodSeconds: 10

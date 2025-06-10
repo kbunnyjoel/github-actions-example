@@ -22,20 +22,22 @@ spec:
         containerPort: 3000 # The port your Node.js application listens on inside the container
 
         service:
-          name: {{ app_name }}-service # Dynamically set service name
-          type: ClusterIP
-          port: 80 # Service port
-          targetPort: 3000 # Port on the pod to forward traffic to (should match containerPort)
-
-        ingress:
-          enabled: {{ ingress_enabled | default(true) }}
-          className: "{{ ingress_className | default('nginx') }}" # Your Ingress controller's class name
-          host: "{{ app_name }}.bunnycloud.xyz" # Dynamically set hostname
-          tls:
-            - secretName: "{{ app_name }}-tls"
-              hosts:
-                - "{{ app_name }}.bunnycloud.xyz"
-
+        type: LoadBalancer
+        annotations:
+          service.beta.kubernetes.io/aws-load-balancer-type: nlb
+          service.beta.kubernetes.io/aws-load-balancer-ssl-cert: {{ acm_certificate_arn }}
+          service.beta.kubernetes.io/aws-load-balancer-ssl-ports: "https"
+          service.beta.kubernetes.io/aws-load-balancer-backend-protocol: "http"
+        ports:
+          - name: http
+            port: 80
+            targetPort: 3000
+            protocol: TCP
+          - name: https
+            port: 443
+            targetPort: 3000
+            protocol: TCP
+          
         # Define resource requests and limits for your application pods
         resources: {} # Leave empty to use Helm chart defaults or override as needed
         #  limits:

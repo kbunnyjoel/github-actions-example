@@ -32,3 +32,7 @@ output "external_dns_role_arn" {
   description = "ARN of the IAM role for ExternalDNS"
   value       = aws_iam_role.external_dns.arn
 }
+
+output "bastion_public_ip" {
+  value = aws_instance.bastion.public_ip
+}
