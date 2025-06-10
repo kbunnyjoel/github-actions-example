@@ -338,6 +338,10 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+      - name: Install Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "1.11.0" # Example: Use a more recent stable version
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v3
         with:
@@ -437,21 +441,59 @@ jobs:
         run: |
           echo "Getting ExternalDNS role ARN from Terraform..."
           cd terraform
-          ROLE_ARN=$(terraform output -raw external_dns_role_arn || echo "")
-          
-          if [ -z "$ROLE_ARN" ]; then
-            echo "Warning: Could not get ExternalDNS role ARN from Terraform output"
-            # Fallback to looking up the role
+
+          # Initialize Terraform to access the state
+          # The backend configuration in your Terraform files must allow this job to access the state
+          echo "Initializing Terraform..."
+          if ! terraform init -input=false -reconfigure; then
+            echo "Error: Terraform init failed."
+            # Decide if you want to exit or attempt fallback. Exiting is safer.
+            # exit 1 
+          fi
+
+          ROLE_ARN_FROM_TF=$(terraform output -raw external_dns_role_arn 2>/dev/null)
+
+          if [ ! -z "$ROLE_ARN_FROM_TF" ]; then
+            echo "Successfully retrieved ExternalDNS role ARN from Terraform output: $ROLE_ARN_FROM_TF"
+            ROLE_ARN="$ROLE_ARN_FROM_TF"
+          else
+            echo "Warning: Could not get ExternalDNS role ARN from Terraform output. Attempting fallback."
             AWS_ACCOUNT_ID=$(aws sts get-caller-identity --query "Account" --output text)
-            ROLE_NAME="eks-external-dns-role"
-            ROLE_ARN="arn:aws:iam::${AWS_ACCOUNT_ID}:role/${ROLE_NAME}"
+            if [ -z "$AWS_ACCOUNT_ID" ]; then
+              echo "Error: Could not determine AWS Account ID for fallback."
+              exit 1
+            fi
+            # This ROLE_NAME must exactly match the name defined in terraform/external_dns.tf
+            FALLBACK_ROLE_NAME="eks-external-dns-role" 
+            ROLE_ARN="arn:aws:iam::${AWS_ACCOUNT_ID}:role/${FALLBACK_ROLE_NAME}"
+            echo "Using fallback ExternalDNS role ARN: $ROLE_ARN"
+            # Verify the fallback role actually exists
+            if ! aws iam get-role --role-name "$FALLBACK_ROLE_NAME" > /dev/null 2>&1; then
+                echo "Error: Fallback role '$FALLBACK_ROLE_NAME' does not exist in AWS."
+                echo "Please check Terraform apply job and ensure the role was created with this name."
+                exit 1
+            fi
           fi
           
           echo "Using ExternalDNS role ARN: $ROLE_ARN"
           echo "EXTERNAL_DNS_ROLE_ARN=$ROLE_ARN" >> $GITHUB_ENV
           
-          # Get hosted zone ID
-          HOSTED_ZONE_ID=$(terraform output -raw route53_zone_id || aws route53 list-hosted-zones --query "HostedZones[?Name=='bunnycloud.xyz.'].Id" --output text | sed 's/\/hostedzone\///')
+          # Get hosted zone ID - applying similar robustness
+          echo "Getting Hosted Zone ID..."
+          HOSTED_ZONE_ID_FROM_TF=$(terraform output -raw route53_zone_id 2>/dev/null)
+
+          if [ ! -z "$HOSTED_ZONE_ID_FROM_TF" ]; then
+            echo "Successfully retrieved Hosted Zone ID from Terraform output: $HOSTED_ZONE_ID_FROM_TF"
+            HOSTED_ZONE_ID="$HOSTED_ZONE_ID_FROM_TF"
+          else
+            echo "Warning: Could not get Hosted Zone ID from Terraform output. Attempting fallback."
+            HOSTED_ZONE_ID=$(aws route53 list-hosted-zones --query "HostedZones[?Name=='bunnycloud.xyz.'].Id" --output text | sed 's/\/hostedzone\///')
+          fi
+
+          if [ -z "$ROLE_ARN" ]; then
+            echo "Error: ExternalDNS role ARN is empty after all attempts."
+            exit 1
+          fi
           echo "Using hosted zone ID: $HOSTED_ZONE_ID"
           echo "HOSTED_ZONE_ID=$HOSTED_ZONE_ID" >> $GITHUB_ENV
           
@@ -475,7 +517,7 @@ jobs:
         # Changed from manual creation to verification as ExternalDNS handles it
         run: |
           echo "Checking ArgoCD installation status..."
-          kubectl get pods -n argocd --timeout=2m
+          kubectl get pods -n argocd
           
           echo "Checking ArgoCD service..."
           kubectl get svc -n argocd
