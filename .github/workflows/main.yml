@@ -623,6 +623,13 @@ jobs:
           DEPLOYMENT_NAMESPACE="${{ vars.DEPLOYMENT_NAMESPACE || 'github-actions-example' }}"
           IMAGE_NAME="github-actions-example"  # Use a consistent image name
           
+          # Get ACM certificate ARN
+          ACM_CERT_ARN="${{ env.ACM_CERTIFICATE_ARN }}"
+          if [ -z "$ACM_CERT_ARN" ]; then
+            ACM_CERT_ARN=$(aws acm list-certificates --query "CertificateSummaryList[?DomainName=='*.bunnycloud.xyz'].CertificateArn" --output text)
+            echo "Retrieved ACM certificate ARN: $ACM_CERT_ARN"
+          fi
+
           echo "$APPS_JSON" | jq -r '.[]' | while read app; do
             OUTFILE="k8s/argocd/applications/${app}.yaml"
             echo "Rendering $OUTFILE for app: $app"
@@ -642,10 +649,12 @@ jobs:
               -D image_repository="$IMAGE_REPOSITORY" \
               -D image_tag="$IMAGE_TAG" \
               -D deployment_namespace="$DEPLOYMENT_NAMESPACE" \
+              -D acm_certificate_arn="$ACM_CERT_ARN" \
               > "$OUTFILE"
             echo "Generated manifest for $app (using app_name=$APP_NAME):"
             cat "$OUTFILE"
           done
+
 
 
       - name: Commit generated ArgoCD Application manifests
