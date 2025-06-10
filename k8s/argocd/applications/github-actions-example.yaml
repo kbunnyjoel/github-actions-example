@@ -16,25 +16,37 @@ spec:
         replicaCount: 1 # Default replica count, can be overridden
         image:
           repository: 1073286/github-actions-example # Docker image repository (e.g., yourdockerhubusername/my-node-app)
-          tag: d957d7356ef395fe96d79dc91d141844046ee0d5 # Docker image tag (e.g., commit SHA or version)
+          tag: 83e14a6d4242113c55effd849797756cae809fa1 # Docker image tag (e.g., commit SHA or version)
           pullPolicy: IfNotPresent
 
         containerPort: 3000 # The port your Node.js application listens on inside the container
 
         service:
-          name: github-actions-example-service # Dynamically set service name
-          type: ClusterIP
-          port: 80 # Service port
-          targetPort: 3000 # Port on the pod to forward traffic to (should match containerPort)
-
+          type: ClusterIP # Changed from LoadBalancer
+          ports: # Ensure your Helm chart's service template uses this structure
+            - name: http # Name of the port, referenced by Ingress
+              port: 80 # Service's port
+              targetPort: 3000 # Target the containerPort directly, assuming it's 3000 as per containerPort and probes.
+              protocol: TCP
+          # annotations: {} # Service annotations are generally not needed for ClusterIP with Ingress
+          
         ingress:
-          enabled: True
-          className: "nginx" # Your Ingress controller's class name
-          host: "github-actions-example.bunnycloud.xyz" # Dynamically set hostname
-          tls:
-            - secretName: "github-actions-example-tls"
-              hosts:
+          enabled: true
+          className: "nginx" # Matches the IngressClass of your NGINX controller
+          hostname: "github-actions-example.bunnycloud.xyz"
+          annotations:
+            "kubernetes.io/ingress.class": "nginx" # Legacy annotation, good for compatibility
+            "nginx.ingress.kubernetes.io/ssl-redirect": "true"
+            "nginx.ingress.kubernetes.io/force-ssl-redirect": "true"
+            # This annotation is crucial for ExternalDNS to create the DNS record
+            "external-dns.alpha.kubernetes.io/hostname": "github-actions-example.bunnycloud.xyz."
+            # If you were using cert-manager, you'd add its annotations here.
+            # Since your NGINX Ingress Controller's NLB is configured with the ACM cert,
+            # this Ingress resource doesn't need specific cert-manager annotations for this app.
+          tls: # Informs the Ingress controller that this host expects TLS
+            - hosts:
                 - "github-actions-example.bunnycloud.xyz"
+              # secretName is not needed here if the NGINX Ingress Controller's NLB handles SSL termination with the wildcard ACM cert.
 
         # Define resource requests and limits for your application pods
         resources: {} # Leave empty to use Helm chart defaults or override as needed
@@ -48,14 +60,14 @@ spec:
         livenessProbe:
           httpGet:
             path: /status # Your application's liveness probe endpoint
-            port: http   # This should refer to a named port in your Deployment spec (e.g., name: http, containerPort: 3000)
+            port: 3000   # Target the containerPort directly or a named port on the container (e.g., 'http')
           initialDelaySeconds: 15
           periodSeconds: 20
 
         readinessProbe:
           httpGet:
             path: /status # Your application's readiness probe endpoint
-            port: http    # This should refer to a named port in your Deployment spec
+            port: 3000    # Target the containerPort directly or a named port on the container
           initialDelaySeconds: 5
           periodSeconds: 10
   destination:
