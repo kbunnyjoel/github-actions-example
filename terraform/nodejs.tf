@@ -10,5 +10,5 @@ resource "aws_route53_record" "app" {
   name    = "github-actions-example.bunnycloud.xyz"
   type    = "CNAME"
   ttl     = 300
-  records = [module.eks.cluster_endpoint]  # This is a placeholder, you'll need to update this
+  records = [module.eks.cluster_endpoint] # This is a placeholder, you'll need to update this
 }
