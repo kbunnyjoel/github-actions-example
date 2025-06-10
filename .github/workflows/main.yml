@@ -469,7 +469,6 @@ jobs:
             --version 1.14.5 \
             --wait
           echo "ExternalDNS installed."
-        continue-on-error: true  # Don't fail the workflow if ExternalDNS installation fails
 
 
       - name: Verify ArgoCD Installation and DNS

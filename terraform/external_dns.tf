@@ -10,8 +10,12 @@ resource "aws_iam_policy" "external_dns" {
         Action = [
           "route53:ChangeResourceRecordSets"
         ],
-        Resource = [
-          "arn:aws:route53:::hostedzone/*"
+        Resource = [data.aws.route53_zone.bunnycloud.arn]
+      },
+      {
+        Effect = "Allow",
+        Action = [
+          "arn"
         ]
       },
       {
@@ -20,7 +24,7 @@ resource "aws_iam_policy" "external_dns" {
           "route53:ListHostedZones",
           "route53:ListResourceRecordSets"
         ],
-        Resource = ["*"]
+        Resource = [data.aws.route53_zone.bunnycloud.arn]
       }
     ]
   })
