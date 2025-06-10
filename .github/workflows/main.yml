@@ -851,6 +851,7 @@ jobs:
         continue-on-error: true  # Don't fail the workflow if security group check fails
 
 
+
       - name: Verify SSL/TLS for Node.js application
         run: |
           echo "Verifying SSL/TLS encryption for Node.js application..."
