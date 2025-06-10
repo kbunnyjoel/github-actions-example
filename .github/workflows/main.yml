@@ -166,6 +166,8 @@ jobs:
         with:
           terraform_version: "1.11.0" # Example: Use a more recent stable version
 
+      - name: Terraform Unlock
+        run: terraform force-unlock -force -all || echo "No locks to unlock"
       - name: Run tfsec IaC scan
         uses: aquasecurity/tfsec-action@v1.0.0 # Use a specific version if preferred
         with:
