@@ -442,14 +442,39 @@ jobs:
           echo "Preparing argocd namespace..."
           # Try to delete the namespace if it exists and wait for deletion.
           # This helps clean up if it's in a Terminating state from a previous run.
-          if kubectl get namespace argocd --no-headers --output=name &> /dev/null; then
-            echo "Namespace 'argocd' found. Attempting to delete and wait for it to be removed..."
-            kubectl delete namespace argocd --wait=true --timeout=120s || \
-              echo "Warning: Failed to delete 'argocd' namespace or timed out. This might be okay if it was already gone or is severely stuck. Helm will attempt to proceed."
-            # Add a small sleep to allow the Kubernetes API to fully process the deletion
-            # before attempting to recreate the namespace with Helm.
-            echo "Waiting a few seconds after namespace deletion attempt..."
-            sleep 15
+          ARGOCD_NS_NAME="argocd"
+          if kubectl get namespace $ARGOCD_NS_NAME --no-headers --output=name &> /dev/null; then
+            echo "Namespace '$ARGOCD_NS_NAME' found. Initiating comprehensive cleanup..."
+            
+            # 1. Attempt to delete all resources within the namespace.
+            #    --wait=false here, as we want to issue commands and let namespace deletion handle overall waiting.
+            #    --timeout is for this specific command's API interaction.
+            echo "Attempting to delete all resources in namespace '$ARGOCD_NS_NAME' (non-blocking, API timeout 90s)..."
+            kubectl delete all --all -n $ARGOCD_NS_NAME --wait=false --timeout=90s || \
+              echo "Warning: Command to delete resources in '$ARGOCD_NS_NAME' encountered issues or timed out. Namespace deletion will proceed."
+            
+            # Give a moment for the API server to process the bulk delete requests.
+            echo "Waiting 10s for resource deletion requests to be processed..."
+            sleep 10 
+            
+            # 2. Attempt to delete the namespace and wait for it to be removed.
+            echo "Attempting to delete '$ARGOCD_NS_NAME' namespace and wait (timeout 180s)..."
+            kubectl delete namespace $ARGOCD_NS_NAME --wait=true --timeout=180s || \
+              echo "Warning: Failed to delete '$ARGOCD_NS_NAME' namespace or timed out after 180s. It might be stuck."
+            
+            # 3. If namespace is still terminating, try to remove its finalizers.
+            #    This is an aggressive step if the namespace object itself is stuck.
+            if kubectl get namespace $ARGOCD_NS_NAME --no-headers --output=name &> /dev/null; then
+                echo "Namespace '$ARGOCD_NS_NAME' still exists, likely stuck in Terminating state."
+                echo "Attempting to patch out finalizers from namespace '$ARGOCD_NS_NAME'..."
+                kubectl patch namespace $ARGOCD_NS_NAME -p '{\"metadata\":{\"finalizers\":null}}' --type=merge || \
+                  echo "Warning: Failed to patch finalizers for namespace '$ARGOCD_NS_NAME'. It might already be gone or patch is not allowed."
+                
+                echo "Waiting 30s after finalizer patch attempt for namespace to clear..."
+                sleep 30
+            fi
+            echo "Final short wait (10s) before Helm install..."
+            sleep 10
           else
             echo "Namespace 'argocd' not found. Helm will create it."
           fi
