@@ -1,18 +1,18 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: {{ include "nodejs.fullname" . }}
+  name: {{ include "github-actions-example.fullname" . }}
   labels:
-    {{- include "nodejs.labels" . | nindent 4 }}
+    {{- include "github-actions-example.labels" . | nindent 4 }}
 spec:
   replicas: {{ .Values.replicaCount | default 1 }}
   selector:
     matchLabels:
-      {{- include "nodejs.selectorLabels" . | nindent 6 }}
+      {{- include "github-actions-example.selectorLabels" . | nindent 6 }}
   template:
     metadata:
       labels:
-        {{- include "nodejs.selectorLabels" . | nindent 8 }}
+        {{- include "github-actions-example.selectorLabels" . | nindent 8 }}
     spec:
       containers:
       - name: {{ .Chart.Name }}
