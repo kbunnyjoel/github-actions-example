@@ -15,12 +15,6 @@ resource "aws_iam_policy" "external_dns" {
       {
         Effect = "Allow",
         Action = [
-          "arn"
-        ]
-      },
-      {
-        Effect = "Allow",
-        Action = [
           "route53:ListHostedZones",
           "route53:ListResourceRecordSets"
         ],
