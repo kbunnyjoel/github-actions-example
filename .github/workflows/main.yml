@@ -26,7 +26,7 @@ env:
 jobs:
 
   build-and-test:
-    if: ${{ env.IS_DESTROY != 'true' }}
+    if: ${{ github.event.inputs.destroy != 'true' }}
     env:
       IS_DESTROY: ${{ github.event.inputs.destroy == 'true' }}
     permissions:
@@ -79,7 +79,7 @@ jobs:
           path: coverage/
 
   docker:
-    if: ${{ env.IS_DESTROY != 'true' }}
+    if: ${{ github.event.inputs.destroy != 'true' }}
     env:
       IS_DESTROY: ${{ github.event.inputs.destroy == 'true' }}
     name: Build and push Docker image
@@ -142,7 +142,7 @@ jobs:
           done
 
   terraform-eks:
-    if: ${{ github.event.inputs.run_terraform == 'true' && env.IS_DESTROY != 'true' }}
+    if: ${{ github.event.inputs.run_terraform == 'true' && github.event.inputs.destroy != 'true' }}
     env:
       IS_DESTROY: ${{ github.event.inputs.destroy == 'true' }}
     runs-on: ubuntu-latest
@@ -236,7 +236,7 @@ jobs:
 
   
   destroy-infrastructure:
-    if: env.IS_DESTROY == 'true'
+    if: ${{ github.event.inputs.destroy == 'true' }}
     env:
       IS_DESTROY: ${{ github.event.inputs.destroy == 'true' }}
     runs-on: ubuntu-latest
@@ -347,7 +347,7 @@ jobs:
 
       
   deploy-argocd:
-    if: github.event.inputs.run_terraform == 'true' && env.IS_DESTROY != 'true'
+    if: github.event.inputs.run_terraform == 'true' && github.event.inputs.destroy != 'true'
     env:
       IS_DESTROY: ${{ github.event.inputs.destroy == 'true' }}
     needs: terraform-eks
@@ -666,7 +666,7 @@ jobs:
           fi
         continue-on-error: true  # Don't fail the workflow if the app isn't ready yet
   generate-argo-apps:
-    if: ${{ env.IS_DESTROY != 'true' }}
+    if: ${{ github.event.inputs.destroy != 'true' }}
     env:
       IS_DESTROY: ${{ github.event.inputs.destroy == 'true' }}
     runs-on: ubuntu-latest
@@ -749,7 +749,7 @@ jobs:
           fi
 
   lint-and-deploy-helm:
-    if: (github.event_name == 'push' || github.event_name == 'workflow_dispatch') && env.IS_DESTROY != 'true'
+    if: (github.event_name == 'push' || github.event_name == 'workflow_dispatch') && github.event.inputs.destroy != 'true'
     env:
       IS_DESTROY: ${{ github.event.inputs.destroy == 'true' }}
     needs: [docker, deploy-argocd] # Changed from generate-argo-apps to deploy-argocd
