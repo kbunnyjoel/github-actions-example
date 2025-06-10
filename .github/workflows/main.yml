@@ -426,35 +426,7 @@ jobs:
           echo "Waiting for ingress-nginx controller pod to be ready..."
           kubectl rollout status deployment ingress-nginx-controller -n ingress-nginx --timeout=5m
 
-      - name: Install Argo CD
-        run: |
-          echo "Preparing argocd namespace..."
-          # Check if namespace exists and force delete it if needed
-          if kubectl get namespace argocd &>/dev/null; then
-            echo "Namespace 'argocd' found. Deleting it..."
-            kubectl delete namespace argocd --wait=false
-            
-            # Wait for namespace to be deleted (with timeout)
-            for i in {1..30}; do
-              if ! kubectl get namespace argocd &>/dev/null; then
-                echo "Namespace 'argocd' deleted successfully."
-                break
-              fi
-              echo "Waiting for namespace deletion... ($i/30)"
-              sleep 10
-              
-              # If namespace is stuck, try to remove finalizers
-              if [ $i -eq 15 ]; then
-                echo "Namespace may be stuck, attempting to remove finalizers..."
-                kubectl get namespace argocd -o json | jq '.spec.finalizers = []' | kubectl replace --raw "/api/v1/namespaces/argocd/finalize" -f -
-              fi
-            done
-          fi
-          
-          # Create namespace fresh
-          kubectl create namespace argocd --dry-run=client -o yaml | kubectl apply -f -
-          
-          echo "Installing ArgoCD..."
+                echo "Installing ArgoCD..."
           helm upgrade --install argocd argo/argo-cd \
             --namespace argocd \
             --set server.service.type=LoadBalancer \
@@ -462,7 +434,15 @@ jobs:
             --set server.service.annotations."service\.beta\.kubernetes\.io/aws-load-balancer-backend-protocol"="http" \
             --set server.service.annotations."service\.beta\.kubernetes\.io/aws-load-balancer-ssl-ports"="https" \
             --set server.service.ports.https=443 \
-            --version 6.11.
+            --version 6.11.1 \
+            --wait
+            
+          echo "Checking ArgoCD pods status..."
+          kubectl get pods -n argocd
+          echo "Waiting for ArgoCD deployments to be ready..."
+          kubectl wait --for=condition=Available deployment --all -n argocd --timeout=5m || true
+          echo "ArgoCD installation completed."
+
 
 
       - name: Get ExternalDNS role ARN from Terraform
