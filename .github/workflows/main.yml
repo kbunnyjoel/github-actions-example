@@ -770,21 +770,21 @@ jobs:
           # Create a JSON file for the Route53 change
           cat > app-dns-change.json << EOF
           {
-            "Changes": [
-              {
-                "Action": "UPSERT",
-                "ResourceRecordSet": {
-                  "Name": "github-actions-example.bunnycloud.xyz",
-                  "Type": "CNAME",
-                  "TTL": 300,
-                  "ResourceRecords": [
-                    {
-                      "Value": "$APP_HOSTNAME"
-                    }
-                  ]
-                }
-              }
-            ]
+          "Changes": [
+          {
+          "Action": "UPSERT",
+          "ResourceRecordSet": {
+          "Name": "github-actions-example.bunnycloud.xyz",
+          "Type": "CNAME",
+          "TTL": 300,
+          "ResourceRecords": [
+          {
+          "Value": "$APP_HOSTNAME"
+          }
+          ]
+          }
+          }
+          ]
           }
           EOF
               
