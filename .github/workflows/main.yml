@@ -311,24 +311,7 @@ jobs:
           # Get all subnets in the VPC
           SUBNETS=$(aws ec2 describe-subnets --filters "Name=vpc-id,Values=$VPC_ID" --query "Subnets[*].SubnetId" --output text)
           echo "Subnets: $SUBNETS"
-
-          # Delete network interfaces in each subnet
-          for SUBNET in $SUBNETS; do
-            echo "Cleaning up resources in subnet $SUBNET..."
-            aws ec2 describe-network-interfaces --filters "Name=subnet-id,Values=$SUBNET" --query "NetworkInterfaces[*].NetworkInterfaceId" --output text | tr '\t' '\n' | while read NI; do
-              if [ ! -z "$NI" ]; then
-                echo "Checking network interface $NI..."
-                ATTACHMENT=$(aws ec2 describe-network-interfaces --network-interface-ids $NI --query "NetworkInterfaces[0].Attachment.AttachmentId" --output text)
-                if [ "$ATTACHMENT" != "None" ] && [ ! -z "$ATTACHMENT" ]; then
-                  echo "Detaching network interface $NI (attachment $ATTACHMENT)..."
-                  aws ec2 detach-network-interface --attachment-id "$ATTACHMENT" --force
-                  sleep 5
-                fi
-                echo "Deleting network interface $NI..."
-                aws ec2 delete-network-interface --network-interface-id "$NI"
-              fi
-            done
-          done
+          echo "Note: Terraform destroy should handle the deletion of VPC-specific resources like NAT Gateways, EIPs, and Network Interfaces created by Terraform."
           
           # Wait for resources to be released
           echo "Waiting for resources to be released..."
@@ -492,9 +475,10 @@ jobs:
 
 
       - name: Verify ArgoCD Installation and DNS
+        # Changed from manual creation to verification as ExternalDNS handles it
         run: |
           echo "Checking ArgoCD installation status..."
-          kubectl get pods -n argocd
+          kubectl get pods -n argocd --timeout=2m
           
           echo "Checking ArgoCD service..."
           kubectl get svc -n argocd
@@ -502,51 +486,40 @@ jobs:
           echo "Checking ArgoCD ingress..."
           kubectl get ingress -n argocd
           
-          echo "Waiting for ArgoCD service to get an address..."
-          ARGOCD_HOSTNAME=""
+          echo "Waiting for NGINX Ingress Controller LoadBalancer to get an address..."
+          NGINX_LB_HOSTNAME=""
           for i in {1..15}; do
-            ARGOCD_HOSTNAME=$(kubectl get svc argocd-server -n argocd -o jsonpath='{.status.loadBalancer.ingress[0].hostname}' 2>/dev/null)
+            # Get the NGINX Ingress controller's LoadBalancer hostname
+            NGINX_LB_HOSTNAME=$(kubectl get svc -n ingress-nginx ingress-nginx-controller -o jsonpath='{.status.loadBalancer.ingress[0].hostname}' 2>/dev/null)
             
-            if [ ! -z "$ARGOCD_HOSTNAME" ]; then
-              echo "ArgoCD hostname found: $ARGOCD_HOSTNAME"
+            if [ ! -z "$NGINX_LB_HOSTNAME" ]; then
+              echo "NGINX Ingress Controller LoadBalancer hostname found: $NGINX_LB_HOSTNAME"
               break
             fi
-            echo "Waiting for ArgoCD service to get an address... ($i/15)"
+            echo "Waiting for NGINX Ingress Controller LoadBalancer hostname... ($i/15)"
             sleep 20
           done
           
-          if [ -z "$ARGOCD_HOSTNAME" ]; then
-            echo "Warning: Could not find ArgoCD hostname after timeout."
-            exit 0  # Don't fail the workflow
+          if [ -z "$NGINX_LB_HOSTNAME" ]; then
+            echo "Error: Could not find NGINX Ingress Controller LoadBalancer hostname after timeout."
+            exit 1 # Fail the step
           fi
           
-          echo "Creating DNS record for argocd.bunnycloud.xyz..."
-          HOSTED_ZONE_ID=$(aws route53 list-hosted-zones --query "HostedZones[?Name=='bunnycloud.xyz.'].Id" --output text | sed 's/\/hostedzone\///')
-          
-          # Create a JSON file for the Route53 change
-          cat > argocd-dns-change.json << EOF
-          {
-            "Changes": [
-              {
-                "Action": "UPSERT",
-                "ResourceRecordSet": {
-                  "Name": "argocd.bunnycloud.xyz",
-                  "Type": "CNAME",
-                  "TTL": 300,
-                  "ResourceRecords": [
-                    {
-                      "Value": "$ARGOCD_HOSTNAME"
-                    }
-                  ]
-                }
-              }
-            ]
-          }
-          EOF
-          
-          # Apply the DNS change
-          aws route53 change-resource-record-sets --hosted-zone-id $HOSTED_ZONE_ID --change-batch file://argocd-dns-change.json || true
-          echo "DNS record created for argocd.bunnycloud.xyz pointing to $ARGOCD_HOSTNAME"
+          echo "Verifying DNS record for argocd.bunnycloud.xyz (should point to $NGINX_LB_HOSTNAME)..."
+          echo "Waiting for DNS propagation (max 5 minutes)..."
+          for i in {1..10}; do
+            if dig argocd.bunnycloud.xyz +short | grep -q "$NGINX_LB_HOSTNAME"; then
+              echo "DNS record argocd.bunnycloud.xyz propagated and points to $NGINX_LB_HOSTNAME."
+              break
+            fi
+            echo "Waiting for DNS propagation for argocd.bunnycloud.xyz... ($i/10)"
+            sleep 30
+            if [ $i -eq 10 ]; then
+              echo "Warning: DNS propagation for argocd.bunnycloud.xyz timed out or record does not point to $NGINX_LB_HOSTNAME."
+              echo "Current DNS resolution for argocd.bunnycloud.xyz:"
+              dig argocd.bunnycloud.xyz +trace
+            fi
+          done
         continue-on-error: true  # Don't fail the workflow if verification fails
 
       # Security group rules are now managed by Terraform in eks_sg_rules.tf
@@ -593,13 +566,6 @@ jobs:
           DEPLOYMENT_NAMESPACE="${{ vars.DEPLOYMENT_NAMESPACE || 'github-actions-example' }}"
           IMAGE_NAME="github-actions-example"  # Use a consistent image name
           
-          # Get ACM certificate ARN
-          ACM_CERT_ARN="${{ env.ACM_CERTIFICATE_ARN }}"
-          if [ -z "$ACM_CERT_ARN" ]; then
-            ACM_CERT_ARN=$(aws acm list-certificates --query "CertificateSummaryList[?DomainName=='*.bunnycloud.xyz'].CertificateArn" --output text)
-            echo "Retrieved ACM certificate ARN: $ACM_CERT_ARN"
-          fi
-
           echo "$APPS_JSON" | jq -r '.[]' | while read app; do
             OUTFILE="k8s/argocd/applications/${app}.yaml"
             echo "Rendering $OUTFILE for app: $app"
@@ -619,7 +585,6 @@ jobs:
               -D image_repository="$IMAGE_REPOSITORY" \
               -D image_tag="$IMAGE_TAG" \
               -D deployment_namespace="$DEPLOYMENT_NAMESPACE" \
-              -D acm_certificate_arn="$ACM_CERT_ARN" \
               > "$OUTFILE"
             echo "Generated manifest for $app (using app_name=$APP_NAME):"
             cat "$OUTFILE"
@@ -732,125 +697,54 @@ jobs:
           kubectl get pods -n $APP_NAMESPACE
         continue-on-error: true  # Don't fail the workflow if the app isn't ready yet
 
-      - name: Create DNS record for application
+      - name: Verify DNS record for application (managed by ExternalDNS)
         run: |
-          echo "Creating DNS record for github-actions-example.bunnycloud.xyz..."
+          APP_TARGET_HOSTNAME="github-actions-example.bunnycloud.xyz"
+          echo "Verifying DNS record for $APP_TARGET_HOSTNAME..."
           
-          # Get the application's service hostname
-          APP_HOSTNAME=""
-          
-          # First, check for LoadBalancer service
+          # Get the NGINX Ingress Controller's LoadBalancer hostname, which is the CNAME target
+          NGINX_LB_HOSTNAME=""
           for i in {1..15}; do
-            APP_HOSTNAME=$(kubectl get svc -n github-actions-example -l app.kubernetes.io/instance=github-actions-example -o jsonpath='{.items[0].status.loadBalancer.ingress[0].hostname}' 2>/dev/null)
+            NGINX_LB_HOSTNAME=$(kubectl get svc -n ingress-nginx ingress-nginx-controller -o jsonpath='{.status.loadBalancer.ingress[0].hostname}' 2>/dev/null)
             
-            if [ -z "$APP_HOSTNAME" ]; then
-              # Try to get hostname from ingress
-              APP_HOSTNAME=$(kubectl get ingress -n github-actions-example -o jsonpath='{.items[0].status.loadBalancer.ingress[0].hostname}' 2>/dev/null)
-            fi
-            
-            if [ ! -z "$APP_HOSTNAME" ]; then
-              echo "Application hostname found: $APP_HOSTNAME"
+            if [ ! -z "$NGINX_LB_HOSTNAME" ]; then
+              echo "NGINX Ingress Controller LoadBalancer hostname found: $NGINX_LB_HOSTNAME"
               break
             fi
-            echo "Waiting for application hostname... ($i/15)"
+            echo "Waiting for NGINX Ingress Controller LoadBalancer hostname... ($i/15)"
             sleep 20
           done
           
-          # If no hostname found, exit
-          if [ -z "$APP_HOSTNAME" ]; then
-            echo "Warning: Could not find application hostname after timeout."
-            kubectl get svc -n github-actions-example
-            kubectl get ingress -n github-actions-example
-            exit 0
+          if [ -z "$NGINX_LB_HOSTNAME" ]; then
+            echo "Error: Could not find NGINX Ingress Controller LoadBalancer hostname after timeout."
+            echo "Debug: Listing services in ingress-nginx namespace:"
+            kubectl get svc -n ingress-nginx
+            exit 1 # Fail the step
           fi
           
-          # Create DNS record
-          HOSTED_ZONE_ID=$(aws route53 list-hosted-zones --query "HostedZones[?Name=='bunnycloud.xyz.'].Id" --output text | sed 's/\/hostedzone\///')
-          
-          # Create a JSON file for the Route53 change
-          cat > app-dns-change.json << EOF
-          {
-            "Changes": [
-              {
-                "Action": "UPSERT",
-                "ResourceRecordSet": {
-                  "Name": "github-actions-example.bunnycloud.xyz",
-                  "Type": "CNAME",
-                  "TTL": 300,
-                  "ResourceRecords": [
-                    {
-                      "Value": "$APP_HOSTNAME"
-                    }
-                  ]
-                }
-              }
-            ]
-          }
-          EOF
-              
-          # Apply the DNS change
-          aws route53 change-resource-record-sets --hosted-zone-id $HOSTED_ZONE_ID --change-batch file://app-dns-change.json
-          echo "DNS record created for github-actions-example.bunnycloud.xyz pointing to $APP_HOSTNAME"
-          
-          # Wait for DNS propagation
-          echo "Waiting for DNS propagation..."
+          echo "ExternalDNS should create a CNAME record for $APP_TARGET_HOSTNAME pointing to $NGINX_LB_HOSTNAME."
+          echo "Waiting for DNS propagation (max 5 minutes)..."
           for i in {1..10}; do
-            if dig github-actions-example.bunnycloud.xyz +short | grep -q .; then
-              echo "DNS record found for github-actions-example.bunnycloud.xyz"
+            # Check if the CNAME resolves and points to the correct target
+            if dig $APP_TARGET_HOSTNAME +short | grep -q "$NGINX_LB_HOSTNAME"; then
+              echo "DNS record $APP_TARGET_HOSTNAME propagated and points to $NGINX_LB_HOSTNAME."
               break
             fi
-            echo "Waiting for DNS propagation... ($i/10)"
+            echo "Waiting for DNS propagation for $APP_TARGET_HOSTNAME... ($i/10)"
             sleep 30
+            if [ $i -eq 10 ]; then
+              echo "Error: DNS propagation for $APP_TARGET_HOSTNAME timed out or record does not point to $NGINX_LB_HOSTNAME."
+              echo "Current DNS resolution for $APP_TARGET_HOSTNAME:"
+              dig $APP_TARGET_HOSTNAME +trace
+              echo "Ensure the application's Ingress resource in namespace 'github-actions-example' has the annotation 'external-dns.alpha.kubernetes.io/hostname: $APP_TARGET_HOSTNAME.' and that ExternalDNS is running correctly."
+              echo "Listing Ingresses in github-actions-example namespace:"
+              kubectl get ingress -n github-actions-example -o yaml
+              echo "ExternalDNS logs:"
+              kubectl logs -n external-dns -l app.kubernetes.io/name=external-dns --tail=100
+              exit 1 # Fail the step
+            fi
           done
-        continue-on-error: true  # Don't fail the workflow if DNS creation fails
-
-      
-      - name: Check security group rules for load balancer
-        run: |
-          echo "Checking security group rules for load balancer..."
-          
-          # Get the load balancer name
-          LB_NAME=$(kubectl get svc -n github-actions-example -l app.kubernetes.io/instance=github-actions-example -o jsonpath='{.items[0].metadata.name}')
-          
-          # Get the load balancer details
-          LB_ARN=$(aws elbv2 describe-load-balancers --query "LoadBalancers[?contains(DNSName, '$APP_HOSTNAME')].LoadBalancerArn" --output text)
-          
-          if [ -z "$LB_ARN" ]; then
-            echo "Warning: Could not find load balancer ARN."
-            exit 0
-          fi
-          
-          # Check if this is a Network Load Balancer
-          LB_TYPE=$(aws elbv2 describe-load-balancers --load-balancer-arns $LB_ARN --query "LoadBalancers[0].Type" --output text)
-          
-          if [ "$LB_TYPE" == "network" ]; then
-            echo "This is a Network Load Balancer (NLB), which doesn't use security groups."
-            echo "NLBs allow all traffic by default, so no security group configuration is needed."
-            exit 0
-          fi
-          
-          # Get the security group ID
-          SG_ID=$(aws elbv2 describe-load-balancers --load-balancer-arns $LB_ARN --query "LoadBalancers[0].SecurityGroups[0]" --output text)
-          
-          if [ -z "$SG_ID" ] || [ "$SG_ID" == "None" ]; then
-            echo "Warning: Could not find security group for load balancer."
-            exit 0
-          fi
-          
-          echo "Load balancer security group: $SG_ID"
-          
-          # Check if the security group allows HTTPS traffic
-          HTTPS_RULE=$(aws ec2 describe-security-groups --group-ids $SG_ID --query "SecurityGroups[0].IpPermissions[?FromPort==\`443\` && ToPort==\`443\` && IpProtocol==\`tcp\`]" --output text)
-          
-          if [ -z "$HTTPS_RULE" ]; then
-            echo "Adding rule for HTTPS traffic..."
-            aws ec2 authorize-security-group-ingress --group-id $SG_ID --protocol tcp --port 443 --cidr 0.0.0.0/0
-          else
-            echo "Security group already allows HTTPS traffic."
-          fi
-        continue-on-error: true  # Don't fail the workflow if security group check fails
-
-
+        # continue-on-error: true # Removed to make DNS verification failure explicit
 
       - name: Verify SSL/TLS for Node.js application
         run: |
