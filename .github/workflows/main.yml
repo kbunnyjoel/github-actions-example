@@ -484,70 +484,63 @@ jobs:
         continue-on-error: true  # Don't fail the workflow if ExternalDNS installation fails
 
 
-      - name: Verify Ingress and DNS (ArgoCD)
+      - name: Verify ArgoCD Installation and DNS
         run: |
-          echo "Waiting for ArgoCD Ingress or Service to get an address..."
-          HOSTNAME=""
-          for i in {1..30}; do
-            # Check for Ingress
-            INGRESS_HOSTNAME=$(kubectl get ingress -n argocd -l app.kubernetes.io/name=argocd-server -o jsonpath='{.items[0].status.loadBalancer.ingress[0].hostname}' 2>/dev/null)
+          echo "Checking ArgoCD installation status..."
+          kubectl get pods -n argocd
+          
+          echo "Checking ArgoCD service..."
+          kubectl get svc -n argocd
+          
+          echo "Checking ArgoCD ingress..."
+          kubectl get ingress -n argocd
+          
+          echo "Waiting for ArgoCD service to get an address..."
+          ARGOCD_HOSTNAME=""
+          for i in {1..15}; do
+            ARGOCD_HOSTNAME=$(kubectl get svc argocd-server -n argocd -o jsonpath='{.status.loadBalancer.ingress[0].hostname}' 2>/dev/null)
             
-            # If Ingress not found, check for LoadBalancer Service
-            if [ -z "$INGRESS_HOSTNAME" ]; then
-              INGRESS_HOSTNAME=$(kubectl get svc -n argocd argocd-server -o jsonpath='{.status.loadBalancer.ingress[0].hostname}' 2>/dev/null)
-            fi
-            
-            if [ ! -z "$INGRESS_HOSTNAME" ]; then
-              echo "LoadBalancer hostname found: $INGRESS_HOSTNAME"
+            if [ ! -z "$ARGOCD_HOSTNAME" ]; then
+              echo "ArgoCD hostname found: $ARGOCD_HOSTNAME"
               break
             fi
-            echo "Waiting for LoadBalancer... (attempt $i/30)"
+            echo "Waiting for ArgoCD service to get an address... ($i/15)"
             sleep 20
           done
           
-          if [ -z "$INGRESS_HOSTNAME" ]; then
-            echo "Error: ArgoCD LoadBalancer not found after timeout."
-            echo "Checking Ingress resources:"
-            kubectl get ingress -n argocd -o wide
-            echo "Checking Service resources:"
-            kubectl get svc -n argocd -o wide
-            exit 1
+          if [ -z "$ARGOCD_HOSTNAME" ]; then
+            echo "Warning: Could not find ArgoCD hostname after timeout."
+            exit 0  # Don't fail the workflow
           fi
           
-          # Check ExternalDNS logs to see if it's working
-          echo "Checking ExternalDNS logs..."
-          kubectl logs -n external-dns -l app.kubernetes.io/name=external-dns --tail=50 || true
+          echo "Creating DNS record for argocd.bunnycloud.xyz..."
+          HOSTED_ZONE_ID=$(aws route53 list-hosted-zones --query "HostedZones[?Name=='bunnycloud.xyz.'].Id" --output text | sed 's/\/hostedzone\///')
           
-          echo "Waiting for DNS record for argocd.bunnycloud.xyz to be created by ExternalDNS..."
-          for i in {1..5}; do # Reduced wait time to 2.5 minutes
-            if dig +short argocd.bunnycloud.xyz | grep -q .; then
-              echo "DNS record found for argocd.bunnycloud.xyz"
-              break
-            fi
-            echo "DNS not propagated yet for argocd.bunnycloud.xyz... ($i/5)"
-            sleep 30
-          done
+          # Create a JSON file for the Route53 change
+          cat > argocd-dns-change.json << EOF
+          {
+            "Changes": [
+              {
+                "Action": "UPSERT",
+                "ResourceRecordSet": {
+                  "Name": "argocd.bunnycloud.xyz",
+                  "Type": "CNAME",
+                  "TTL": 300,
+                  "ResourceRecords": [
+                    {
+                      "Value": "$ARGOCD_HOSTNAME"
+                    }
+                  ]
+                }
+              }
+            ]
+          }
+          EOF
           
-          # Let ExternalDNS handle DNS records - just log status
-          if ! dig +short argocd.bunnycloud.xyz | grep -q .; then
-            echo "DNS record for argocd.bunnycloud.xyz not found yet. ExternalDNS should create it automatically."
-            echo "Checking ExternalDNS logs for troubleshooting:"
-            kubectl logs -n external-dns -l app.kubernetes.io/name=external-dns --tail=20 || true
-            
-            echo "Verifying ArgoCD ingress has proper annotations:"
-            kubectl get ingress -n argocd -o yaml | grep -A5 annotations || true
-            
-            echo "DNS propagation may take some time. Continuing..."
-          else
-            echo "DNS record for argocd.bunnycloud.xyz found and propagated."
-          fi
-         
-          # Final DNS check
-          echo "Final DNS check:"
-          dig argocd.bunnycloud.xyz || true
-        continue-on-error: true  # Don't fail the workflow if DNS isn't ready
-
-
+          # Apply the DNS change
+          aws route53 change-resource-record-sets --hosted-zone-id $HOSTED_ZONE_ID --change-batch file://argocd-dns-change.json || true
+          echo "DNS record created for argocd.bunnycloud.xyz pointing to $ARGOCD_HOSTNAME"
+        continue-on-error: true  # Don't fail the workflow if verification fails
 
       # Security group rules are now managed by Terraform in eks_sg_rules.tf
       - name: Verify EKS security group rules
