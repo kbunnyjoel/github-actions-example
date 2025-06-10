@@ -656,7 +656,6 @@ jobs:
           done
 
 
-
       - name: Commit generated ArgoCD Application manifests
         env:
           # Use PAT if GITHUB_TOKEN doesn't have push rights to main or if main is protected
