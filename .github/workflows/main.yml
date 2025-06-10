@@ -561,61 +561,6 @@ jobs:
           aws ec2 describe-security-groups --group-ids $SG_ID --query "SecurityGroups[0].IpPermissions[?FromPort==\`443\` || FromPort==\`8080\`]" --output table
         continue-on-error: true  # Don't fail the workflow if verification fails
 
-          
-      # The 'Check domain nameserver delegation' and 'Check Route53 record' steps can remain for verification.
-      # The 'Update Nodejs App DNS record' step is removed as ExternalDNS will handle it
-      # based on annotations in your Node.js app's Ingress (defined in its Helm chart).
-
-      # Removed duplicate "Verify and fix ArgoCD DNS" step.
-    
-      - name: Verify Node.js App DNS
-        run: |
-          echo "Waiting for Node.js app ingress to get an address..."
-          NODEJS_HOSTNAME=""
-          
-          # First, check for Ingress
-          for i in {1..10}; do
-            NODEJS_HOSTNAME=$(kubectl get ingress -n github-actions-example -o jsonpath='{.items[0].status.loadBalancer.ingress[0].hostname}' 2>/dev/null)
-            if [ ! -z "$NODEJS_HOSTNAME" ]; then
-              echo "Node.js Ingress hostname found: $NODEJS_HOSTNAME"
-              break
-            fi
-            echo "Waiting for Node.js Ingress... (attempt $i/10)"
-            sleep 10
-          done
-          
-          # If no Ingress found, check for Service
-          if [ -z "$NODEJS_HOSTNAME" ]; then
-            for i in {1..10}; do
-              NODEJS_HOSTNAME=$(kubectl get svc -n github-actions-example -l app.kubernetes.io/name=nodejs-app -o jsonpath='{.items[0].status.loadBalancer.ingress[0].hostname}' 2>/dev/null)
-              if [ ! -z "$NODEJS_HOSTNAME" ]; then
-                echo "Node.js Service hostname found: $NODEJS_HOSTNAME"
-                break
-              fi
-              echo "Waiting for Node.js Service... (attempt $i/10)"
-              sleep 10
-            done
-          fi
-          
-          # If still no hostname, use ArgoCD hostname as fallback
-          if [ -z "$NODEJS_HOSTNAME" ]; then
-            echo "No Node.js hostname found. Using ArgoCD hostname as fallback..."
-            NODEJS_HOSTNAME=$(kubectl get svc argocd-server -n argocd -o jsonpath='{.status.loadBalancer.ingress[0].hostname}' 2>/dev/null)
-            if [ -z "$NODEJS_HOSTNAME" ]; then
-              echo "Warning: Could not find any hostname to use"
-              echo "Checking resources in namespace:"
-              kubectl get ingress,svc -n github-actions-example
-              echo "Continuing without hostname..."
-            fi
-          fi
-          
-          if [ ! -z "$NODEJS_HOSTNAME" ]; then
-            echo "Using hostname for DNS record: $NODEJS_HOSTNAME"
-            echo "ExternalDNS will automatically create DNS records based on ingress annotations."
-          else
-            echo "No hostname found. DNS records will be created when resources are available."
-          fi
-        continue-on-error: true  # Don't fail the workflow if the app isn't ready yet
   generate-argo-apps:
     if: ${{ github.event.inputs.destroy != 'true' }}
     env:
@@ -711,16 +656,18 @@ jobs:
       - name: Install Helm
         run: |
           curl https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
+
       - name: Lint Helm charts
         run: |
-          if [ -d "apps" ]; then # Changed from "helm" to "apps"
-            for chart_dir in apps/*; do # Iterate through app folders
-              if [ -f "$chart_dir/chart/Chart.yaml" ]; then # Check for a Chart.yaml file
-                echo "Linting $chart_dir/chart..."
-                helm lint "$chart_dir/chart"
-              fi
+          if [ -d "apps" ]; then  # Changed from "helm" to "apps"
+            for chart_dir in apps/*/chart; do
+              echo "Linting $chart_dir..."
+              helm lint $chart_dir
             done
+          else
+            echo "No apps directory found, skipping Helm lint"
           fi
+
       - name: Template Helm charts (dry-run render)
         run: |
           if [ -d "apps" ]; then # Changed from "helm" to "apps"

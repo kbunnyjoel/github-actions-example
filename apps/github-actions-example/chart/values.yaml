@@ -7,7 +7,6 @@ image:
 
 containerPort: 3000 # The port your Node.js application listens on inside the container
 
-
 service:
   type: LoadBalancer
   annotations: {}  # Will be populated by Jinja template
@@ -20,8 +19,6 @@ service:
       port: 443
       targetPort: 3000
       protocol: TCP
-
-
 
 resources: {}
   # We usually recommend not to specify default resources and to leave this as a conscious
@@ -38,13 +35,13 @@ resources: {}
 livenessProbe:
   httpGet:
     path: /status # Example path, adjust to your app's health check endpoint
-    port: {{ .Values.containerPort }}
+    port: 3000  # Use the actual port number instead of template expression
   initialDelaySeconds: 15
   periodSeconds: 20
 
 readinessProbe:
   httpGet:
     path: /readyz # Example path, adjust to your app's readiness endpoint
-    port: {{ .Values.containerPort }}
+    port: 3000  # Use the actual port number instead of template expression
   initialDelaySeconds: 5
   periodSeconds: 10
