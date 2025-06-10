@@ -1,5 +1,5 @@
 resource "aws_iam_policy" "external_dns" {
-  name        = "eks-external-dns-role"
+  name        = "eks-external-dns-policy"
   description = "Policy for ExternalDNS to access Route 53"
 
   policy = jsonencode({
@@ -49,7 +49,8 @@ resource "aws_iam_role" "external_dns" {
         Action = "sts:AssumeRoleWithWebIdentity",
         Condition = {
           StringEquals = {
-            "${data.aws_iam_openid_connect_provider.this.url}:sub" = "system:serviceaccount:external-dns:external-dns"
+            "${data.aws_iam_openid_connect_provider.this.url}:sub" = "system:serviceaccount:external-dns:external-dns",
+            "${data.aws_iam_openid_connect_provider.this.url}:aud" = "sts.amazonaws.com"
           }
         }
       }
