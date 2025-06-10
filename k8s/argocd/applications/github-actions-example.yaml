@@ -16,7 +16,7 @@ spec:
         replicaCount: 1 # Default replica count, can be overridden
         image:
           repository: 1073286/github-actions-example # Docker image repository (e.g., yourdockerhubusername/my-node-app)
-          tag: 2c991383187014f53f2aacd9e69edcdff0bc59db # Docker image tag (e.g., commit SHA or version)
+          tag: ca5e6369deab80a046df2b93830392dae8f55b56 # Docker image tag (e.g., commit SHA or version)
           pullPolicy: IfNotPresent
 
         containerPort: 3000 # The port your Node.js application listens on inside the container
