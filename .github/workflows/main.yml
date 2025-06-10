@@ -727,6 +727,79 @@ jobs:
           kubectl get pods -n $APP_NAMESPACE
         continue-on-error: true  # Don't fail the workflow if the app isn't ready yet
 
+      - name: Create DNS record for application
+        run: |
+          echo "Creating DNS record for github-actions-example.bunnycloud.xyz..."
+          
+          # Get the application's service hostname
+          APP_HOSTNAME=""
+          
+          # First, check for LoadBalancer service
+          for i in {1..15}; do
+            APP_HOSTNAME=$(kubectl get svc -n github-actions-example -l app.kubernetes.io/instance=github-actions-example -o jsonpath='{.items[0].status.loadBalancer.ingress[0].hostname}' 2>/dev/null)
+            
+            if [ -z "$APP_HOSTNAME" ]; then
+              # Try to get hostname from ingress
+              APP_HOSTNAME=$(kubectl get ingress -n github-actions-example -o jsonpath='{.items[0].status.loadBalancer.ingress[0].hostname}' 2>/dev/null)
+            fi
+            
+            if [ ! -z "$APP_HOSTNAME" ]; then
+              echo "Application hostname found: $APP_HOSTNAME"
+              break
+            fi
+            echo "Waiting for application hostname... ($i/15)"
+            sleep 20
+          done
+          
+          # If no hostname found, exit
+          if [ -z "$APP_HOSTNAME" ]; then
+            echo "Warning: Could not find application hostname after timeout."
+            kubectl get svc -n github-actions-example
+            kubectl get ingress -n github-actions-example
+            exit 0
+          fi
+          
+          # Create DNS record
+          HOSTED_ZONE_ID=$(aws route53 list-hosted-zones --query "HostedZones[?Name=='bunnycloud.xyz.'].Id" --output text | sed 's/\/hostedzone\///')
+          
+          # Create a JSON file for the Route53 change
+          cat > app-dns-change.json << EOF
+          {
+            "Changes": [
+              {
+                "Action": "UPSERT",
+                "ResourceRecordSet": {
+                  "Name": "github-actions-example.bunnycloud.xyz",
+                  "Type": "CNAME",
+                  "TTL": 300,
+                  "ResourceRecords": [
+                    {
+                      "Value": "$APP_HOSTNAME"
+                    }
+                  ]
+                }
+              }
+            ]
+          }
+          EOF
+              
+          # Apply the DNS change
+          aws route53 change-resource-record-sets --hosted-zone-id $HOSTED_ZONE_ID --change-batch file://app-dns-change.json
+          echo "DNS record created for github-actions-example.bunnycloud.xyz pointing to $APP_HOSTNAME"
+          
+          # Wait for DNS propagation
+          echo "Waiting for DNS propagation..."
+          for i in {1..10}; do
+            if dig github-actions-example.bunnycloud.xyz +short | grep -q .; then
+              echo "DNS record found for github-actions-example.bunnycloud.xyz"
+              break
+            fi
+            echo "Waiting for DNS propagation... ($i/10)"
+            sleep 30
+          done
+        continue-on-error: true  # Don't fail the workflow if DNS creation fails
+
+
       - name: Verify SSL/TLS for Node.js application
         run: |
           echo "Verifying SSL/TLS encryption for Node.js application..."
