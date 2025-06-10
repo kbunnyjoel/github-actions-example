@@ -439,6 +439,21 @@ jobs:
 
       - name: Install Argo CD
         run: |
+          echo "Preparing argocd namespace..."
+          # Try to delete the namespace if it exists and wait for deletion.
+          # This helps clean up if it's in a Terminating state from a previous run.
+          if kubectl get namespace argocd --no-headers --output=name &> /dev/null; then
+            echo "Namespace 'argocd' found. Attempting to delete and wait for it to be removed..."
+            kubectl delete namespace argocd --wait=true --timeout=120s || \
+              echo "Warning: Failed to delete 'argocd' namespace or timed out. This might be okay if it was already gone or is severely stuck. Helm will attempt to proceed."
+            # Add a small sleep to allow the Kubernetes API to fully process the deletion
+            # before attempting to recreate the namespace with Helm.
+            echo "Waiting a few seconds after namespace deletion attempt..."
+            sleep 15
+          else
+            echo "Namespace 'argocd' not found. Helm will create it."
+          fi
+
           echo "Installing ArgoCD..."
           helm upgrade --install argocd argo/argo-cd \
             --namespace argocd --create-namespace \
