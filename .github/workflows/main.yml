@@ -495,10 +495,6 @@ jobs:
           kubectl wait --for=condition=Available deployment --all -n argocd --timeout=5m || true
           echo "ArgoCD installation completed."
 
-
-      # Removed duplicate "Verify and fix ArgoCD DNS" step.
-
-
       - name: Get ExternalDNS role ARN from Terraform
         run: |
           echo "Getting ExternalDNS role ARN from Terraform..."
