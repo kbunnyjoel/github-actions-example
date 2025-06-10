@@ -9,7 +9,6 @@ containerPort: 3000 # The port your Node.js application listens on inside the co
 
 
 service:
-  name: {{ app_name }}-service # Dynamically set service name
   type: LoadBalancer
   annotations: {}  # Will be populated by Jinja template
   ports:
