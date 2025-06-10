@@ -259,7 +259,7 @@ jobs:
           echo "Waiting up to 5 minutes for AWS Load Balancers from Kubernetes services to be deleted..."
           # This is a best-effort wait; more sophisticated polling might be needed for very complex setups
           # The goal is to give AWS time to react to the k8s service deletions.
-          sleep 300 
+          # sleep 300 
 
           kubectl delete deployment --all -n argocd --ignore-not-found=true
           kubectl delete deployment --all -n ingress-nginx --ignore-not-found=true
