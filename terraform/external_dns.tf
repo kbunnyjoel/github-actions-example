@@ -24,7 +24,7 @@ resource "aws_iam_policy" "external_dns" {
           "route53:ListHostedZones",
           "route53:ListResourceRecordSets"
         ],
-        Resource = [data.aws.route53_zone.bunnycloud.arn]
+        Resource = ["*",data.aws.route53_zone.bunnycloud.arn]
       }
     ]
   })
