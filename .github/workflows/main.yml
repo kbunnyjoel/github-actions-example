@@ -732,24 +732,24 @@ jobs:
           kubectl get pods -n $APP_NAMESPACE
         continue-on-error: true  # Don't fail the workflow if the app isn't ready yet
 
-    - name: Verify SSL/TLS for Node.js application
-      run: |
-        echo "Verifying SSL/TLS encryption for Node.js application..."
-        
-        # Get the application URL
-        APP_URL="https://nodejs.bunnycloud.xyz"
-        
-        # Check if the URL is accessible with HTTPS
-        echo "Checking if $APP_URL is accessible with HTTPS..."
-        if curl -s -o /dev/null -w "%{http_code}" --connect-timeout 30 $APP_URL | grep -q "200\|301\|302"; then
-          echo "✅ $APP_URL is accessible with HTTPS"
-        else
-          echo "❌ $APP_URL is not accessible with HTTPS"
-          echo "Checking DNS record..."
-          dig nodejs.bunnycloud.xyz
-        fi
-        
-        # Verify SSL certificate details
-        echo "Verifying SSL certificate details..."
-        echo | openssl s_client -servername nodejs.bunnycloud.xyz -connect nodejs.bunnycloud.xyz:443 2>/dev/null | openssl x509 -noout -text | grep -A2 "Issuer:"
-      continue-on-error: true  # Don't fail the workflow if verification fails
+      - name: Verify SSL/TLS for Node.js application
+        run: |
+          echo "Verifying SSL/TLS encryption for Node.js application..."
+          
+          # Get the application URL
+          APP_URL="https://nodejs.bunnycloud.xyz"
+          
+          # Check if the URL is accessible with HTTPS
+          echo "Checking if $APP_URL is accessible with HTTPS..."
+          if curl -s -o /dev/null -w "%{http_code}" --connect-timeout 30 $APP_URL | grep -q "200\|301\|302"; then
+            echo "✅ $APP_URL is accessible with HTTPS"
+          else
+            echo "❌ $APP_URL is not accessible with HTTPS"
+            echo "Checking DNS record..."
+            dig nodejs.bunnycloud.xyz
+          fi
+          
+          # Verify SSL certificate details
+          echo "Verifying SSL certificate details..."
+          echo | openssl s_client -servername nodejs.bunnycloud.xyz -connect nodejs.bunnycloud.xyz:443 2>/dev/null | openssl x509 -noout -text | grep -A2 "Issuer:"
+        continue-on-error: true  # Don't fail the workflow if verification fails
