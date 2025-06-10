@@ -1,3 +1,7 @@
+- name: Create Helm chart helper templates
+  run: |
+    mkdir -p apps/github-actions-example/chart/templates
+    cat > apps/github-actions-example/chart/templates/_helpers.tpl << 'EOF'
 {{/*
 Expand the name of the chart.
 */}}
@@ -49,3 +53,4 @@ Selector labels
 app.kubernetes.io/name: {{ include "nodejs.name" . }}
 app.kubernetes.io/instance: {{ .Release.Name }}
 {{- end }}
+EOF
