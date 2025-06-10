@@ -24,7 +24,11 @@ env:
   REGISTRY: docker.io/${{ secrets.DOCKER_USERNAME }}
 
 jobs:
+
   build-and-test:
+    if: ${{ env.IS_DESTROY != 'true' }}
+    env:
+      IS_DESTROY: ${{ github.event.inputs.destroy == 'true' }}
     permissions:
       actions: read # Default permission for GITHUB_TOKEN
       contents: read # To checkout the repository
@@ -75,6 +79,9 @@ jobs:
           path: coverage/
 
   docker:
+    if: ${{ env.IS_DESTROY != 'true' }}
+    env:
+      IS_DESTROY: ${{ github.event.inputs.destroy == 'true' }}
     name: Build and push Docker image
     runs-on: ubuntu-latest
     permissions:
@@ -135,7 +142,9 @@ jobs:
           done
 
   terraform-eks:
-    if: ${{ github.event.inputs.run_terraform == 'true' }}
+    if: ${{ github.event.inputs.run_terraform == 'true' && env.IS_DESTROY != 'true' }}
+    env:
+      IS_DESTROY: ${{ github.event.inputs.destroy == 'true' }}
     runs-on: ubuntu-latest
     needs: docker
     defaults:
@@ -183,11 +192,11 @@ jobs:
 
       - name: Terraform Apply
         working-directory: terraform
-        if: github.event.inputs.destroy != 'true'
+        if: env.IS_DESTROY != 'true'
         run: terraform apply -auto-approve
 
       - name: Generate kubeconfig and upload
-        if: github.event.inputs.destroy != 'true'
+        if: env.IS_DESTROY != 'true'
         run: |
           mkdir -p /tmp/kubeconfig
           aws eks update-kubeconfig --region ap-southeast-2 --name github-actions-eks-example --kubeconfig /tmp/kubeconfig/config
@@ -208,7 +217,7 @@ jobs:
           path: terraform/keys/deployment_key.pem
 
       - name: Install kubectl and check EKS status
-        if: github.event.inputs.destroy != 'true'
+        if: env.IS_DESTROY != 'true'
         run: |
           set -e
           VERSION=v1.29.2 # Use a valid and more recent kubectl version
@@ -227,7 +236,9 @@ jobs:
 
   
   destroy-infrastructure:
-    if: github.event.inputs.destroy == 'true'
+    if: env.IS_DESTROY == 'true'
+    env:
+      IS_DESTROY: ${{ github.event.inputs.destroy == 'true' }}
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
@@ -336,7 +347,9 @@ jobs:
 
       
   deploy-argocd:
-    if: github.event.inputs.run_terraform == 'true' && github.event.inputs.destroy != 'true'
+    if: github.event.inputs.run_terraform == 'true' && env.IS_DESTROY != 'true'
+    env:
+      IS_DESTROY: ${{ github.event.inputs.destroy == 'true' }}
     needs: terraform-eks
     runs-on: ubuntu-latest
     steps:
@@ -653,6 +666,9 @@ jobs:
           fi
         continue-on-error: true  # Don't fail the workflow if the app isn't ready yet
   generate-argo-apps:
+    if: ${{ env.IS_DESTROY != 'true' }}
+    env:
+      IS_DESTROY: ${{ github.event.inputs.destroy == 'true' }}
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -725,7 +741,9 @@ jobs:
           fi
 
   lint-and-deploy-helm:
-    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+    if: (github.event_name == 'push' || github.event_name == 'workflow_dispatch') && env.IS_DESTROY != 'true'
+    env:
+      IS_DESTROY: ${{ github.event.inputs.destroy == 'true' }}
     needs: [docker, deploy-argocd] # Changed from generate-argo-apps to deploy-argocd
     runs-on: ubuntu-latest
     steps:
