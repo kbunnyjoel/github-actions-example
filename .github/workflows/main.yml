@@ -498,7 +498,7 @@ jobs:
             sleep 20
           done
           
-          if [ -z "$NGINX_LB_HOSTNAME" ]; then
+          if [ -z "$NGINX_LB_HOSTNAM" ]; then
             echo "Error: Could not find NGINX Ingress Controller LoadBalancer hostname after timeout."
             exit 1 # Fail the step
           fi
