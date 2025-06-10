@@ -5,7 +5,7 @@
 {{/*
 Expand the name of the chart.
 */}}
-{{- define "nodejs.name" -}}
+{{- define "github-actions-example.name" -}}
 {{- default .Chart.Name .Values.nameOverride | trunc 63 | trimSuffix "-" }}
 {{- end }}
 
@@ -14,7 +14,7 @@ Create a default fully qualified app name.
 We truncate at 63 chars because some Kubernetes name fields are limited to this (by the DNS naming spec).
 If release name contains chart name it will be used as a full name.
 */}}
-{{- define "nodejs.fullname" -}}
+{{- define "github-actions-example.fullname" -}}
 {{- if .Values.fullnameOverride }}
 {{- .Values.fullnameOverride | trunc 63 | trimSuffix "-" }}
 {{- else }}
@@ -30,16 +30,16 @@ If release name contains chart name it will be used as a full name.
 {{/*
 Create chart name and version as used by the chart label.
 */}}
-{{- define "nodejs.chart" -}}
+{{- define "github-actions-example.chart" -}}
 {{- printf "%s-%s" .Chart.Name .Chart.Version | replace "+" "_" | trunc 63 | trimSuffix "-" }}
 {{- end }}
 
 {{/*
 Common labels
 */}}
-{{- define "nodejs.labels" -}}
-helm.sh/chart: {{ include "nodejs.chart" . }}
-{{ include "nodejs.selectorLabels" . }}
+{{- define "github-actions-example.labels" -}}
+helm.sh/chart: {{ include "github-actions-example.chart" . }}
+{{ include "github-actions-example.selectorLabels" . }}
 {{- if .Chart.AppVersion }}
 app.kubernetes.io/version: {{ .Chart.AppVersion | quote }}
 {{- end }}
@@ -49,8 +49,8 @@ app.kubernetes.io/managed-by: {{ .Release.Service }}
 {{/*
 Selector labels
 */}}
-{{- define "nodejs.selectorLabels" -}}
-app.kubernetes.io/name: {{ include "nodejs.name" . }}
+{{- define "github-actions-example.selectorLabels" -}}
+app.kubernetes.io/name: {{ include "github-actions-example.name" . }}
 app.kubernetes.io/instance: {{ .Release.Name }}
 {{- end }}
 EOF
