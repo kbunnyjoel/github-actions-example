@@ -446,28 +446,38 @@ jobs:
           if kubectl get namespace $ARGOCD_NS_NAME --no-headers --output=name &> /dev/null; then
             echo "Namespace '$ARGOCD_NS_NAME' found. Initiating comprehensive cleanup..."
             
-            # 1. Attempt to delete all resources within the namespace.
+            # 1. Attempt to remove finalizers from all resources within the namespace
+            echo "Attempting to remove finalizers from all resources in namespace '$ARGOCD_NS_NAME'..."
+            # List all namespaced API resource types, then for each type, get all instances in the namespace and patch them.
+            kubectl api-resources --verbs=list --namespaced -o name | \
+              xargs -r -n 1 -I {} sh -c "kubectl get {} --show-kind --ignore-not-found -n $ARGOCD_NS_NAME -o name | xargs -r -n 1 -I % kubectl patch % -n $ARGOCD_NS_NAME -p '{\"metadata\":{\"finalizers\":null}}' --type=merge --ignore-not-found" || \
+              echo "Warning: Some errors occurred while trying to patch finalizers from resources in '$ARGOCD_NS_NAME'. This might be okay if resources were already gone or some types don't support patching finalizers."
+            
+            echo "Waiting 15s after attempting to patch resource finalizers..."
+            sleep 15
+
+            # 2. Attempt to delete all resources within the namespace.
             #    --wait=false here, as we want to issue commands and let namespace deletion handle overall waiting.
             #    --timeout is for this specific command's API interaction.
             echo "Attempting to delete all resources in namespace '$ARGOCD_NS_NAME' (non-blocking, API timeout 90s)..."
-            kubectl delete all --all -n $ARGOCD_NS_NAME --wait=false --timeout=90s || \
+            kubectl delete all --all -n $ARGOCD_NS_NAME --wait=false --timeout=90s --ignore-not-found=true || \
               echo "Warning: Command to delete resources in '$ARGOCD_NS_NAME' encountered issues or timed out. Namespace deletion will proceed."
             
             # Give a moment for the API server to process the bulk delete requests.
             echo "Waiting 10s for resource deletion requests to be processed..."
             sleep 10 
             
-            # 2. Attempt to delete the namespace and wait for it to be removed.
+            # 3. Attempt to delete the namespace and wait for it to be removed.
             echo "Attempting to delete '$ARGOCD_NS_NAME' namespace and wait (timeout 180s)..."
-            kubectl delete namespace $ARGOCD_NS_NAME --wait=true --timeout=180s || \
+            kubectl delete namespace $ARGOCD_NS_NAME --wait=true --timeout=180s --ignore-not-found=true || \
               echo "Warning: Failed to delete '$ARGOCD_NS_NAME' namespace or timed out after 180s. It might be stuck."
             
-            # 3. If namespace is still terminating, try to remove its finalizers.
+            # 4. If namespace is still terminating, try to remove its finalizers.
             #    This is an aggressive step if the namespace object itself is stuck.
             if kubectl get namespace $ARGOCD_NS_NAME --no-headers --output=name &> /dev/null; then
                 echo "Namespace '$ARGOCD_NS_NAME' still exists, likely stuck in Terminating state."
                 echo "Attempting to patch out finalizers from namespace '$ARGOCD_NS_NAME'..."
-                kubectl patch namespace $ARGOCD_NS_NAME -p '{\"metadata\":{\"finalizers\":null}}' --type=merge || \
+                kubectl patch namespace $ARGOCD_NS_NAME -p '{\"metadata\":{\"finalizers\":null}}' --type=merge --ignore-not-found || \
                   echo "Warning: Failed to patch finalizers for namespace '$ARGOCD_NS_NAME'. It might already be gone or patch is not allowed."
                 
                 echo "Waiting 30s after finalizer patch attempt for namespace to clear..."
