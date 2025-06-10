@@ -497,6 +497,18 @@ jobs:
           echo "Using hosted zone ID: $HOSTED_ZONE_ID"
           echo "HOSTED_ZONE_ID=$HOSTED_ZONE_ID" >> $GITHUB_ENV
           
+      - name: Install ExternalDNS
+        run: |
+          echo "Installing ExternalDNS..."
+          
+          # Get the ExternalDNS role ARN
+          EXTERNAL_DNS_ROLE_ARN=$(aws iam get-role --role-name eks-external-dns-role --query "Role.Arn" --output text)
+          echo "ExternalDNS role ARN: $EXTERNAL_DNS_ROLE_ARN"
+          
+          # Get hosted zone ID
+          HOSTED_ZONE_ID=$(aws route53 list-hosted-zones --query "HostedZones[?Name=='bunnycloud.xyz.'].Id" --output text | sed 's/\/hostedzone\///')
+          echo "Using hosted zone ID: $HOSTED_ZONE_ID"
+          
           # Install ExternalDNS
           helm upgrade --install external-dns external-dns/external-dns \
             --namespace external-dns --create-namespace \
@@ -506,12 +518,18 @@ jobs:
             --set policy=upsert-only \
             --set serviceAccount.create=true \
             --set serviceAccount.name=external-dns \
-            --set serviceAccount.annotations."eks\.amazonaws\.com/role-arn"="${EXTERNAL_DNS_ROLE_ARN}" \
+            --set serviceAccount.annotations."eks\.amazonaws\.com/role-arn"="$EXTERNAL_DNS_ROLE_ARN" \
             --set txtOwnerId=$HOSTED_ZONE_ID \
             --version 1.14.5 \
             --wait
+          
           echo "ExternalDNS installed."
-
+          
+          # Check ExternalDNS logs
+          echo "Checking ExternalDNS logs..."
+          sleep 10  # Wait for ExternalDNS to start
+          kubectl logs -n external-dns -l app.kubernetes.io/name=external-dns --tail=50
+        continue-on-error: true  # Don't fail the workflow if ExternalDNS installation fails
 
       - name: Verify ArgoCD Installation and DNS
         # Changed from manual creation to verification as ExternalDNS handles it
