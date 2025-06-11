@@ -470,7 +470,7 @@ jobs:
               exit 1
             fi
             # This ROLE_NAME must exactly match the name defined in terraform/external_dns.tf
-            FALLBACK_ROLE_NAME="spot-nodes-eks-node-group" # Example: if you changed the role name
+            FALLBACK_ROLE_NAME="eks-external-dns-role" 
             ROLE_ARN="arn:aws:iam::${AWS_ACCOUNT_ID}:role/${FALLBACK_ROLE_NAME}"
             echo "Using fallback ExternalDNS role ARN: $ROLE_ARN"
             # Verify the fallback role actually exists
@@ -525,8 +525,8 @@ jobs:
           # Check ExternalDNS logs
           echo "Checking ExternalDNS logs..."
           sleep 10  # Wait for ExternalDNS to start
-          kubectl logs -n external-dns -l app.kubernetes.io/name=external-dns --tail=50
-        continue-on-error: true  # Don't fail the workflow if ExternalDNS installation fails
+          kubectl logs -n external-dns -l app.kubernetes.io/name=external-dns --tail=50 # Consider removing --tail or increasing it for more context if issues persist
+        # continue-on-error: true # Recommended to remove this to catch Helm installation errors
 
       - name: Verify ArgoCD Installation and DNS
         # Changed from manual creation to verification as ExternalDNS handles it
