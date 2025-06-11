@@ -539,6 +539,12 @@ jobs:
           echo "📦 Deletion batch file created: delete-conflicts.json"
           echo "🚨 Deleting records..."
 
+          # Check if any deletions are present before attempting to apply the change batch
+          if [ "$(jq '.Changes | length' delete-conflicts.json)" -eq 0 ]; then
+            echo "✅ No deletable conflicting records found. Skipping Route 53 change batch."
+            exit 0
+          fi
+
           aws route53 change-resource-record-sets --hosted-zone-id "$HOSTED_ZONE_ID" \
             --change-batch file://delete-conflicts.json
 
