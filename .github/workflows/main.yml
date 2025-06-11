@@ -516,6 +516,7 @@ jobs:
             --set serviceAccount.create=true \
             --set serviceAccount.name=external-dns \
             --set serviceAccount.annotations."eks\.amazonaws\.com/role-arn"="${{ env.EXTERNAL_DNS_ROLE_ARN }}" \
+            --set aws.preferCNAME=true \
             --set txtOwnerId="${{ env.HOSTED_ZONE_ID }}" \
             --version 1.14.5 \
             --wait
@@ -570,15 +571,22 @@ jobs:
           echo "Verifying DNS record for argocd.bunnycloud.xyz (should point to $NGINX_LB_HOSTNAME)..."
           echo "Waiting for DNS propagation (max 5 minutes)..."
           for i in {1..10}; do
-            if dig argocd.bunnycloud.xyz +short | grep -q "$NGINX_LB_HOSTNAME"; then
-              echo "DNS record argocd.bunnycloud.xyz propagated and points to $NGINX_LB_HOSTNAME."
+            # ExternalDNS should create a CNAME record pointing to the NLB hostname.
+            # Add a trailing dot to NGINX_LB_HOSTNAME for exact CNAME match, as dig output for CNAME includes it.
+            EXPECTED_CNAME_TARGET="${NGINX_LB_HOSTNAME}."
+            RESOLVED_CNAME_VALUE=$(dig +short -t CNAME argocd.bunnycloud.xyz @8.8.8.8)
+
+            if [ "$RESOLVED_CNAME_VALUE" = "$EXPECTED_CNAME_TARGET" ]; then
+              echo "DNS CNAME record for argocd.bunnycloud.xyz propagated and correctly points to $NGINX_LB_HOSTNAME."
               break
             fi
-            echo "Waiting for DNS propagation for argocd.bunnycloud.xyz... ($i/10)"
+            echo "Waiting for DNS CNAME propagation for argocd.bunnycloud.xyz... Attempt $i/10. Found: '$RESOLVED_CNAME_VALUE', Expected: '$EXPECTED_CNAME_TARGET'"
             sleep 30
             if [ $i -eq 10 ]; then
               echo "Warning: DNS propagation for argocd.bunnycloud.xyz timed out or record does not point to $NGINX_LB_HOSTNAME."
               echo "Current DNS resolution for argocd.bunnycloud.xyz:"
+              echo "Checking CNAME using 8.8.8.8:"
+              dig -t CNAME argocd.bunnycloud.xyz @8.8.8.8
               dig argocd.bunnycloud.xyz +trace
             fi
           done
