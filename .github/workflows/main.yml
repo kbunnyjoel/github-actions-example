@@ -524,13 +524,13 @@ jobs:
           cat > delete-conflicts.json <<EOF
           {
             "Comment": "Deleting existing records for $RECORD_NAME",
-            "Changes": $(echo "$RECORDS" | jq '[.[] | {
+            "Changes": $(echo "$RECORDS" | jq '[.[] | select(.ResourceRecords and (.ResourceRecords | length > 0)) | {
               Action: "DELETE",
               ResourceRecordSet: {
                 Name: .Name,
                 Type: .Type,
                 TTL: (.TTL // 300),
-                ResourceRecords: (.ResourceRecords // [])
+                ResourceRecords: .ResourceRecords
               }
             }]')
           }
