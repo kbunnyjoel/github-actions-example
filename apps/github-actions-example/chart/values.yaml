@@ -22,7 +22,7 @@ ingress:
   annotations:
     "nginx.ingress.kubernetes.io/ssl-redirect": "true" # Enforce HTTPS
     "nginx.ingress.kubernetes.io/force-ssl-redirect": "true" # Enforce HTTPS
-    "external-dns.alpha.kubernetes.io/target": "{{ .Values.externalDNS.elbTarget }}"
+    "external-dns.alpha.kubernetes.io/target": ""
     "external-dns.alpha.kubernetes.io/ttl": "60"
     "external-dns.alpha.kubernetes.io/hostname": "github-actions-example.bunnycloud.xyz."
   tls:
