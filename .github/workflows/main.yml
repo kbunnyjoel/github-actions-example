@@ -525,6 +525,34 @@ jobs:
             --wait
           
           echo "ExternalDNS installed."
+
+      - name: Retry ExternalDNS install if deployment fails
+        run: |
+          echo "Checking if ExternalDNS deployment exists..."
+          if ! kubectl rollout status deployment external-dns -n external-dns --timeout=30s; then
+            echo "ExternalDNS deployment failed. Reinstalling..."
+            helm uninstall external-dns -n external-dns || true
+            sleep 10
+            kubectl delete secret -n external-dns $(kubectl get secrets -n external-dns | grep sh.helm.release.v1.external-dns | awk '{print $1}') || true
+            sleep 5
+            helm upgrade --install external-dns external-dns/external-dns \
+              --namespace external-dns --create-namespace \
+              --set provider=aws \
+              --set aws.zoneType=public \
+              --set domainFilters[0]=bunnycloud.xyz \
+              --set policy=upsert-only \
+              --set serviceAccount.create=true \
+              --set serviceAccount.name=external-dns \
+              --set serviceAccount.annotations."eks\.amazonaws\.com/role-arn"="${{ env.EXTERNAL_DNS_ROLE_ARN }}" \
+              --set txtOwnerId="${{ env.HOSTED_ZONE_ID }}" \
+              --set extraArgs[0]=--aws-prefer-cname \
+              --set extraArgs[1]=--registry=txt \
+              --version 1.14.5 \
+              --timeout 10m \
+              --wait
+          else
+            echo "ExternalDNS is already deployed and healthy."
+          fi
           
       - name: Verify ExternalDNS Service Account and Restart Pods
         run: |
