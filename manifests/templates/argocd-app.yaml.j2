@@ -41,7 +41,6 @@ spec:
             # This annotation is crucial for ExternalDNS to create the DNS record
             "external-dns.alpha.kubernetes.io/hostname": "{{ app_name }}.bunnycloud.xyz."
             "external-dns.alpha.kubernetes.io/ttl": "60"
-            "external-dns.alpha.kubernetes.io/target": "{{ elb_hostname }}"
             # If you were using cert-manager, you'd add its annotations here.
             # Since your NGINX Ingress Controller's NLB is configured with the ACM cert,
             # this Ingress resource doesn't need specific cert-manager annotations for this app.
@@ -73,8 +72,7 @@ spec:
           initialDelaySeconds: 5
           periodSeconds: 10
 
-        externalDNS:
-          elbTarget: "{{ elb_hostname | default('') }}"
+        # No longer using externalDNS.elbTarget as it causes template rendering issues
   destination:
     server: https://kubernetes.default.svc # Target Kubernetes API server
     namespace: {{ deployment_namespace | default(app_name) }} # Namespace to deploy the application into (e.g., "nodejs")
