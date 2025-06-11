@@ -509,17 +509,20 @@ jobs:
           # Install ExternalDNS
           helm upgrade --install external-dns external-dns/external-dns \
             --namespace external-dns --create-namespace \
-            # Removed --reuse-values to ensure explicit configuration
             --set provider=aws \
             --set aws.zoneType=public \
             --set domainFilters[0]=bunnycloud.xyz \
-            --set policy=upsert-only \ # Policy for DNS updates
+            # Policy for DNS updates
+            --set policy=upsert-only \
             --set serviceAccount.create=true \
             --set serviceAccount.name=external-dns \
             --set serviceAccount.annotations."eks\.amazonaws\.com/role-arn"="${{ env.EXTERNAL_DNS_ROLE_ARN }}" \
-            --set txtOwnerId="${{ env.HOSTED_ZONE_ID }}" \ # Sets the TXT record owner ID
-            --set extraArgs[0]=--aws-prefer-cname \ # Ensures CNAMEs are preferred for ELB hostnames
-            --set extraArgs[1]=--registry=txt \ # Use TXT records for ownership verification
+            # Sets the TXT record owner ID
+            --set txtOwnerId="${{ env.HOSTED_ZONE_ID }}" \
+            # Ensures CNAMEs are preferred for ELB hostnames
+            --set extraArgs[0]=--aws-prefer-cname \
+            # Use TXT records for ownership verification
+            --set extraArgs[1]=--registry=txt \
             --version 1.14.5 \
             --timeout 10m \
             --wait
@@ -540,12 +543,16 @@ jobs:
               --set provider=aws \
               --set aws.zoneType=public \
               --set domainFilters[0]=bunnycloud.xyz \
+              # Policy for DNS updates
               --set policy=upsert-only \
               --set serviceAccount.create=true \
               --set serviceAccount.name=external-dns \
               --set serviceAccount.annotations."eks\.amazonaws\.com/role-arn"="${{ env.EXTERNAL_DNS_ROLE_ARN }}" \
+              # Sets the TXT record owner ID
               --set txtOwnerId="${{ env.HOSTED_ZONE_ID }}" \
+              # Ensures CNAMEs are preferred for ELB hostnames
               --set extraArgs[0]=--aws-prefer-cname \
+              # Use TXT records for ownership verification
               --set extraArgs[1]=--registry=txt \
               --version 1.14.5 \
               --timeout 10m \
