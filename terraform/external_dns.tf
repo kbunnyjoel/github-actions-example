@@ -60,3 +60,8 @@ resource "aws_iam_role_policy_attachment" "external_dns_attach" {
   role       = aws_iam_role.external_dns.name
   policy_arn = aws_iam_policy.external_dns.arn
 }
+
+output "external_dns_role_arn" {
+  description = "The ARN of the IAM role for ExternalDNS"
+  value       = aws_iam_role.external_dns.arn
+}
