@@ -529,7 +529,11 @@ jobs:
                 NAME=$(echo "$record" | jq -r '.Name')
                 TYPE=$(echo "$record" | jq -r '.Type')
                 TTL=$(echo "$record" | jq -r '.TTL // 300')
-                VALUES=$(echo "$record" | jq -c '.ResourceRecords')
+                VALUES=$(echo "$record" | jq -c '.ResourceRecords // empty')
+
+                if [ -z "$VALUES" ] || [ "$VALUES" = "null" ]; then
+                  continue
+                fi
 
                 cat <<RECORD
           {
@@ -542,7 +546,7 @@ jobs:
             }
           }
           RECORD
-              done | paste -sd, -)
+              done | jq -s '.' | sed 's/^\[//;s/\]$//')
             ]
           }
           EOF
