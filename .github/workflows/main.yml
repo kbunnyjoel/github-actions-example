@@ -524,30 +524,15 @@ jobs:
           cat > delete-conflicts.json <<EOF
           {
             "Comment": "Deleting existing records for $RECORD_NAME",
-            "Changes": [
-              $(echo "$RECORDS" | jq -c '.[]' | while read -r record; do
-                NAME=$(echo "$record" | jq -r '.Name')
-                TYPE=$(echo "$record" | jq -r '.Type')
-                TTL=$(echo "$record" | jq -r '.TTL // 300')
-                VALUES=$(echo "$record" | jq -c '.ResourceRecords // empty')
-
-                if [ -z "$VALUES" ] || [ "$VALUES" = "null" ]; then
-                  continue
-                fi
-
-                cat <<RECORD
-          {
-            "Action": "DELETE",
-            "ResourceRecordSet": {
-              "Name": "$NAME",
-              "Type": "$TYPE",
-              "TTL": $TTL,
-              "ResourceRecords": $VALUES
-            }
-          }
-          RECORD
-              done | jq -s '.' | sed 's/^\[//;s/\]$//')
-            ]
+            "Changes": $(echo "$RECORDS" | jq '[.[] | {
+              Action: "DELETE",
+              ResourceRecordSet: {
+                Name: .Name,
+                Type: .Type,
+                TTL: (.TTL // 300),
+                ResourceRecords: .ResourceRecords
+              }
+            }]')
           }
           EOF
 
