@@ -509,8 +509,10 @@ jobs:
           # Install ExternalDNS
           helm upgrade --install external-dns external-dns/external-dns \
             --namespace external-dns --create-namespace \
-            --set provider=aws \
+            --set sources[0]=service \
+            --set sources[1]=ingress \
             --set aws.zoneType=public \
+            --set aws.region=ap-southeast-2 \
             --set domainFilters[0]=bunnycloud.xyz \
             # Policy for DNS updates
             --set policy=upsert-only \
@@ -540,8 +542,10 @@ jobs:
             sleep 5
             helm upgrade --install external-dns external-dns/external-dns \
               --namespace external-dns --create-namespace \
-              --set provider=aws \
+              --set sources[0]=service \
+              --set sources[1]=ingress \
               --set aws.zoneType=public \
+              --set aws.region=ap-southeast-2 \
               --set domainFilters[0]=bunnycloud.xyz \
               # Policy for DNS updates
               --set policy=upsert-only \
