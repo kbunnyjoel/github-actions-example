@@ -24,6 +24,7 @@ ingress:
     "nginx.ingress.kubernetes.io/force-ssl-redirect": "true" # Enforce HTTPS
     "external-dns.alpha.kubernetes.io/target": "{{ .Values.externalDNS.elbTarget }}"
     "external-dns.alpha.kubernetes.io/ttl": "60"
+    "external-dns.alpha.kubernetes.io/hostname": "argocd.bunnycloud.xyz."
   tls:
     - hosts:
         - "github-actions-example.bunnycloud.xyz" # Static placeholder, overridden by ArgoCD
