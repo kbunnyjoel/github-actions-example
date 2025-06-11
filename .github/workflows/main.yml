@@ -626,86 +626,26 @@ jobs:
           
       - name: Create manual DNS record
         run: |
-          # Delete any existing records first
           HOSTED_ZONE_ID="${{ env.HOSTED_ZONE_ID }}"
           RECORD_NAME="github-actions-example.bunnycloud.xyz."
           
-          echo "Deleting any existing records for $RECORD_NAME..."
-          # Get all records for the domain
-          RECORDS=$(aws route53 list-resource-record-sets --hosted-zone-id "$HOSTED_ZONE_ID" \
-            --query "ResourceRecordSets[?Name=='$RECORD_NAME']" --output json)
-          
-          # Check if there are any records to delete
-          if [ "$RECORDS" != "[]" ]; then
-            echo "Found records to delete. Creating change batch..."
-            
-            # Create a change batch file with all records to delete
-            cat > delete-records.json <<EOF
-            {
-              "Comment": "Delete existing records",
-              "Changes": []
-            }
-            EOF
-            
-            # Process each record type separately
-            echo "$RECORDS" | jq -c '.[]' | while read -r record; do
-              TYPE=$(echo "$record" | jq -r '.Type')
-              echo "Processing record type: $TYPE"
-              
-              # For Alias records (A records with AliasTarget)
-              if [ "$TYPE" = "A" ] && [ "$(echo "$record" | jq 'has("AliasTarget")')" = "true" ]; then
-                ALIAS_TARGET=$(echo "$record" | jq -c '.AliasTarget')
-                
-                # Add to change batch
-                jq --argjson record "$record" '.Changes += [{"Action": "DELETE", "ResourceRecordSet": $record}]' delete-records.json > temp.json && mv temp.json delete-records.json
-              
-              # For CNAME records with ResourceRecords
-              elif [ "$(echo "$record" | jq 'has("ResourceRecords")')" = "true" ]; then
-                # Add to change batch
-                jq --argjson record "$record" '.Changes += [{"Action": "DELETE", "ResourceRecordSet": $record}]' delete-records.json > temp.json && mv temp.json delete-records.json
-              
-              # For TXT records
-              elif [ "$TYPE" = "TXT" ]; then
-                # Add to change batch
-                jq --argjson record "$record" '.Changes += [{"Action": "DELETE", "ResourceRecordSet": $record}]' delete-records.json > temp.json && mv temp.json delete-records.json
-              fi
-            done
-            
-            # Check if we have any changes to apply
-            CHANGES_COUNT=$(jq '.Changes | length' delete-records.json)
-            if [ "$CHANGES_COUNT" -gt 0 ]; then
-              echo "Deleting $CHANGES_COUNT records..."
-              cat delete-records.json
-              aws route53 change-resource-record-sets --hosted-zone-id "$HOSTED_ZONE_ID" --change-batch file://delete-records.json
-              echo "Waiting for deletion to complete..."
-              sleep 10
-            else
-              echo "No valid records to delete."
-            fi
-          else
-            echo "No records found for $RECORD_NAME"
-          fi
-          
-          # Create a new CNAME record
-          echo "Creating CNAME record for $RECORD_NAME..."
+          # Get NGINX LoadBalancer hostname
           NGINX_LB_HOSTNAME=$(kubectl get svc -n ingress-nginx ingress-nginx-controller -o jsonpath='{.status.loadBalancer.ingress[0].hostname}')
-          
           if [ -z "$NGINX_LB_HOSTNAME" ]; then
             echo "Error: Could not find NGINX Ingress Controller LoadBalancer hostname."
             exit 1
           fi
-          
           echo "NGINX LoadBalancer hostname: $NGINX_LB_HOSTNAME"
           
-          # Create a change batch file for the CNAME record
-          cat > create-cname.json <<EOF
+          # Create a simple change batch file for UPSERT
+          cat > dns-change.json <<EOF
           {
-            "Comment": "Creating CNAME record for $RECORD_NAME",
+            "Comment": "Update DNS record for github-actions-example.bunnycloud.xyz",
             "Changes": [
               {
                 "Action": "UPSERT",
                 "ResourceRecordSet": {
-                  "Name": "$RECORD_NAME",
+                  "Name": "github-actions-example.bunnycloud.xyz.",
                   "Type": "CNAME",
                   "TTL": 300,
                   "ResourceRecords": [
@@ -719,9 +659,10 @@ jobs:
           }
           EOF
           
-          echo "Applying CNAME record..."
-          cat create-cname.json
-          aws route53 change-resource-record-sets --hosted-zone-id "$HOSTED_ZONE_ID" --change-batch file://create-cname.json
+          # Apply the change
+          echo "Applying DNS change..."
+          cat dns-change.json
+          aws route53 change-resource-record-sets --hosted-zone-id "$HOSTED_ZONE_ID" --change-batch file://dns-change.json
         # continue-on-error: true # Recommended to remove this to catch Helm installation errors
 
       - name: Verify ArgoCD Installation and DNS
