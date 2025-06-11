@@ -565,8 +565,8 @@ jobs:
             --set serviceAccount.name=external-dns \
             --set serviceAccount.annotations."eks\.amazonaws\.com/role-arn"="${{ env.EXTERNAL_DNS_ROLE_ARN }}" \
             --set txtOwnerId="${{ env.HOSTED_ZONE_ID }}" \
-            --set extraArgs[0]=--aws-prefer-cname \
-            --set extraArgs[1]=--txt-prefix=externaldns- \
+            --set txtPrefix=externaldns- \
+            --set aws.preferCNAME=true \
             --version 1.14.5 \
             --timeout 20m \
             --wait
@@ -594,8 +594,8 @@ jobs:
               --set serviceAccount.name=external-dns \
               --set serviceAccount.annotations."eks\.amazonaws\.com/role-arn"="${{ env.EXTERNAL_DNS_ROLE_ARN }}" \
               --set txtOwnerId="${{ env.HOSTED_ZONE_ID }}" \
-              --set extraArgs[0]=--aws-prefer-cname \
-              --set extraArgs[1]=--txt-prefix=externaldns- \
+              --set txtPrefix=externaldns- \
+              --set aws.preferCNAME=true \
               --version 1.14.5 \
               --timeout 10m \
               --wait
