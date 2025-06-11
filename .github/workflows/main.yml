@@ -566,9 +566,9 @@ jobs:
             --set serviceAccount.annotations."eks\.amazonaws\.com/role-arn"="${{ env.EXTERNAL_DNS_ROLE_ARN }}" \
             --set txtOwnerId="${{ env.HOSTED_ZONE_ID }}" \
             --set provider=aws \
-            --set registry=txt \
             --set txtPrefix=externaldns- \
-            --set aws.preferCNAME=true \
+            --set aws.batchChangeSize=1000 \
+            --set logLevel=debug \
             --version 1.14.5 \
             --timeout 20m \
             --wait
@@ -597,9 +597,9 @@ jobs:
               --set serviceAccount.annotations."eks\.amazonaws\.com/role-arn"="${{ env.EXTERNAL_DNS_ROLE_ARN }}" \
               --set txtOwnerId="${{ env.HOSTED_ZONE_ID }}" \
               --set provider=aws \
-              --set registry=txt \
               --set txtPrefix=externaldns- \
-              --set aws.preferCNAME=true \
+              --set aws.batchChangeSize=1000 \
+              --set logLevel=debug \
               --version 1.14.5 \
               --timeout 10m \
               --wait
@@ -620,35 +620,44 @@ jobs:
           sleep 10  # Wait for ExternalDNS to start
           kubectl logs -n external-dns -l app.kubernetes.io/name=external-dns --tail=100
           
-          # Create a test ingress to verify ExternalDNS is working
-          echo "Creating a test ingress to verify ExternalDNS..."
-          cat <<EOF | kubectl apply -f -
-          apiVersion: networking.k8s.io/v1
-          kind: Ingress
-          metadata:
-            name: test-externaldns
-            namespace: default
-            annotations:
-              kubernetes.io/ingress.class: "nginx"
-              external-dns.alpha.kubernetes.io/hostname: "test-externaldns.bunnycloud.xyz."
-          spec:
-            rules:
-            - host: test-externaldns.bunnycloud.xyz
-              http:
-                paths:
-                - path: /
-                  pathType: Prefix
-                  backend:
-                    service:
-                      name: kubernetes
-                      port:
-                        number: 443
+          # Check ExternalDNS configuration
+          echo "Checking ExternalDNS configuration..."
+          kubectl get deployment external-dns -n external-dns -o yaml | grep -A20 args
+          
+          # Create a manual CNAME record for github-actions-example.bunnycloud.xyz
+          echo "Creating a manual CNAME record for github-actions-example.bunnycloud.xyz..."
+          NGINX_LB_HOSTNAME=$(kubectl get svc -n ingress-nginx ingress-nginx-controller -o jsonpath='{.status.loadBalancer.ingress[0].hostname}')
+          if [ -z "$NGINX_LB_HOSTNAME" ]; then
+            echo "Error: Could not find NGINX Ingress Controller LoadBalancer hostname."
+            exit 1
+          fi
+          
+          echo "NGINX LoadBalancer hostname: $NGINX_LB_HOSTNAME"
+          
+          # Create a change batch file for the CNAME record
+          cat > create-cname.json <<EOF
+          {
+            "Comment": "Creating CNAME record for github-actions-example.bunnycloud.xyz",
+            "Changes": [
+              {
+                "Action": "UPSERT",
+                "ResourceRecordSet": {
+                  "Name": "github-actions-example.bunnycloud.xyz.",
+                  "Type": "CNAME",
+                  "TTL": 300,
+                  "ResourceRecords": [
+                    {
+                      "Value": "${NGINX_LB_HOSTNAME}."
+                    }
+                  ]
+                }
+              }
+            ]
+          }
           EOF
           
-          # Wait for ExternalDNS to process the ingress
-          echo "Waiting for ExternalDNS to process the test ingress..."
-          sleep 30
-          kubectl logs -n external-dns -l app.kubernetes.io/name=external-dns --tail=100
+          # Apply the change batch
+          aws route53 change-resource-record-sets --hosted-zone-id "${{ env.HOSTED_ZONE_ID }}" --change-batch file://create-cname.json
         # continue-on-error: true # Recommended to remove this to catch Helm installation errors
 
       - name: Verify ArgoCD Installation and DNS
