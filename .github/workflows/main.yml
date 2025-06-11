@@ -522,7 +522,6 @@ jobs:
             --set extraArgs[0]=--aws-prefer-cname \
             --set extraArgs[1]=--registry=txt \
             --version 1.14.5 \
-            --timeout 10m \
             --wait
           
           echo "ExternalDNS installed."
