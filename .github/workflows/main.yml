@@ -410,7 +410,6 @@ jobs:
             --set controller.service.annotations."service\.beta\.kubernetes\.io/aws-load-balancer-ssl-cert"="${{ env.ACM_CERTIFICATE_ARN }}" \
             --set controller.service.annotations."service\.beta\.kubernetes\.io/aws-load-balancer-ssl-ports"="https" \
             --set controller.service.annotations."service\.beta\.kubernetes\.io/aws-load-balancer-backend-protocol"="http" \
-            --set controller.service.annotations."service\.beta\.kubernetes\.io/aws-load-balancer-proxy-protocol"="*" \
             --set controller.service.targetPorts.https=http \
             --set controller.service.ports.https=443 \
             --set controller.service.ports.http=80 \
@@ -418,9 +417,13 @@ jobs:
             --set controller.config.use-forwarded-headers=true \
             --set controller.config.compute-full-forwarded-for=true \
             --set controller.config.use-proxy-protocol=false \
+            --set controller.config.enable-real-ip=false \
+            --set controller.config.proxy-real-ip-cidr=0.0.0.0/0 \
             --set controller.config.server-tokens=false \
             --set controller.config.log-format-upstream='$remote_addr - $remote_user [$time_local] "$request" $status $body_bytes_sent "$http_referer" "$http_user_agent" $request_length $request_time [$proxy_upstream_name] [$proxy_alternative_upstream_name] $upstream_addr $upstream_response_length $upstream_response_time $upstream_status $req_id' \
             --set controller.replicaCount=2 \
+            --set controller.containerPort.http=80 \
+            --set controller.containerPort.https=443 \
             --version 4.10.1 \
             --wait
           
@@ -473,12 +476,27 @@ jobs:
           kubectl rollout restart deployment ingress-nginx-controller -n ingress-nginx
           kubectl rollout status deployment ingress-nginx-controller -n ingress-nginx --timeout=5m
           
-          echo "Applying ConfigMap patch to fix PROXY protocol issues..."
+          echo "Applying ConfigMap patches to fix PROXY protocol issues..."
           kubectl patch configmap -n ingress-nginx ingress-nginx-controller --type=merge -p '{"data":{"use-proxy-protocol":"false"}}'
+          kubectl patch configmap -n ingress-nginx ingress-nginx-controller --type=merge -p '{"data":{"proxy-real-ip-cidr":"0.0.0.0/0"}}'
+          kubectl patch configmap -n ingress-nginx ingress-nginx-controller --type=merge -p '{"data":{"enable-real-ip":"false"}}'
+          
+          echo "Waiting for ConfigMap changes to propagate..."
+          sleep 30
           
           echo "Restarting NGINX Ingress Controller again to apply ConfigMap changes..."
           kubectl rollout restart deployment ingress-nginx-controller -n ingress-nginx
           kubectl rollout status deployment ingress-nginx-controller -n ingress-nginx --timeout=5m
+          
+          echo "Creating a direct patch to NGINX configuration..."
+          kubectl exec -n ingress-nginx deploy/ingress-nginx-controller -- cat /etc/nginx/nginx.conf > nginx.conf
+          
+          echo "Checking if PROXY protocol is enabled in NGINX configuration..."
+          grep -i "proxy_protocol" nginx.conf || echo "No proxy_protocol found in configuration"
+          
+          echo "Verifying NGINX Ingress Controller configuration..."
+          kubectl get configmap -n ingress-nginx ingress-nginx-controller -o yaml
+          kubectl get pods -n ingress-nginx
 
       - name: Install ArgoCD
         run: |
