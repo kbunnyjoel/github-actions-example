@@ -509,6 +509,10 @@ jobs:
           # Install ExternalDNS
           helm upgrade --install external-dns external-dns/external-dns \
             --namespace external-dns --create-namespace \
+            --reuse-values \
+            --set extraArgs[0]="--policy=upsert-only" \
+            --set extraArgs[1]="--registry=txt" \
+            --set extraArgs[2]="--txt-owner-id=Z0722775AO3VTQLFVQU3" \
             --set provider=aws \
             --set aws.zoneType=public \
             --set domainFilters[0]=bunnycloud.xyz \
@@ -516,7 +520,6 @@ jobs:
             --set serviceAccount.create=true \
             --set serviceAccount.name=external-dns \
             --set serviceAccount.annotations."eks\.amazonaws\.com/role-arn"="${{ env.EXTERNAL_DNS_ROLE_ARN }}" \
-            --set extraArgs[0]=--aws-prefer-cname \
             --set txtOwnerId="${{ env.HOSTED_ZONE_ID }}" \
             --version 1.14.5 \
             --wait
