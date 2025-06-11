@@ -35,11 +35,13 @@ spec:
           className: "nginx" # Matches the IngressClass of your NGINX controller
           hostname: "{{ app_name }}.bunnycloud.xyz"
           annotations:
+            "kubernetes.io/ingress.class": "nginx" # Legacy annotation, good for compatibility
             "nginx.ingress.kubernetes.io/ssl-redirect": "true"
             "nginx.ingress.kubernetes.io/force-ssl-redirect": "true"
             # This annotation is crucial for ExternalDNS to create the DNS record
             "external-dns.alpha.kubernetes.io/hostname": "{{ app_name }}.bunnycloud.xyz."
             "external-dns.alpha.kubernetes.io/ttl": "60"
+            "external-dns.alpha.kubernetes.io/target": "{{ externalDNS.elbTarget }}"
             # If you were using cert-manager, you'd add its annotations here.
             # Since your NGINX Ingress Controller's NLB is configured with the ACM cert,
             # this Ingress resource doesn't need specific cert-manager annotations for this app.
@@ -70,6 +72,9 @@ spec:
             port: 3000    # Target the containerPort directly or a named port on the container
           initialDelaySeconds: 5
           periodSeconds: 10
+
+        externalDNS:
+          elbTarget: {{ elb_hostname | default("") }}
   destination:
     server: https://kubernetes.default.svc # Target Kubernetes API server
     namespace: {{ deployment_namespace | default(app_name) }} # Namespace to deploy the application into (e.g., "nodejs")

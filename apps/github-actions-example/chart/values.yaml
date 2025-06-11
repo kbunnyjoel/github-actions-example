@@ -20,10 +20,9 @@ ingress:
   className: "nginx"
   hostname: "github-actions-example.bunnycloud.xyz" # Static placeholder, overridden by ArgoCD
   annotations:
-    "kubernetes.io/ingress.class": "nginx"
     "nginx.ingress.kubernetes.io/ssl-redirect": "true" # Enforce HTTPS
     "nginx.ingress.kubernetes.io/force-ssl-redirect": "true" # Enforce HTTPS
-    "external-dns.alpha.kubernetes.io/hostname": "github-actions-example.bunnycloud.xyz." # Static placeholder, overridden by ArgoCD
+    "external-dns.alpha.kubernetes.io/target": "{{ .Values.externalDNS.elbTarget }}"
     "external-dns.alpha.kubernetes.io/ttl": "60"
   tls:
     - hosts:
@@ -56,3 +55,6 @@ readinessProbe:
     port: 3000  # Use the actual port number instead of template expression
   initialDelaySeconds: 5
   periodSeconds: 10
+
+externalDNS:
+  elbTarget: ""

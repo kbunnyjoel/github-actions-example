@@ -656,13 +656,15 @@ jobs:
             APP_NAME="github-actions-example"
 
             jinja2 manifests/templates/argocd-app.yaml.j2 \
-              -D app_name="$APP_NAME" -D chart_path="apps/$app/chart" \
+              -D app_name="$APP_NAME" \
+              -D chart_path="apps/$app/chart" \
               -D github_repository_url="${{ github.server_url }}/${{ github.repository }}" \
               -D target_revision="$TARGET_REVISION_BRANCH" \
               -D image_repository="$IMAGE_REPOSITORY" \
               -D image_tag="$IMAGE_TAG" \
               -D deployment_namespace="$DEPLOYMENT_NAMESPACE" \
               -D acm_certificate_arn="$ACM_CERT_ARN" \
+              -D elb_hostname="$NGINX_LB_HOSTNAME" \
               > "$OUTFILE"
             echo "Generated manifest for $app (using app_name=$APP_NAME):"
             cat "$OUTFILE"
