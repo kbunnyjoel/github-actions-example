@@ -34,6 +34,8 @@ spec:
           enabled: true
           className: "nginx" # Matches the IngressClass of your NGINX controller
           hostname: "{{ app_name }}.bunnycloud.xyz"
+          path: "/" # Explicit path for better routing
+          pathType: "Prefix" # Path type for better routing
           annotations:
             "kubernetes.io/ingress.class": "nginx" # Legacy annotation, good for compatibility
             "nginx.ingress.kubernetes.io/ssl-redirect": "true"
@@ -44,10 +46,7 @@ spec:
             # If you were using cert-manager, you'd add its annotations here.
             # Since your NGINX Ingress Controller's NLB is configured with the ACM cert,
             # this Ingress resource doesn't need specific cert-manager annotations for this app.
-          tls: # Informs the Ingress controller that this host expects TLS
-            - hosts:
-                - "{{ app_name }}.bunnycloud.xyz"
-              # secretName is not needed here if the NGINX Ingress Controller's NLB handles SSL termination with the wildcard ACM cert.
+          # TLS section removed as NLB handles SSL termination
 
         # Define resource requests and limits for your application pods
         resources: {} # Leave empty to use Helm chart defaults or override as needed

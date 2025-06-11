@@ -19,17 +19,14 @@ ingress:
   enabled: true
   className: "nginx"
   hostname: "github-actions-example.bunnycloud.xyz" # Static placeholder, overridden by ArgoCD
+  path: "/"  # Adding explicit path
+  pathType: "Prefix"  # Adding pathType for better routing
   annotations:
     "nginx.ingress.kubernetes.io/ssl-redirect": "true" # Enforce HTTPS
     "nginx.ingress.kubernetes.io/force-ssl-redirect": "true" # Enforce HTTPS
     "external-dns.alpha.kubernetes.io/target": ""
     "external-dns.alpha.kubernetes.io/ttl": "60"
     "external-dns.alpha.kubernetes.io/hostname": "github-actions-example.bunnycloud.xyz."
-  tls:
-    - hosts:
-        - "github-actions-example.bunnycloud.xyz" # Static placeholder, overridden by ArgoCD
-      # secretName: "{{ app_name }}-tls" # Generally not needed if your NGINX Ingress Controller's NLB handles SSL termination with the wildcard ACM cert.
-
 
 resources: {}
   # We usually recommend not to specify default resources and to leave this as a conscious
