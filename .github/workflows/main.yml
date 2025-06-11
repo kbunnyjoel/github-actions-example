@@ -522,6 +522,14 @@ jobs:
           
           echo "ExternalDNS installed."
           
+      - name: Verify ExternalDNS Service Account and Restart Pods
+        run: |
+          echo "Verifying ExternalDNS service account annotations..."
+          kubectl describe sa external-dns -n external-dns
+          echo "Restarting ExternalDNS deployment to ensure IRSA is applied..."
+          kubectl rollout restart deployment external-dns -n external-dns
+          kubectl rollout status deployment external-dns -n external-dns --timeout=2m
+
           # Check ExternalDNS logs
           echo "Checking ExternalDNS logs..."
           sleep 10  # Wait for ExternalDNS to start
