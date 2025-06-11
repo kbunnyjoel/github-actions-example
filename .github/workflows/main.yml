@@ -637,15 +637,49 @@ jobs:
           fi
           echo "NGINX LoadBalancer hostname: $NGINX_LB_HOSTNAME"
           
-          # Create a simple change batch file for UPSERT
-          cat > dns-change.json <<EOF
+          # First, list all records for the domain
+          echo "Listing existing records for $RECORD_NAME..."
+          aws route53 list-resource-record-sets --hosted-zone-id "$HOSTED_ZONE_ID" \
+            --query "ResourceRecordSets[?Name=='$RECORD_NAME']"
+          
+          # Delete A record if it exists (Alias record)
+          echo "Deleting any A record for $RECORD_NAME..."
+          aws route53 list-resource-record-sets --hosted-zone-id "$HOSTED_ZONE_ID" \
+            --query "ResourceRecordSets[?Name=='$RECORD_NAME' && Type=='A']" \
+            --output json > a-record.json
+          
+          if [ "$(cat a-record.json)" != "[]" ]; then
+            echo "Found A record, deleting it..."
+            A_RECORD=$(cat a-record.json | jq '.[0]')
+            
+            cat > delete-a-record.json <<EOF
           {
-            "Comment": "Update DNS record for github-actions-example.bunnycloud.xyz",
+            "Comment": "Delete A record",
+            "Changes": [
+              {
+                "Action": "DELETE",
+                "ResourceRecordSet": $A_RECORD
+              }
+            ]
+          }
+          EOF
+            
+            cat delete-a-record.json
+            aws route53 change-resource-record-sets --hosted-zone-id "$HOSTED_ZONE_ID" --change-batch file://delete-a-record.json
+            echo "Waiting for deletion to complete..."
+            sleep 10
+          fi
+          
+          # Now create the CNAME record
+          echo "Creating CNAME record..."
+          cat > create-cname.json <<EOF
+          {
+            "Comment": "Create CNAME record",
             "Changes": [
               {
                 "Action": "UPSERT",
                 "ResourceRecordSet": {
-                  "Name": "github-actions-example.bunnycloud.xyz.",
+                  "Name": "$RECORD_NAME",
                   "Type": "CNAME",
                   "TTL": 300,
                   "ResourceRecords": [
@@ -659,10 +693,8 @@ jobs:
           }
           EOF
           
-          # Apply the change
-          echo "Applying DNS change..."
-          cat dns-change.json
-          aws route53 change-resource-record-sets --hosted-zone-id "$HOSTED_ZONE_ID" --change-batch file://dns-change.json
+          cat create-cname.json
+          aws route53 change-resource-record-sets --hosted-zone-id "$HOSTED_ZONE_ID" --change-batch file://create-cname.json || echo "Failed to create CNAME record"
         # continue-on-error: true # Recommended to remove this to catch Helm installation errors
 
       - name: Verify ArgoCD Installation and DNS
