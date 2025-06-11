@@ -412,11 +412,64 @@ jobs:
             --set controller.service.annotations."service\.beta\.kubernetes\.io/aws-load-balancer-backend-protocol"="http" \
             --set controller.service.targetPorts.https=http \
             --set controller.service.ports.https=443 \
+            --set controller.service.ports.http=80 \
+            --set controller.service.enableHttp=true \
+            --set controller.config.use-forwarded-headers=true \
+            --set controller.config.compute-full-forwarded-for=true \
+            --set controller.config.use-proxy-protocol=true \
+            --set controller.config.server-tokens=false \
+            --set controller.config.log-format-upstream='$remote_addr - $remote_user [$time_local] "$request" $status $body_bytes_sent "$http_referer" "$http_user_agent" $request_length $request_time [$proxy_upstream_name] [$proxy_alternative_upstream_name] $upstream_addr $upstream_response_length $upstream_response_time $upstream_status $req_id' \
             --set controller.replicaCount=2 \
             --version 4.10.1 \
             --wait
           
           echo "Waiting for ingress-nginx controller pod to be ready..."
+          kubectl rollout status deployment ingress-nginx-controller -n ingress-nginx --timeout=5m
+          
+          echo "Creating default backend for 404 handling..."
+          kubectl apply -f - <<EOF
+          apiVersion: apps/v1
+          kind: Deployment
+          metadata:
+            name: default-http-backend
+            namespace: ingress-nginx
+            labels:
+              app: default-http-backend
+          spec:
+            replicas: 1
+            selector:
+              matchLabels:
+                app: default-http-backend
+            template:
+              metadata:
+                labels:
+                  app: default-http-backend
+              spec:
+                containers:
+                - name: default-http-backend
+                  image: k8s.gcr.io/defaultbackend-amd64:1.5
+                  ports:
+                  - containerPort: 8080
+          ---
+          apiVersion: v1
+          kind: Service
+          metadata:
+            name: default-http-backend
+            namespace: ingress-nginx
+          spec:
+            ports:
+            - port: 80
+              targetPort: 8080
+            selector:
+              app: default-http-backend
+          EOF
+          
+          echo "Configuring NGINX Ingress Controller to use default backend..."
+          kubectl patch deployment ingress-nginx-controller -n ingress-nginx --type=json \
+            -p='[{"op": "add", "path": "/spec/template/spec/containers/0/args/-", "value": "--default-backend-service=ingress-nginx/default-http-backend"}]'
+          
+          echo "Restarting NGINX Ingress Controller..."
+          kubectl rollout restart deployment ingress-nginx-controller -n ingress-nginx
           kubectl rollout status deployment ingress-nginx-controller -n ingress-nginx --timeout=5m
 
       - name: Install ArgoCD
@@ -758,6 +811,12 @@ jobs:
           echo "Checking application service..."
           kubectl get svc -n github-actions-example
           
+          echo "Checking NGINX Ingress Controller logs..."
+          kubectl logs -n ingress-nginx -l app.kubernetes.io/name=ingress-nginx --tail=100
+          
+          echo "Checking NGINX Ingress Controller configuration..."
+          kubectl get configmap -n ingress-nginx ingress-nginx-controller -o yaml
+          
           echo "Verifying DNS record for github-actions-example.bunnycloud.xyz..."
           NGINX_LB_HOSTNAME=$(kubectl get svc -n ingress-nginx ingress-nginx-controller -o jsonpath='{.status.loadBalancer.ingress[0].hostname}')
           EXPECTED_CNAME_TARGET="${NGINX_LB_HOSTNAME}."
@@ -771,6 +830,17 @@ jobs:
           
           echo "Testing connectivity to the load balancer directly..."
           curl -v --connect-timeout 10 -k https://$NGINX_LB_HOSTNAME/ || echo "Connection to load balancer failed"
+          
+          echo "Testing connectivity to the load balancer on HTTP port..."
+          curl -v --connect-timeout 10 http://$NGINX_LB_HOSTNAME/ || echo "HTTP connection to load balancer failed"
+          
+          echo "Checking application pod logs..."
+          APP_POD=$(kubectl get pods -n github-actions-example -l app=github-actions-example -o jsonpath='{.items[0].metadata.name}' 2>/dev/null)
+          if [ ! -z "$APP_POD" ]; then
+            kubectl logs -n github-actions-example $APP_POD
+          else
+            echo "No application pods found"
+          fi
         continue-on-error: true  # Don't fail the workflow if verification fails
 
       # Security group rules are now managed by Terraform in eks_sg_rules.tf
