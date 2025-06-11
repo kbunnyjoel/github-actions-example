@@ -530,7 +530,7 @@ jobs:
                 Name: .Name,
                 Type: .Type,
                 TTL: (.TTL // 300),
-                ResourceRecords: .ResourceRecords
+                ResourceRecords: (.ResourceRecords // [])
               }
             }]')
           }
