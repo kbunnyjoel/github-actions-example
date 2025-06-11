@@ -18,15 +18,16 @@ service:
 ingress:
   enabled: true
   className: "nginx"
-  hostname: "placeholder.bunnycloud.xyz" # Static placeholder, overridden by ArgoCD
+  hostname: "github-actions-example.bunnycloud.xyz" # Static placeholder, overridden by ArgoCD
   annotations:
     "kubernetes.io/ingress.class": "nginx"
     "nginx.ingress.kubernetes.io/ssl-redirect": "true" # Enforce HTTPS
     "nginx.ingress.kubernetes.io/force-ssl-redirect": "true" # Enforce HTTPS
-    "external-dns.alpha.kubernetes.io/hostname": "placeholder.bunnycloud.xyz." # Static placeholder, overridden by ArgoCD
+    "external-dns.alpha.kubernetes.io/hostname": "github-actions-example.bunnycloud.xyz." # Static placeholder, overridden by ArgoCD
+    "external-dns.alpha.kubernetes.io/ttl": "60"
   tls:
     - hosts:
-        - "placeholder.bunnycloud.xyz" # Static placeholder, overridden by ArgoCD
+        - "github-actions-example.bunnycloud.xyz" # Static placeholder, overridden by ArgoCD
       # secretName: "{{ app_name }}-tls" # Generally not needed if your NGINX Ingress Controller's NLB handles SSL termination with the wildcard ACM cert.
 
 
