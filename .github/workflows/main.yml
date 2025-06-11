@@ -565,6 +565,8 @@ jobs:
             --set serviceAccount.name=external-dns \
             --set serviceAccount.annotations."eks\.amazonaws\.com/role-arn"="${{ env.EXTERNAL_DNS_ROLE_ARN }}" \
             --set txtOwnerId="${{ env.HOSTED_ZONE_ID }}" \
+            --set provider=aws \
+            --set registry=txt \
             --set txtPrefix=externaldns- \
             --set aws.preferCNAME=true \
             --version 1.14.5 \
@@ -594,6 +596,8 @@ jobs:
               --set serviceAccount.name=external-dns \
               --set serviceAccount.annotations."eks\.amazonaws\.com/role-arn"="${{ env.EXTERNAL_DNS_ROLE_ARN }}" \
               --set txtOwnerId="${{ env.HOSTED_ZONE_ID }}" \
+              --set provider=aws \
+              --set registry=txt \
               --set txtPrefix=externaldns- \
               --set aws.preferCNAME=true \
               --version 1.14.5 \
@@ -614,7 +618,37 @@ jobs:
           # Check ExternalDNS logs
           echo "Checking ExternalDNS logs..."
           sleep 10  # Wait for ExternalDNS to start
-          kubectl logs -n external-dns -l app.kubernetes.io/name=external-dns --tail=50 # Consider removing --tail or increasing it for more context if issues persist
+          kubectl logs -n external-dns -l app.kubernetes.io/name=external-dns --tail=100
+          
+          # Create a test ingress to verify ExternalDNS is working
+          echo "Creating a test ingress to verify ExternalDNS..."
+          cat <<EOF | kubectl apply -f -
+          apiVersion: networking.k8s.io/v1
+          kind: Ingress
+          metadata:
+            name: test-externaldns
+            namespace: default
+            annotations:
+              kubernetes.io/ingress.class: "nginx"
+              external-dns.alpha.kubernetes.io/hostname: "test-externaldns.bunnycloud.xyz."
+          spec:
+            rules:
+            - host: test-externaldns.bunnycloud.xyz
+              http:
+                paths:
+                - path: /
+                  pathType: Prefix
+                  backend:
+                    service:
+                      name: kubernetes
+                      port:
+                        number: 443
+          EOF
+          
+          # Wait for ExternalDNS to process the ingress
+          echo "Waiting for ExternalDNS to process the test ingress..."
+          sleep 30
+          kubectl logs -n external-dns -l app.kubernetes.io/name=external-dns --tail=100
         # continue-on-error: true # Recommended to remove this to catch Helm installation errors
 
       - name: Verify ArgoCD Installation and DNS
@@ -744,7 +778,7 @@ jobs:
               -D image_tag="$IMAGE_TAG" \
               -D deployment_namespace="$DEPLOYMENT_NAMESPACE" \
               -D acm_certificate_arn="$ACM_CERT_ARN" \
-              -D elb_hostname="$NGINX_LB_HOSTNAME" \
+              -D elb_hostname="${{ env.NGINX_LB_HOSTNAME }}" \
               > "$OUTFILE"
             echo "Generated manifest for $app (using app_name=$APP_NAME):"
             cat "$OUTFILE"
