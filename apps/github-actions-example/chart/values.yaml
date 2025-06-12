@@ -27,6 +27,9 @@ ingress:
     "external-dns.alpha.kubernetes.io/target": ""
     "external-dns.alpha.kubernetes.io/ttl": "60"
     "external-dns.alpha.kubernetes.io/hostname": "github-actions-example.bunnycloud.xyz."
+  tls:  # Add this section
+    - hosts:
+        - "github-actions-example.bunnycloud.xyz"
 
 resources: {}
   # We usually recommend not to specify default resources and to leave this as a conscious
