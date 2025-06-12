@@ -1191,9 +1191,8 @@ jobs:
           echo "NGINX LoadBalancer hostname: $NGINX_LB_HOSTNAME"
           dig +short $APP_TARGET_HOSTNAME
           
-          # Create ingress if needed
-          if ! kubectl get ingress -n github-actions-example github-actions-example &>/dev/null; then
-            kubectl apply -f - <<EOF
+          # Create or update ingress with SSL redirect disabled
+          kubectl apply -f - <<EOF
           apiVersion: networking.k8s.io/v1
           kind: Ingress
           metadata:
@@ -1217,7 +1216,6 @@ jobs:
                       port:
                         number: 80
           EOF
-          fi
 
       - name: Verify application accessibility
         run: |
