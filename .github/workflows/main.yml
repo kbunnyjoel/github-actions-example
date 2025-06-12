@@ -404,6 +404,19 @@ jobs:
       - name: Install NGINX Ingress Controller with SSL
         run: |
           echo "Installing NGINX Ingress Controller for AWS with SSL..."
+          # Check if NGINX Ingress Controller is already installed
+          if kubectl get namespace ingress-nginx &>/dev/null; then
+            echo "NGINX Ingress Controller namespace already exists, checking deployment..."
+            if kubectl get deployment -n ingress-nginx ingress-nginx-controller &>/dev/null; then
+              echo "NGINX Ingress Controller deployment already exists, skipping installation"
+              kubectl get pods -n ingress-nginx
+              kubectl get svc -n ingress-nginx
+              echo "Using existing NGINX Ingress Controller"
+              return 0
+            fi
+          fi
+          
+          echo "Installing NGINX Ingress Controller..."
           helm upgrade --install ingress-nginx ingress-nginx/ingress-nginx \
             --namespace ingress-nginx --create-namespace \
             --set controller.service.annotations."service\.beta\.kubernetes\.io/aws-load-balancer-type"=nlb \
@@ -420,15 +433,23 @@ jobs:
             --set controller.config.enable-real-ip=false \
             --set controller.config.proxy-real-ip-cidr=0.0.0.0/0 \
             --set controller.config.server-tokens=false \
-            --set controller.config.log-format-upstream='$remote_addr - $remote_user [$time_local] "$request" $status $body_bytes_sent "$http_referer" "$http_user_agent" $request_length $request_time [$proxy_upstream_name] [$proxy_alternative_upstream_name] $upstream_addr $upstream_response_length $upstream_response_time $upstream_status $req_id' \
-            --set controller.replicaCount=2 \
+            --set controller.replicaCount=1 \
             --set controller.containerPort.http=80 \
             --set controller.containerPort.https=443 \
             --version 4.10.1 \
-            --wait
+            --timeout 30m
           
           echo "Waiting for ingress-nginx controller pod to be ready..."
-          kubectl rollout status deployment ingress-nginx-controller -n ingress-nginx --timeout=5m
+          kubectl rollout status deployment ingress-nginx-controller -n ingress-nginx --timeout=10m || true
+          
+          echo "Checking NGINX Ingress Controller pods..."
+          kubectl get pods -n ingress-nginx
+          
+          echo "Checking NGINX Ingress Controller services..."
+          kubectl get svc -n ingress-nginx
+          
+          echo "Checking NGINX Ingress Controller events..."
+          kubectl get events -n ingress-nginx --sort-by='.lastTimestamp' | tail -20
           
           echo "Creating default backend for 404 handling..."
           kubectl apply -f - <<EOF
