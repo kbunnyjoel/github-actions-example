@@ -27,10 +27,13 @@ metadata:
   name: {{ include "github-actions-example.fullname" . }}
   labels:
     {{- include "github-actions-example.labels" . | nindent 4 }}
-  {{- with .Values.ingress.annotations }}
   annotations:
+    {{- with .Values.ingress.annotations }}
     {{- toYaml . | nindent 4 }}
-  {{- end }}
+    {{- end }}
+    {{- if .Values.ingress.acmCertArn }}
+    service.beta.kubernetes.io/aws-load-balancer-ssl-cert: {{ .Values.ingress.acmCertArn }}
+    {{- end }}
 spec:
   {{- if and .Values.ingress.className (semverCompare ">=1.18-0" .Capabilities.KubeVersion.GitVersion) }}
   ingressClassName: {{ .Values.ingress.className }}

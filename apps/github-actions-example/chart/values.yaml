@@ -21,12 +21,15 @@ ingress:
   hostname: "github-actions-example.bunnycloud.xyz" # Static placeholder, overridden by ArgoCD
   path: "/"  # Adding explicit path
   pathType: "Prefix"  # Adding pathType for better routing
+  acmCertArn: "" # Will be populated by ArgoCD/Helm with the ACM certificate ARN
   annotations:
-    "nginx.ingress.kubernetes.io/ssl-redirect": "false" # Allow HTTP
-    "nginx.ingress.kubernetes.io/force-ssl-redirect": "false" # Allow HTTP
+    "nginx.ingress.kubernetes.io/ssl-redirect": "true" # Force SSL HTTPS
+    "nginx.ingress.kubernetes.io/force-ssl-redirect": "true" # Force SSL HTTPS
     "external-dns.alpha.kubernetes.io/target": ""
     "external-dns.alpha.kubernetes.io/ttl": "60"
     "external-dns.alpha.kubernetes.io/hostname": "github-actions-example.bunnycloud.xyz."
+    "service.beta.kubernetes.io/aws-load-balancer-backend-protocol": "http"
+    "service.beta.kubernetes.io/aws-load-balancer-ssl-ports": "https"
   tls:  # Add this section
     - hosts:
         - "github-actions-example.bunnycloud.xyz"
