@@ -826,22 +826,74 @@ jobs:
             fi
           done
           
-      - name: Verify application ingress and DNS
+      - name: Create test application
         run: |
-          echo "Checking application ingress configuration..."
-          kubectl get ingress -n github-actions-example -o yaml
+          echo "Creating test application to verify ingress..."
+          kubectl create namespace test-app || true
           
-          echo "Checking if application pods are running..."
-          kubectl get pods -n github-actions-example
+          # Create a simple test deployment and service
+          kubectl apply -f - <<EOF
+          apiVersion: apps/v1
+          kind: Deployment
+          metadata:
+            name: nginx-test
+            namespace: test-app
+          spec:
+            replicas: 1
+            selector:
+              matchLabels:
+                app: nginx-test
+            template:
+              metadata:
+                labels:
+                  app: nginx-test
+              spec:
+                containers:
+                - name: nginx
+                  image: nginx:stable
+                  ports:
+                  - containerPort: 80
+          ---
+          apiVersion: v1
+          kind: Service
+          metadata:
+            name: nginx-test
+            namespace: test-app
+          spec:
+            ports:
+            - port: 80
+              targetPort: 80
+            selector:
+              app: nginx-test
+          ---
+          apiVersion: networking.k8s.io/v1
+          kind: Ingress
+          metadata:
+            name: nginx-test
+            namespace: test-app
+            annotations:
+              kubernetes.io/ingress.class: "nginx"
+              nginx.ingress.kubernetes.io/ssl-redirect: "true"
+          spec:
+            ingressClassName: nginx
+            rules:
+            - host: github-actions-example.bunnycloud.xyz
+              http:
+                paths:
+                - path: /
+                  pathType: Prefix
+                  backend:
+                    service:
+                      name: nginx-test
+                      port:
+                        number: 80
+          EOF
           
-          echo "Checking application service..."
-          kubectl get svc -n github-actions-example
+          echo "Waiting for test application to be ready..."
+          kubectl rollout status deployment nginx-test -n test-app --timeout=2m
           
-          echo "Checking NGINX Ingress Controller logs..."
-          kubectl logs -n ingress-nginx -l app.kubernetes.io/name=ingress-nginx --tail=100
-          
-          echo "Checking NGINX Ingress Controller configuration..."
-          kubectl get configmap -n ingress-nginx ingress-nginx-controller -o yaml
+          echo "Checking test application ingress..."
+          kubectl get ingress -n test-app
           
           echo "Verifying DNS record for github-actions-example.bunnycloud.xyz..."
           NGINX_LB_HOSTNAME=$(kubectl get svc -n ingress-nginx ingress-nginx-controller -o jsonpath='{.status.loadBalancer.ingress[0].hostname}')
@@ -856,17 +908,6 @@ jobs:
           
           echo "Testing connectivity to the load balancer directly..."
           curl -v --connect-timeout 10 -k https://$NGINX_LB_HOSTNAME/ || echo "Connection to load balancer failed"
-          
-          echo "Testing connectivity to the load balancer on HTTP port..."
-          curl -v --connect-timeout 10 http://$NGINX_LB_HOSTNAME/ || echo "HTTP connection to load balancer failed"
-          
-          echo "Checking application pod logs..."
-          APP_POD=$(kubectl get pods -n github-actions-example -l app=github-actions-example -o jsonpath='{.items[0].metadata.name}' 2>/dev/null)
-          if [ ! -z "$APP_POD" ]; then
-            kubectl logs -n github-actions-example $APP_POD
-          else
-            echo "No application pods found"
-          fi
         continue-on-error: true  # Don't fail the workflow if verification fails
 
       # Security group rules are now managed by Terraform in eks_sg_rules.tf

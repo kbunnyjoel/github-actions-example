@@ -27,13 +27,13 @@ spec:
           value: "3000"
         readinessProbe:
           httpGet:
-            path: /
+            path: /status
             port: http
           initialDelaySeconds: 10
           periodSeconds: 5
         livenessProbe:
           httpGet:
-            path: /
+            path: /status
             port: http
           initialDelaySeconds: 15
           periodSeconds: 10

@@ -49,7 +49,7 @@ livenessProbe:
 
 readinessProbe:
   httpGet:
-    path: /readyz # Example path, adjust to your app's readiness endpoint
+    path: /status # Example path, adjust to your app's readiness endpoint
     port: 3000  # Use the actual port number instead of template expression
   initialDelaySeconds: 5
   periodSeconds: 10
