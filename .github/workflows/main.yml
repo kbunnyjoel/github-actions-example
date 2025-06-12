@@ -636,6 +636,7 @@ jobs:
             --set server.ingress.annotations."service\.beta\.kubernetes\.io/aws-load-balancer-ssl-cert"="${{ env.ACM_CERTIFICATE_ARN }}" \
             --set server.ingress.tls=null \
             --set server.extraArgs[0]="--insecure" \
+            --set configs.secret.argocdServerAdminPassword='$2a$10$mivhwttXM0U5eBrZGtAG8.0NVYlsGYdIZxFJWVFwe8p2BO4TQtBfS' \
             --version 6.11.1 \
             --wait
           
@@ -934,19 +935,27 @@ jobs:
         run: |
           echo "Patching Ingress resources to prevent redirect loops..."
           
-          # Patch the main application ingress
-          kubectl patch ingress github-actions-example -n github-actions-example --type=merge -p '{
-            "metadata": {
-              "annotations": {
-                "nginx.ingress.kubernetes.io/ssl-redirect": "false",
-                "nginx.ingress.kubernetes.io/force-ssl-redirect": "false"
-              }
-            }
-          }'
+          # Create the namespace if it doesn't exist
+          kubectl create namespace github-actions-example --dry-run=client -o yaml | kubectl apply -f -
           
-          # Verify the patch was applied
-          echo "Verifying ingress configuration:"
-          kubectl get ingress github-actions-example -n github-actions-example -o jsonpath='{.metadata.annotations}'
+          # Check if the ingress exists before trying to patch it
+          if kubectl get ingress github-actions-example -n github-actions-example &>/dev/null; then
+            # Patch the main application ingress
+            kubectl patch ingress github-actions-example -n github-actions-example --type=merge -p '{
+              "metadata": {
+                "annotations": {
+                  "nginx.ingress.kubernetes.io/ssl-redirect": "false",
+                  "nginx.ingress.kubernetes.io/force-ssl-redirect": "false"
+                }
+              }
+            }'
+            
+            # Verify the patch was applied
+            echo "Verifying ingress configuration:"
+            kubectl get ingress github-actions-example -n github-actions-example -o jsonpath='{.metadata.annotations}'
+          else
+            echo "Ingress 'github-actions-example' not found in namespace 'github-actions-example'. It will be created later."
+          fi
           
       - name: Verify ArgoCD Installation and DNS
         # Changed from manual creation to verification as ExternalDNS handles it
