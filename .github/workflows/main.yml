@@ -540,7 +540,7 @@ jobs:
               ]
             }'
 
-                kubectl get pods -n ingress-nginx
+          kubectl get pods -n ingress-nginx
 
       - name: Install ArgoCD
         run: |
