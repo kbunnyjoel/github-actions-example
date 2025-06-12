@@ -32,6 +32,7 @@ A sample project demonstrating how to use **GitHub Actions** for CI/CD in a Kube
 ## ✅ Status
 
 ![CI](https://github.com/bunnykocharla/github-actions-example/actions/workflows/deploy.yml/badge.svg)
+![ArgoCD Sync](https://img.shields.io/badge/ArgoCD-Synced-brightgreen?logo=argo)
 
 ## ✅ License
 
