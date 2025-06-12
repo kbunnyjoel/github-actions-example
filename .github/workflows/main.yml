@@ -555,27 +555,18 @@ jobs:
           ARGOCD_RECORD_NAME="argocd.bunnycloud.xyz."
           echo "Updating ArgoCD DNS record to point to $NGINX_LB_HOSTNAME..."
           
-          # Delete existing ArgoCD record first
+          # Check for existing records and use UPSERT instead of CREATE/DELETE
+          echo "Checking for existing ArgoCD DNS records..."
           aws route53 list-resource-record-sets --hosted-zone-id "$HOSTED_ZONE_ID" \
             --query "ResourceRecordSets[?Name=='$ARGOCD_RECORD_NAME']" --output json > argocd-records.json
           
-          if [ "$(cat argocd-records.json)" != "[]" ]; then
-            echo "Deleting existing ArgoCD DNS record..."
-            jq -c '.[]' argocd-records.json | while read -r record; do
-              echo "{\"Changes\":[{\"Action\":\"DELETE\",\"ResourceRecordSet\":$record}]}" > delete-record.json
-              aws route53 change-resource-record-sets --hosted-zone-id "$HOSTED_ZONE_ID" \
-                --change-batch file://delete-record.json || echo "Failed to delete record"
-            done
-            sleep 10
-          fi
-          
-          # Create new ArgoCD CNAME record
-          echo "Creating new ArgoCD CNAME record..."
+          # Create or update ArgoCD CNAME record using UPSERT
+          echo "Creating/updating ArgoCD CNAME record..."
           aws route53 change-resource-record-sets --hosted-zone-id "$HOSTED_ZONE_ID" \
             --change-batch '{
               "Changes": [
                 {
-                  "Action": "CREATE",
+                  "Action": "UPSERT",
                   "ResourceRecordSet": {
                     "Name": "'"$ARGOCD_RECORD_NAME"'",
                     "Type": "CNAME",
@@ -588,33 +579,19 @@ jobs:
                   }
                 }
               ]
-            }'
+            }' || echo "Warning: Failed to update ArgoCD DNS record, continuing workflow"
             
           # Update Application DNS record
           APP_RECORD_NAME="github-actions-example.bunnycloud.xyz."
           echo "Updating Application DNS record to point to $NGINX_LB_HOSTNAME..."
           
-          # Delete existing Application record first
-          aws route53 list-resource-record-sets --hosted-zone-id "$HOSTED_ZONE_ID" \
-            --query "ResourceRecordSets[?Name=='$APP_RECORD_NAME']" --output json > app-records.json
-          
-          if [ "$(cat app-records.json)" != "[]" ]; then
-            echo "Deleting existing Application DNS record..."
-            jq -c '.[]' app-records.json | while read -r record; do
-              echo "{\"Changes\":[{\"Action\":\"DELETE\",\"ResourceRecordSet\":$record}]}" > delete-record.json
-              aws route53 change-resource-record-sets --hosted-zone-id "$HOSTED_ZONE_ID" \
-                --change-batch file://delete-record.json || echo "Failed to delete record"
-            done
-            sleep 10
-          fi
-          
-          # Create new Application CNAME record
-          echo "Creating new Application CNAME record..."
+          # Create or update Application CNAME record using UPSERT
+          echo "Creating/updating Application CNAME record..."
           aws route53 change-resource-record-sets --hosted-zone-id "$HOSTED_ZONE_ID" \
             --change-batch '{
               "Changes": [
                 {
-                  "Action": "CREATE",
+                  "Action": "UPSERT",
                   "ResourceRecordSet": {
                     "Name": "'"$APP_RECORD_NAME"'",
                     "Type": "CNAME",
@@ -627,7 +604,7 @@ jobs:
                   }
                 }
               ]
-            }'
+            }' || echo "Warning: Failed to update Application DNS record, continuing workflow"
             
           # Verify DNS records were created
           echo "Verifying DNS records were created..."
@@ -651,8 +628,8 @@ jobs:
             --set server.ingress.ingressClassName=nginx \
             --set server.ingress.hostname=argocd.bunnycloud.xyz \
             --set server.ingress.annotations."kubernetes\.io/ingress\.class"=nginx \
-            --set server.ingress.annotations."nginx\.ingress\.kubernetes\.io/ssl-redirect"=true \
-            --set server.ingress.annotations."nginx\.ingress\.kubernetes\.io/force-ssl-redirect"=true \
+            --set server.ingress.annotations."nginx\.ingress\.kubernetes\.io/ssl-redirect"=false \
+            --set server.ingress.annotations."nginx\.ingress\.kubernetes\.io/force-ssl-redirect"=false \
             --set server.ingress.annotations."external-dns\.alpha\.kubernetes\.io/hostname"=argocd.bunnycloud.xyz. \
             --set server.ingress.annotations."service\.beta\.kubernetes\.io/aws-load-balancer-backend-protocol"=http \
             --set server.ingress.annotations."service\.beta\.kubernetes\.io/aws-load-balancer-ssl-ports"=https \
@@ -924,45 +901,26 @@ jobs:
           
           echo "Updating DNS record for $RECORD_NAME to point to $NEW_LB_HOSTNAME..."
           
-          # Delete existing record if it exists
-          echo "Checking for existing records for $RECORD_NAME..."
-          aws route53 list-resource-record-sets --hosted-zone-id "$HOSTED_ZONE_ID" \
-            --query "ResourceRecordSets[?Name=='$RECORD_NAME']" --output json > test-externaldns-records.json
-          
-          if [ "$(cat test-externaldns-records.json)" != "[]" ]; then
-            echo "Deleting existing records for $RECORD_NAME..."
-            jq -c '.[]' test-externaldns-records.json | while read -r record; do
-              echo "{\"Changes\":[{\"Action\":\"DELETE\",\"ResourceRecordSet\":$record}]}" > delete-test-record.json
-              aws route53 change-resource-record-sets --hosted-zone-id "$HOSTED_ZONE_ID" \
-                --change-batch file://delete-test-record.json || echo "Failed to delete record"
-            done
-            sleep 10
-          fi
-          
-          # Create new CNAME record
-          echo "Creating new CNAME record for $RECORD_NAME..."
-          cat > create-test-cname.json <<EOF
-          {
-            "Comment": "Create test-externaldns CNAME record",
-            "Changes": [
-              {
-                "Action": "CREATE",
-                "ResourceRecordSet": {
-                  "Name": "$RECORD_NAME",
-                  "Type": "CNAME",
-                  "TTL": 60,
-                  "ResourceRecords": [
-                    {
-                      "Value": "$NEW_LB_HOSTNAME"
-                    }
-                  ]
+          # Use UPSERT to create or update the record
+          echo "Creating/updating CNAME record for $RECORD_NAME..."
+          aws route53 change-resource-record-sets --hosted-zone-id "$HOSTED_ZONE_ID" \
+            --change-batch '{
+              "Changes": [
+                {
+                  "Action": "UPSERT",
+                  "ResourceRecordSet": {
+                    "Name": "'"$RECORD_NAME"'",
+                    "Type": "CNAME",
+                    "TTL": 60,
+                    "ResourceRecords": [
+                      {
+                        "Value": "'"$NEW_LB_HOSTNAME"'"
+                      }
+                    ]
+                  }
                 }
-              }
-            ]
-          }
-          EOF
-          
-          aws route53 change-resource-record-sets --hosted-zone-id "$HOSTED_ZONE_ID" --change-batch file://create-test-cname.json
+              ]
+            }' || echo "Warning: Failed to update DNS record, continuing workflow"
           
           # Verify the DNS record was created
           echo "Verifying test-externaldns DNS record creation..."
@@ -971,6 +929,24 @@ jobs:
             --query "ResourceRecordSets[?Name=='$RECORD_NAME']"
         # continue-on-error: true # Recommended to remove this to catch Helm installation errors
 
+      - name: Fix Ingress SSL redirect configuration
+        run: |
+          echo "Patching Ingress resources to prevent redirect loops..."
+          
+          # Patch the main application ingress
+          kubectl patch ingress github-actions-example -n github-actions-example --type=merge -p '{
+            "metadata": {
+              "annotations": {
+                "nginx.ingress.kubernetes.io/ssl-redirect": "false",
+                "nginx.ingress.kubernetes.io/force-ssl-redirect": "false"
+              }
+            }
+          }'
+          
+          # Verify the patch was applied
+          echo "Verifying ingress configuration:"
+          kubectl get ingress github-actions-example -n github-actions-example -o jsonpath='{.metadata.annotations}'
+          
       - name: Verify ArgoCD Installation and DNS
         # Changed from manual creation to verification as ExternalDNS handles it
         run: |
@@ -1072,7 +1048,8 @@ jobs:
             namespace: test-app
             annotations:
               kubernetes.io/ingress.class: "nginx"
-              nginx.ingress.kubernetes.io/ssl-redirect: "true"
+              nginx.ingress.kubernetes.io/ssl-redirect: "false"
+              nginx.ingress.kubernetes.io/force-ssl-redirect: "false"
           spec:
             ingressClassName: nginx
             rules:
