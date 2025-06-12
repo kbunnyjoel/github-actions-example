@@ -31,7 +31,7 @@ A sample project demonstrating how to use **GitHub Actions** for CI/CD in a Kube
 
 ## ✅ Status
 
-![CI](https://github.com/your-username/github-actions-example/actions/workflows/deploy.yml/badge.svg)
+![CI](https://github.com/bunnykocharla/github-actions-example/actions/workflows/deploy.yml/badge.svg)
 
 ## ✅ License
 
