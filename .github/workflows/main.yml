@@ -654,8 +654,10 @@ jobs:
             --set server.ingress.annotations."nginx\.ingress\.kubernetes\.io/ssl-redirect"=true \
             --set server.ingress.annotations."nginx\.ingress\.kubernetes\.io/force-ssl-redirect"=true \
             --set server.ingress.annotations."external-dns\.alpha\.kubernetes\.io/hostname"=argocd.bunnycloud.xyz. \
-            --set server.ingress.tls[0].hosts[0]=argocd.bunnycloud.xyz \
-            --set server.ingress.tls[0].secretName=argocd-tls \
+            --set server.ingress.annotations."service\.beta\.kubernetes\.io/aws-load-balancer-backend-protocol"=http \
+            --set server.ingress.annotations."service\.beta\.kubernetes\.io/aws-load-balancer-ssl-ports"=https \
+            --set server.ingress.annotations."service\.beta\.kubernetes\.io/aws-load-balancer-ssl-cert"="${{ env.ACM_CERTIFICATE_ARN }}" \
+            --set server.ingress.tls=null \
             --version 6.11.1 \
             --wait
           
@@ -910,6 +912,60 @@ jobs:
           
           # Verify the DNS record was created
           echo "Verifying DNS record creation..."
+          sleep 10
+          aws route53 list-resource-record-sets --hosted-zone-id "$HOSTED_ZONE_ID" \
+            --query "ResourceRecordSets[?Name=='$RECORD_NAME']"
+            
+      - name: Update test-externaldns DNS record
+        run: |
+          HOSTED_ZONE_ID="${{ env.HOSTED_ZONE_ID }}"
+          RECORD_NAME="test-externaldns.bunnycloud.xyz."
+          NEW_LB_HOSTNAME="aa32cc155d5f3413b94f85edcf163984-33c330df4f67ec18.elb.ap-southeast-2.amazonaws.com."
+          
+          echo "Updating DNS record for $RECORD_NAME to point to $NEW_LB_HOSTNAME..."
+          
+          # Delete existing record if it exists
+          echo "Checking for existing records for $RECORD_NAME..."
+          aws route53 list-resource-record-sets --hosted-zone-id "$HOSTED_ZONE_ID" \
+            --query "ResourceRecordSets[?Name=='$RECORD_NAME']" --output json > test-externaldns-records.json
+          
+          if [ "$(cat test-externaldns-records.json)" != "[]" ]; then
+            echo "Deleting existing records for $RECORD_NAME..."
+            jq -c '.[]' test-externaldns-records.json | while read -r record; do
+              echo "{\"Changes\":[{\"Action\":\"DELETE\",\"ResourceRecordSet\":$record}]}" > delete-test-record.json
+              aws route53 change-resource-record-sets --hosted-zone-id "$HOSTED_ZONE_ID" \
+                --change-batch file://delete-test-record.json || echo "Failed to delete record"
+            done
+            sleep 10
+          fi
+          
+          # Create new CNAME record
+          echo "Creating new CNAME record for $RECORD_NAME..."
+          cat > create-test-cname.json <<EOF
+          {
+            "Comment": "Create test-externaldns CNAME record",
+            "Changes": [
+              {
+                "Action": "CREATE",
+                "ResourceRecordSet": {
+                  "Name": "$RECORD_NAME",
+                  "Type": "CNAME",
+                  "TTL": 60,
+                  "ResourceRecords": [
+                    {
+                      "Value": "$NEW_LB_HOSTNAME"
+                    }
+                  ]
+                }
+              }
+            ]
+          }
+          EOF
+          
+          aws route53 change-resource-record-sets --hosted-zone-id "$HOSTED_ZONE_ID" --change-batch file://create-test-cname.json
+          
+          # Verify the DNS record was created
+          echo "Verifying test-externaldns DNS record creation..."
           sleep 10
           aws route53 list-resource-record-sets --hosted-zone-id "$HOSTED_ZONE_ID" \
             --query "ResourceRecordSets[?Name=='$RECORD_NAME']"
