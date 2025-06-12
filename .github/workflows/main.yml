@@ -457,7 +457,7 @@ jobs:
             kubectl get events -n ingress-nginx --sort-by='.lastTimestamp' | tail -20
             
             echo "Creating default backend for 404 handling..."
-            kubectl apply -f - <<EOF
+            cat > default-backend.yaml << 'ENDOFFILE'
             apiVersion: apps/v1
             kind: Deployment
             metadata:
@@ -492,7 +492,8 @@ jobs:
                 targetPort: 8080
               selector:
                 app: default-http-backend
-            EOF
+            ENDOFFILE
+            kubectl apply -f default-backend.yaml
             
             echo "Configuring NGINX Ingress Controller to use default backend..."
             kubectl patch deployment ingress-nginx-controller -n ingress-nginx --type=json \
