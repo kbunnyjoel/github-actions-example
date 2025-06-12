@@ -33,6 +33,10 @@ A sample project demonstrating how to use **GitHub Actions** for CI/CD in a Kube
 
 ![CI](https://github.com/bunnykocharla/github-actions-example/actions/workflows/deploy.yml/badge.svg)
 ![ArgoCD Sync](https://img.shields.io/badge/ArgoCD-Synced-brightgreen?logo=argo)
+![Kubernetes](https://img.shields.io/badge/Kubernetes-EKS-blue?logo=kubernetes)
+![NGINX](https://img.shields.io/badge/Ingress-NGINX-brightgreen?logo=nginx)
+![Helm](https://img.shields.io/badge/Helm-Enabled-blue?logo=helm)
+![ExternalDNS](https://img.shields.io/badge/ExternalDNS-Active-success?logo=amazon-aws)
 
 ## ✅ License
 
