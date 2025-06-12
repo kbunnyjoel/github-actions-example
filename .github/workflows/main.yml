@@ -401,21 +401,25 @@ jobs:
           echo "Using certificate ARN: $CERT_ARN"
           echo "ACM_CERTIFICATE_ARN=$CERT_ARN" >> $GITHUB_ENV
 
-      - name: Install NGINX Ingress Controller with SSL
+      - name: Check NGINX Ingress Controller
+        id: check-nginx
         run: |
-          echo "Installing NGINX Ingress Controller for AWS with SSL..."
-          # Check if NGINX Ingress Controller is already installed
           if kubectl get namespace ingress-nginx &>/dev/null; then
-            echo "NGINX Ingress Controller namespace already exists, checking deployment..."
             if kubectl get deployment -n ingress-nginx ingress-nginx-controller &>/dev/null; then
-              echo "NGINX Ingress Controller deployment already exists, skipping installation"
+              echo "NGINX Ingress Controller deployment exists"
               kubectl get pods -n ingress-nginx
               kubectl get svc -n ingress-nginx
-              echo "Using existing NGINX Ingress Controller"
-              return 0
+              echo "nginx_exists=true" >> $GITHUB_OUTPUT
+            else
+              echo "nginx_exists=false" >> $GITHUB_OUTPUT
             fi
+          else
+            echo "nginx_exists=false" >> $GITHUB_OUTPUT
           fi
-          
+
+      - name: Install NGINX Ingress Controller with SSL
+        if: steps.check-nginx.outputs.nginx_exists != 'true'
+        run: |
           echo "Installing NGINX Ingress Controller..."
           helm upgrade --install ingress-nginx ingress-nginx/ingress-nginx \
             --namespace ingress-nginx --create-namespace \
@@ -438,85 +442,86 @@ jobs:
             --set controller.containerPort.https=443 \
             --version 4.10.1 \
             --timeout 30m
+
           
-          echo "Waiting for ingress-nginx controller pod to be ready..."
-          kubectl rollout status deployment ingress-nginx-controller -n ingress-nginx --timeout=10m || true
-          
-          echo "Checking NGINX Ingress Controller pods..."
-          kubectl get pods -n ingress-nginx
-          
-          echo "Checking NGINX Ingress Controller services..."
-          kubectl get svc -n ingress-nginx
-          
-          echo "Checking NGINX Ingress Controller events..."
-          kubectl get events -n ingress-nginx --sort-by='.lastTimestamp' | tail -20
-          
-          echo "Creating default backend for 404 handling..."
-          kubectl apply -f - <<EOF
-          apiVersion: apps/v1
-          kind: Deployment
-          metadata:
-            name: default-http-backend
-            namespace: ingress-nginx
-            labels:
-              app: default-http-backend
-          spec:
-            replicas: 1
-            selector:
-              matchLabels:
+            echo "Waiting for ingress-nginx controller pod to be ready..."
+            kubectl rollout status deployment ingress-nginx-controller -n ingress-nginx --timeout=10m || true
+            
+            echo "Checking NGINX Ingress Controller pods..."
+            kubectl get pods -n ingress-nginx
+            
+            echo "Checking NGINX Ingress Controller services..."
+            kubectl get svc -n ingress-nginx
+            
+            echo "Checking NGINX Ingress Controller events..."
+            kubectl get events -n ingress-nginx --sort-by='.lastTimestamp' | tail -20
+            
+            echo "Creating default backend for 404 handling..."
+            kubectl apply -f - <<EOF
+            apiVersion: apps/v1
+            kind: Deployment
+            metadata:
+              name: default-http-backend
+              namespace: ingress-nginx
+              labels:
                 app: default-http-backend
-            template:
-              metadata:
-                labels:
+            spec:
+              replicas: 1
+              selector:
+                matchLabels:
                   app: default-http-backend
-              spec:
-                containers:
-                - name: default-http-backend
-                  image: k8s.gcr.io/defaultbackend-amd64:1.5
-                  ports:
-                  - containerPort: 8080
-          ---
-          apiVersion: v1
-          kind: Service
-          metadata:
-            name: default-http-backend
-            namespace: ingress-nginx
-          spec:
-            ports:
-            - port: 80
-              targetPort: 8080
-            selector:
-              app: default-http-backend
-          EOF
-          
-          echo "Configuring NGINX Ingress Controller to use default backend..."
-          kubectl patch deployment ingress-nginx-controller -n ingress-nginx --type=json \
-            -p='[{"op": "add", "path": "/spec/template/spec/containers/0/args/-", "value": "--default-backend-service=ingress-nginx/default-http-backend"}]'
-          
-          echo "Restarting NGINX Ingress Controller..."
-          kubectl rollout restart deployment ingress-nginx-controller -n ingress-nginx
-          kubectl rollout status deployment ingress-nginx-controller -n ingress-nginx --timeout=5m
-          
-          echo "Applying ConfigMap patches to fix PROXY protocol issues..."
-          kubectl patch configmap -n ingress-nginx ingress-nginx-controller --type=merge -p '{"data":{"use-proxy-protocol":"false"}}'
-          kubectl patch configmap -n ingress-nginx ingress-nginx-controller --type=merge -p '{"data":{"proxy-real-ip-cidr":"0.0.0.0/0"}}'
-          kubectl patch configmap -n ingress-nginx ingress-nginx-controller --type=merge -p '{"data":{"enable-real-ip":"false"}}'
-          
-          echo "Waiting for ConfigMap changes to propagate..."
-          sleep 30
-          
-          echo "Restarting NGINX Ingress Controller again to apply ConfigMap changes..."
-          kubectl rollout restart deployment ingress-nginx-controller -n ingress-nginx
-          kubectl rollout status deployment ingress-nginx-controller -n ingress-nginx --timeout=5m
-          
-          echo "Creating a direct patch to NGINX configuration..."
-          kubectl exec -n ingress-nginx deploy/ingress-nginx-controller -- cat /etc/nginx/nginx.conf > nginx.conf
-          
-          echo "Checking if PROXY protocol is enabled in NGINX configuration..."
-          grep -i "proxy_protocol" nginx.conf || echo "No proxy_protocol found in configuration"
-          
-          echo "Verifying NGINX Ingress Controller configuration..."
-          kubectl get configmap -n ingress-nginx ingress-nginx-controller -o yaml
+              template:
+                metadata:
+                  labels:
+                    app: default-http-backend
+                spec:
+                  containers:
+                  - name: default-http-backend
+                    image: k8s.gcr.io/defaultbackend-amd64:1.5
+                    ports:
+                    - containerPort: 8080
+            ---
+            apiVersion: v1
+            kind: Service
+            metadata:
+              name: default-http-backend
+              namespace: ingress-nginx
+            spec:
+              ports:
+              - port: 80
+                targetPort: 8080
+              selector:
+                app: default-http-backend
+            EOF
+            
+            echo "Configuring NGINX Ingress Controller to use default backend..."
+            kubectl patch deployment ingress-nginx-controller -n ingress-nginx --type=json \
+              -p='[{"op": "add", "path": "/spec/template/spec/containers/0/args/-", "value": "--default-backend-service=ingress-nginx/default-http-backend"}]'
+            
+            echo "Restarting NGINX Ingress Controller..."
+            kubectl rollout restart deployment ingress-nginx-controller -n ingress-nginx
+            kubectl rollout status deployment ingress-nginx-controller -n ingress-nginx --timeout=5m
+            
+            echo "Applying ConfigMap patches to fix PROXY protocol issues..."
+            kubectl patch configmap -n ingress-nginx ingress-nginx-controller --type=merge -p '{"data":{"use-proxy-protocol":"false"}}'
+            kubectl patch configmap -n ingress-nginx ingress-nginx-controller --type=merge -p '{"data":{"proxy-real-ip-cidr":"0.0.0.0/0"}}'
+            kubectl patch configmap -n ingress-nginx ingress-nginx-controller --type=merge -p '{"data":{"enable-real-ip":"false"}}'
+            
+            echo "Waiting for ConfigMap changes to propagate..."
+            sleep 30
+            
+            echo "Restarting NGINX Ingress Controller again to apply ConfigMap changes..."
+            kubectl rollout restart deployment ingress-nginx-controller -n ingress-nginx
+            kubectl rollout status deployment ingress-nginx-controller -n ingress-nginx --timeout=5m
+            
+            echo "Creating a direct patch to NGINX configuration..."
+            kubectl exec -n ingress-nginx deploy/ingress-nginx-controller -- cat /etc/nginx/nginx.conf > nginx.conf
+            
+            echo "Checking if PROXY protocol is enabled in NGINX configuration..."
+            grep -i "proxy_protocol" nginx.conf || echo "No proxy_protocol found in configuration"
+            
+            echo "Verifying NGINX Ingress Controller configuration..."
+            kubectl get configmap -n ingress-nginx ingress-nginx-controller -o yaml
 
       - name: Update DNS records
         run: |
