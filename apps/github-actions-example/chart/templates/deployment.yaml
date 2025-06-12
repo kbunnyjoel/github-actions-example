@@ -25,17 +25,13 @@ spec:
         env:
         - name: PORT
           value: "3000"
+        {{- with .Values.readinessProbe }}
         readinessProbe:
-          httpGet:
-            path: /status
-            port: http
-          initialDelaySeconds: 10
-          periodSeconds: 5
+          {{- toYaml . | nindent 10 }}
+        {{- end }}
+        {{- with .Values.livenessProbe }}
         livenessProbe:
-          httpGet:
-            path: /status
-            port: http
-          initialDelaySeconds: 15
-          periodSeconds: 10
+          {{- toYaml . | nindent 10 }}
+        {{- end }}
         resources:
           {{- toYaml .Values.resources | nindent 12 }}
