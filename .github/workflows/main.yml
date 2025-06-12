@@ -627,6 +627,16 @@ jobs:
                 }
               ]
             }'
+            
+          # Verify DNS records were created
+          echo "Verifying DNS records were created..."
+          echo "ArgoCD DNS record:"
+          aws route53 list-resource-record-sets --hosted-zone-id "$HOSTED_ZONE_ID" \
+            --query "ResourceRecordSets[?Name=='$ARGOCD_RECORD_NAME']"
+            
+          echo "Application DNS record:"
+          aws route53 list-resource-record-sets --hosted-zone-id "$HOSTED_ZONE_ID" \
+            --query "ResourceRecordSets[?Name=='$APP_RECORD_NAME']"
 
           kubectl get pods -n ingress-nginx
 
