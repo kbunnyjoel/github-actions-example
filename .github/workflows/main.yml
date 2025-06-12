@@ -525,6 +525,24 @@ jobs:
 
       - name: Update DNS records
         run: |
+          # Get the hosted zone ID from Terraform output
+            cd terraform
+            HOSTED_ZONE_ID=$(terraform output -raw route53_zone_id || echo "")
+            
+            if [ -z "$HOSTED_ZONE_ID" ]; then
+              echo "Error: Could not get hosted zone ID from Terraform output"
+              # Fallback to looking up the hosted zone
+              HOSTED_ZONE_ID=$(aws route53 list-hosted-zones --query "HostedZones[?Name=='bunnycloud.xyz.'].Id" --output text | sed 's/\/hostedzone\///')
+              
+              if [ -z "$HOSTED_ZONE_ID" ]; then
+                echo "Error: No hosted zone found for bunnycloud.xyz"
+                exit 1
+              fi
+            fi
+            
+            echo "Using hosted zone ID: $HOSTED_ZONE_ID"
+    
+          NGINX_LB_HOSTNAME=$(kubectl get svc -n ingress-nginx ingress-nginx-controller -o jsonpath='{.status.loadBalancer.ingress[0].hostname}')
           HOSTED_ZONE_ID="${{ env.HOSTED_ZONE_ID }}"
           NGINX_LB_HOSTNAME=$(kubectl get svc -n ingress-nginx ingress-nginx-controller -o jsonpath='{.status.loadBalancer.ingress[0].hostname}')
           
