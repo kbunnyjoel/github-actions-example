@@ -779,22 +779,38 @@ jobs:
     
       - name: Configure ArgoCD with Cognito
         run: |
-          # Update ArgoCD with IAM role and Cognito configuration
+          # Create values file for Cognito configuration
+          cat > cognito-values.yaml <<EOF
+          global:
+            dualStack:
+              enabled: false
+          notifications:
+            enabled: false
+          commitServer:
+            enabled: false
+          server:
+            serviceAccount:
+              annotations:
+                eks.amazonaws.com/role-arn: ${{ env.ARGOCD_ROLE_ARN }}
+            config:
+              url: https://argocd.bunnycloud.xyz
+              oidc.name: Cognito
+              oidc.issuer: ${{ env.COGNITO_ISSUER_URL }}
+              oidc.clientID: ${{ env.COGNITO_CLIENT_ID }}
+              oidc.clientSecret: ${{ env.COGNITO_CLIENT_SECRET }}
+              oidc.requestedScopes: openid profile email
+              oidc.requestedIDTokenClaims.groups.essential: "true"
+            rbacConfig:
+              policy.csv: |
+                g, Admins, role:admin
+                g, Developers, role:readonly
+              scopes: "[cognito:groups]"
+          EOF
+          
+          # Update ArgoCD with the values file
           helm upgrade argocd argo/argo-cd \
             --namespace argocd \
-            --set global.dualStack.enabled=false \
-            --set notifications.enabled=false \
-            --set commitServer.enabled=false \
-            --set server.serviceAccount.annotations."eks\.amazonaws\.com/role-arn"="${{ env.ARGOCD_ROLE_ARN }}" \
-            --set server.config.url="https://argocd.bunnycloud.xyz" \
-            --set server.config.oidc.name="Cognito" \
-            --set server.config.oidc.issuer="${{ env.COGNITO_ISSUER_URL }}" \
-            --set server.config.oidc.clientID="${{ env.COGNITO_CLIENT_ID }}" \
-            --set server.config.oidc.clientSecret="${{ env.COGNITO_CLIENT_SECRET }}" \
-            --set server.config.oidc.requestedScopes="{openid,profile,email}" \
-            --set server.config.oidc.requestedIDTokenClaims.groups.essential=true \
-            --set "server.rbacConfig.policy.csv=g, Admins, role:admin\ng, Developers, role:readonly" \
-            --set "server.rbacConfig.scopes=[cognito:groups]" \
+            --values cognito-values.yaml \
             --reuse-values
             
           # Restart ArgoCD server to apply changes
@@ -803,6 +819,7 @@ jobs:
           
           echo "ArgoCD configured with Cognito OIDC"
           echo "Users can now log in using their Cognito credentials"
+
 
 
 
