@@ -636,6 +636,7 @@ jobs:
             --set server.ingress.annotations."service\.beta\.kubernetes\.io/aws-load-balancer-ssl-cert"="${{ env.ACM_CERTIFICATE_ARN }}" \
             --set server.ingress.tls=null \
             --set server.extraArgs[0]="--insecure" \
+            --set configs.secret.createSecret=true \
             --set configs.secret.argocdServerAdminPassword='admin' \
             --version 6.11.1 \
             --wait
