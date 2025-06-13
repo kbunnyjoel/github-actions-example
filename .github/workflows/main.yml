@@ -716,6 +716,9 @@ jobs:
 
       - name: Update ArgoCD with IAM role
         run: |
+          # Delete the existing service account first
+          kubectl delete serviceaccount argocd-server -n argocd --ignore-not-found=true
+          
           # Update ArgoCD Helm release to use the IAM role annotation on the service account
           helm upgrade argocd argo/argo-cd \
             --namespace argocd \
