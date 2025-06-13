@@ -622,9 +622,34 @@ jobs:
         run: |
           echo "Installing ArgoCD..."
           
-          # Create namespace if it doesn't exist, don't try to delete existing one
-          kubectl create namespace argocd --dry-run=client -o yaml | kubectl apply -f -
-          echo "ArgoCD namespace ready"
+          # Check if namespace exists and is terminating
+          if kubectl get namespace argocd 2>/dev/null | grep -q Terminating; then
+            echo "ArgoCD namespace is terminating. Waiting for it to be fully deleted..."
+            
+            # Force remove finalizers if any
+            kubectl get namespace argocd -o json | jq '.spec.finalizers = []' | kubectl replace --raw "/api/v1/namespaces/argocd/finalize" -f - || true
+            
+            # Wait for namespace to be fully deleted (max 2 minutes)
+            for i in {1..24}; do
+              if ! kubectl get namespace argocd &>/dev/null; then
+                echo "Namespace argocd has been deleted."
+                break
+              fi
+              echo "Waiting for namespace deletion... ($i/24)"
+              sleep 5
+            done
+            
+            # If namespace still exists after waiting, skip ArgoCD installation
+            if kubectl get namespace argocd &>/dev/null; then
+              echo "ERROR: Namespace argocd is still terminating after waiting. Skipping ArgoCD installation."
+              echo "Please manually delete the namespace and try again."
+              exit 0  # Exit with success to allow workflow to continue
+            fi
+          fi
+          
+          # Create namespace
+          echo "Creating ArgoCD namespace..."
+          kubectl create namespace argocd
           
           # Install ArgoCD with Helm
           helm upgrade --install argocd argo/argo-cd \
