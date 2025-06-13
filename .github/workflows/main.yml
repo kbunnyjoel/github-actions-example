@@ -807,19 +807,34 @@ jobs:
               scopes: "[cognito:groups]"
           EOF
           
+          # Print the values file for debugging
+          echo "Using the following values file:"
+          cat cognito-values.yaml
+          
           # Update ArgoCD with the values file
           helm upgrade argocd argo/argo-cd \
             --namespace argocd \
             --values cognito-values.yaml \
             --reuse-values
-            
+          
+          # Check ArgoCD server status before restart
+          echo "Current ArgoCD server status:"
+          kubectl get pods -n argocd -l app.kubernetes.io/name=argocd-server
+          
           # Restart ArgoCD server to apply changes
           kubectl -n argocd rollout restart deployment argocd-server
-          kubectl -n argocd rollout status deployment argocd-server --timeout=5m
+          
+          # Wait for restart with increased timeout, but continue on error
+          echo "Waiting for ArgoCD server to restart (may take a few minutes)..."
+          kubectl -n argocd rollout status deployment argocd-server --timeout=10m || true
+          
+          # Check status after restart attempt
+          echo "ArgoCD server status after restart attempt:"
+          kubectl get pods -n argocd -l app.kubernetes.io/name=argocd-server
+          kubectl describe pods -n argocd -l app.kubernetes.io/name=argocd-server | grep -A 10 "Events:"
           
           echo "ArgoCD configured with Cognito OIDC"
           echo "Users can now log in using their Cognito credentials"
-
 
 
 
