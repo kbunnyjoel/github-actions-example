@@ -620,7 +620,7 @@ jobs:
 
       - name: Patch ArgoCD resources with Helm ownership
         run: bash k8s/argocd/patch-argocd-helm-ownership.sh
-        
+
       - name: Install ArgoCD
         run: |
           echo "Installing ArgoCD..."
@@ -709,13 +709,23 @@ jobs:
       - name: Get ArgoCD IAM Role ARN
         run: |
           cd terraform
-          ARGOCD_ROLE_ARN=$(terraform output -raw argocd_role_arn || echo "")
+          ARGOCD_ROLE_ARN=$(terraform output -raw argocd_cognito_role_arn || echo "")
           if [ -z "$ARGOCD_ROLE_ARN" ]; then
             echo "Error: Could not get ArgoCD role ARN from Terraform output"
             exit 1
           fi
           echo "Using ArgoCD role ARN: $ARGOCD_ROLE_ARN"
           echo "ARGOCD_ROLE_ARN=$ARGOCD_ROLE_ARN" >> $GITHUB_ENV
+          
+          # Get Cognito details
+          COGNITO_CLIENT_ID=$(terraform output -raw cognito_user_pool_client_id || echo "")
+          COGNITO_ISSUER_URL=$(terraform output -raw cognito_user_pool_endpoint || echo "")
+          COGNITO_CLIENT_SECRET=$(aws secretsmanager get-secret-value --secret-id argocd-cognito-client-secret --query SecretString --output text || echo "")
+          
+          echo "COGNITO_CLIENT_ID=$COGNITO_CLIENT_ID" >> $GITHUB_ENV
+          echo "COGNITO_ISSUER_URL=$COGNITO_ISSUER_URL" >> $GITHUB_ENV
+          echo "COGNITO_CLIENT_SECRET=$COGNITO_CLIENT_SECRET" >> $GITHUB_ENV
+
 
       - name: Update ArgoCD with IAM role
         run: |
@@ -767,43 +777,31 @@ jobs:
 
           echo "✅ ArgoCD IAM role integration validated"
     
-      - name: Configure ArgoCD with AWS Cognito OIDC
+      - name: Configure ArgoCD with Cognito
         run: |
-          # Get Cognito details from Terraform
-          cd terraform
-          COGNITO_CLIENT_ID=$(terraform output -raw cognito_client_id)
-          COGNITO_CLIENT_SECRET=$(terraform output -raw cognito_client_secret)
-          COGNITO_ISSUER_URL=$(terraform output -raw cognito_issuer_url)
-          
-          # Create OIDC config in argocd-cm
-          kubectl -n argocd patch configmap argocd-cm --type=merge -p '{
-            "data": {
-              "url": "https://argocd.bunnycloud.xyz",
-              "oidc.config": "name: Cognito\nissuer: '"$COGNITO_ISSUER_URL"'\nclientID: '"$COGNITO_CLIENT_ID"'\nclientSecret: $oidc.cognito.clientSecret\nrequestedScopes: [\"openid\", \"profile\", \"email\"]\nrequestedIDTokenClaims: {\"groups\": {\"essential\": true}}",
-              "admin.enabled": "true"
-            }
-          }'
-          
-          # Store client secret in argocd-secret
-          kubectl -n argocd patch secret argocd-secret --type=merge -p '{
-            "stringData": {
-              "oidc.cognito.clientSecret": "'"$COGNITO_CLIENT_SECRET"'"
-            }
-          }'
-          
-          # Configure RBAC for Cognito users
-          kubectl -n argocd patch configmap argocd-rbac-cm --type=merge -p '{
-            "data": {
-              "policy.csv": "g, Admins, role:admin\ng, Developers, role:readonly",
-              "scopes": "[cognito:groups]"
-            }
-          }'
-          
+          # Update ArgoCD with IAM role and Cognito configuration
+          helm upgrade argocd argo/argo-cd \
+            --namespace argocd \
+            --set global.dualStack.enabled=false \
+            --set notifications.enabled=false \
+            --set commitServer.enabled=false \
+            --set server.serviceAccount.annotations."eks\.amazonaws\.com/role-arn"="${{ env.ARGOCD_ROLE_ARN }}" \
+            --set server.config.url="https://argocd.bunnycloud.xyz" \
+            --set server.config.oidc.name="Cognito" \
+            --set server.config.oidc.issuer="${{ env.COGNITO_ISSUER_URL }}" \
+            --set server.config.oidc.clientID="${{ env.COGNITO_CLIENT_ID }}" \
+            --set server.config.oidc.clientSecret="${{ env.COGNITO_CLIENT_SECRET }}" \
+            --set server.config.oidc.requestedScopes="{openid,profile,email}" \
+            --set server.config.oidc.requestedIDTokenClaims.groups.essential=true \
+            --set server.rbacConfig.policy.csv="g, Admins, role:admin\ng, Developers, role:readonly" \
+            --set server.rbacConfig.scopes="[cognito:groups]" \
+            --reuse-values
+            
           # Restart ArgoCD server to apply changes
           kubectl -n argocd rollout restart deployment argocd-server
           kubectl -n argocd rollout status deployment argocd-server --timeout=5m
           
-          echo "ArgoCD configured with AWS Cognito OIDC"
+          echo "ArgoCD configured with Cognito OIDC"
           echo "Users can now log in using their Cognito credentials"
 
 
