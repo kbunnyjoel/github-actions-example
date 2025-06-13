@@ -728,6 +728,7 @@ jobs:
             --values apps/github-actions-example/chart/values.yaml \
             --set global.dualStack.enabled=false \
             --set notifications.enabled=false \
+            --set commitServer.enabled=false \
             --reuse-values
 
       - name: Validate ArgoCD IAM role integration
