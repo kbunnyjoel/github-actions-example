@@ -49,9 +49,9 @@ spec:
             # If you were using cert-manager, you'd add its annotations here.
             # Since your NGINX Ingress Controller's NLB is configured with the ACM cert,
             # this Ingress resource doesn't need specific cert-manager annotations for this app.
-          tls: # Informs the Ingress controller that this host expects TLS
-            - hosts:
-                - "{{ app_name }}.bunnycloud.xyz"
+          #tls: # Informs the Ingress controller that this host expects TLS
+            #- hosts:
+                #- "{{ app_name }}.bunnycloud.xyz"
 
         # Define resource requests and limits for your application pods
         resources: {} # Leave empty to use Helm chart defaults or override as needed
