@@ -4,11 +4,11 @@ resource "aws_cognito_user_pool" "argocd_pool" {
   name = "argocd-users"
 
   password_policy {
-    minimum_length    = 12
-    require_lowercase = true
-    require_numbers   = true
-    require_symbols   = true
-    require_uppercase = true
+    minimum_length                   = 12
+    require_lowercase                = true
+    require_numbers                  = true
+    require_symbols                  = true
+    require_uppercase                = true
     temporary_password_validity_days = 1
   }
 
@@ -20,10 +20,10 @@ resource "aws_cognito_user_pool" "argocd_pool" {
   }
 
   auto_verified_attributes = ["email"]
-  
+
   # Enable MFA for additional security
   mfa_configuration = "OPTIONAL"
-  
+
   # Advanced security features
   user_pool_add_ons {
     advanced_security_mode = "ENFORCED"
@@ -38,10 +38,10 @@ resource "aws_cognito_user_pool_client" "argocd_client" {
   allowed_oauth_scopes         = ["email", "openid", "profile"]
   callback_urls                = ["https://argocd.bunnycloud.xyz/auth/callback"]
   supported_identity_providers = ["COGNITO"]
-  
+
   # Prevent user existence errors
   prevent_user_existence_errors = "ENABLED"
-  
+
   # Set token validity periods
   access_token_validity  = 1
   id_token_validity      = 1
@@ -53,7 +53,7 @@ resource "aws_cognito_user_pool_client" "argocd_client" {
   }
 
   generate_secret = true
-  
+
   # Explicitly define auth flows
   explicit_auth_flows = [
     "ALLOW_USER_SRP_AUTH",
@@ -64,7 +64,7 @@ resource "aws_cognito_user_pool_client" "argocd_client" {
 resource "aws_cognito_user_pool_domain" "argocd_domain" {
   domain       = "argocd-auth-${random_string.suffix.result}"
   user_pool_id = aws_cognito_user_pool.argocd_pool.id
-  
+
   # Add custom domain with SSL certificate (uncomment and configure when ready)
   # certificate_arn = aws_acm_certificate.auth_cert.arn
 }

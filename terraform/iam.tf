@@ -185,7 +185,7 @@ resource "aws_iam_policy" "argocd_cognito_policy" {
         Action = [
           "ssm:GetParameter"
         ],
-        Effect   = "Allow",
+        Effect = "Allow",
         Resource = [
           "arn:aws:ssm:${var.aws_region}:${data.aws_caller_identity.current.account_id}:parameter/k8s/argocd/cognito/*"
         ]
@@ -235,7 +235,7 @@ resource "aws_iam_policy" "ssm_parameter_policy" {
         Resource = "*",
         Condition = {
           StringEquals = {
-            "kms:ViaService": "ssm.${var.aws_region}.amazonaws.com"
+            "kms:ViaService" : "ssm.${var.aws_region}.amazonaws.com"
           }
         }
       }
