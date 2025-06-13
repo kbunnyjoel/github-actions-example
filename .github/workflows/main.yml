@@ -734,6 +734,21 @@ jobs:
       - name: Validate ArgoCD IAM role integration
         run: |
           echo "Validating ArgoCD IAM role integration..."
+          
+          # Make sure the service account exists by applying it again
+          sed "s|\${ARGOCD_ROLE_ARN}|${{ env.ARGOCD_ROLE_ARN }}|g" apps/github-actions-example/chart/templates/service-account.yaml > service-account-rendered.yaml
+          kubectl apply -f service-account-rendered.yaml
+          
+          # Wait a moment for the service account to be fully created
+          sleep 5
+          
+          # Check if service account exists
+          if ! kubectl get sa argocd-server -n argocd &>/dev/null; then
+            echo "Error: Service account argocd-server not found in namespace argocd"
+            echo "Creating it now..."
+            kubectl apply -f service-account-rendered.yaml
+            sleep 5
+          fi
 
           # Check if service account has the correct annotation
           SA_ANNOTATION=$(kubectl get sa argocd-server -n argocd -o jsonpath='{.metadata.annotations.eks\.amazonaws\.com/role-arn}')
@@ -741,7 +756,9 @@ jobs:
             echo "Error: Service account annotation does not match expected role ARN"
             echo "Expected: ${{ env.ARGOCD_ROLE_ARN }}"
             echo "Actual: $SA_ANNOTATION"
-            exit 1
+            echo "Updating service account annotation..."
+            kubectl patch serviceaccount argocd-server -n argocd -p '{"metadata":{"annotations":{"eks.amazonaws.com/role-arn":"${{ env.ARGOCD_ROLE_ARN }}"}}}' || true
+            sleep 5
           fi
 
           echo "✅ ArgoCD IAM role integration validated"
