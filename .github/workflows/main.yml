@@ -647,9 +647,9 @@ jobs:
             fi
           fi
           
-          # Create namespace
-          echo "Creating ArgoCD namespace..."
-          kubectl create namespace argocd
+          # Create namespace if it doesn't exist
+          echo "Ensuring ArgoCD namespace exists..."
+          kubectl create namespace argocd --dry-run=client -o yaml | kubectl apply -f -
           
           # Install ArgoCD with Helm
           helm upgrade --install argocd argo/argo-cd \
@@ -689,8 +689,8 @@ jobs:
             --from-literal=clearPassword=$ADMIN_PASSWORD \
             --dry-run=client -o yaml | kubectl apply -f -
             
-          # Set admin.password in argocd-cm
-          kubectl -n argocd patch configmap argocd-cm --type=merge -p '{"data":{"admin.enabled":"true"}}'
+          # Set admin.password and URL in argocd-cm
+          kubectl -n argocd patch configmap argocd-cm --type=merge -p '{"data":{"admin.enabled":"true","url":"https://argocd.bunnycloud.xyz"}}'
           
           # Restart the server to apply changes
           kubectl -n argocd rollout restart deployment argocd-server
