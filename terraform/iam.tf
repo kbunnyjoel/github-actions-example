@@ -262,13 +262,6 @@ variable "terraform_execution_role" {
 # Note: When using AWS credentials directly, ensure your IAM user/role
 # has the permissions defined in ssm_parameter_policy
 
-# Create a Kubernetes service account for ArgoCD server
-resource "kubernetes_service_account" "argocd_server" {
-  metadata {
-    name      = "argocd-server"
-    namespace = "argocd"
-    annotations = {
-      "eks.amazonaws.com/role-arn" = aws_iam_role.argocd_cognito_auth.arn
-    }
-  }
-}
+# Note: The Kubernetes service account will be created by the GitHub Actions workflow
+# using the service-account.yaml template, not by Terraform directly.
+# This avoids the connection refused error when Terraform tries to connect to Kubernetes.

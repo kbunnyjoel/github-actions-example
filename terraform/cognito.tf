@@ -21,13 +21,11 @@ resource "aws_cognito_user_pool" "argocd_pool" {
 
   auto_verified_attributes = ["email"]
 
-  # Enable MFA for additional security
-  mfa_configuration = "OPTIONAL"
+  # MFA configuration
+  mfa_configuration = "OFF"
 
-  # Advanced security features
-  user_pool_add_ons {
-    advanced_security_mode = "ENFORCED"
-  }
+  # Advanced security features are not available in ESSENTIALS tier
+  # Removing user_pool_add_ons block
 }
 
 resource "aws_cognito_user_pool_client" "argocd_client" {
@@ -121,13 +119,27 @@ resource "aws_cognito_user" "dev_user" {
 resource "random_password" "admin_password" {
   length           = 16
   special          = true
+  numeric          = true
+  upper            = true
+  lower            = true
   override_special = "!@#$%^&*()-_=+[]{}|;:,.<>?"
+  min_numeric      = 2
+  min_special      = 2
+  min_upper        = 2
+  min_lower        = 2
 }
 
 resource "random_password" "dev_password" {
   length           = 16
   special          = true
+  numeric          = true
+  upper            = true
+  lower            = true
   override_special = "!@#$%^&*()-_=+[]{}|;:,.<>?"
+  min_numeric      = 2
+  min_special      = 2
+  min_upper        = 2
+  min_lower        = 2
 }
 
 resource "aws_ssm_parameter" "admin_temp_password" {
