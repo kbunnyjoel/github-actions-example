@@ -703,6 +703,86 @@ jobs:
           echo "Username: admin"
           echo "Password: $ADMIN_PASSWORD"
 
+      - name: Get ArgoCD IAM Role ARN
+        run: |
+          cd terraform
+          ARGOCD_ROLE_ARN=$(terraform output -raw argocd_role_arn || echo "")
+          if [ -z "$ARGOCD_ROLE_ARN" ]; then
+            echo "Error: Could not get ArgoCD role ARN from Terraform output"
+            exit 1
+          fi
+          echo "Using ArgoCD role ARN: $ARGOCD_ROLE_ARN"
+          echo "ARGOCD_ROLE_ARN=$ARGOCD_ROLE_ARN" >> $GITHUB_ENV
+
+      - name: Create ArgoCD service account with IAM role
+        run: |
+          # Replace placeholder with actual ARN
+          sed "s|\${ARGOCD_ROLE_ARN}|${{ env.ARGOCD_ROLE_ARN }}|g" apps/github-actions-example/chart/templates/service-account.yaml > service-account-rendered.yaml
+          
+          # Apply the service account
+          kubectl apply -f service-account-rendered.yaml
+          
+          # Update ArgoCD Helm release to use the service account
+          helm upgrade argocd argo/argo-cd \
+            --namespace argocd \
+            --values apps/github-actions-example/chart/values.yaml \
+            --reuse-values
+
+      - name: Validate ArgoCD IAM role integration
+        run: |
+          echo "Validating ArgoCD IAM role integration..."
+
+          # Check if service account has the correct annotation
+          SA_ANNOTATION=$(kubectl get sa argocd-server -n argocd -o jsonpath='{.metadata.annotations.eks\.amazonaws\.com/role-arn}')
+          if [ "$SA_ANNOTATION" != "${{ env.ARGOCD_ROLE_ARN }}" ]; then
+            echo "Error: Service account annotation does not match expected role ARN"
+            echo "Expected: ${{ env.ARGOCD_ROLE_ARN }}"
+            echo "Actual: $SA_ANNOTATION"
+            exit 1
+          fi
+
+          echo "✅ ArgoCD IAM role integration validated"
+    
+      - name: Configure ArgoCD with AWS Cognito OIDC
+        run: |
+          # Get Cognito details from Terraform
+          cd terraform
+          COGNITO_CLIENT_ID=$(terraform output -raw cognito_client_id)
+          COGNITO_CLIENT_SECRET=$(terraform output -raw cognito_client_secret)
+          COGNITO_ISSUER_URL=$(terraform output -raw cognito_issuer_url)
+          
+          # Create OIDC config in argocd-cm
+          kubectl -n argocd patch configmap argocd-cm --type=merge -p '{
+            "data": {
+              "url": "https://argocd.bunnycloud.xyz",
+              "oidc.config": "name: Cognito\nissuer: '"$COGNITO_ISSUER_URL"'\nclientID: '"$COGNITO_CLIENT_ID"'\nclientSecret: $oidc.cognito.clientSecret\nrequestedScopes: [\"openid\", \"profile\", \"email\"]\nrequestedIDTokenClaims: {\"groups\": {\"essential\": true}}",
+              "admin.enabled": "true"
+            }
+          }'
+          
+          # Store client secret in argocd-secret
+          kubectl -n argocd patch secret argocd-secret --type=merge -p '{
+            "stringData": {
+              "oidc.cognito.clientSecret": "'"$COGNITO_CLIENT_SECRET"'"
+            }
+          }'
+          
+          # Configure RBAC for Cognito users
+          kubectl -n argocd patch configmap argocd-rbac-cm --type=merge -p '{
+            "data": {
+              "policy.csv": "g, Admins, role:admin\ng, Developers, role:readonly",
+              "scopes": "[cognito:groups]"
+            }
+          }'
+          
+          # Restart ArgoCD server to apply changes
+          kubectl -n argocd rollout restart deployment argocd-server
+          kubectl -n argocd rollout status deployment argocd-server --timeout=5m
+          
+          echo "ArgoCD configured with AWS Cognito OIDC"
+          echo "Users can now log in using their Cognito credentials"
+
+
       - name: Get ExternalDNS role ARN from Terraform
         run: |
           echo "Getting ExternalDNS role ARN from Terraform..."

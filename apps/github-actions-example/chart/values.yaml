@@ -62,3 +62,10 @@ readinessProbe:
 
 externalDNS:
   elbTarget: ""
+
+server:
+  serviceAccount:
+    create: false
+    name: argocd-server
+  extraArgs:
+    - --insecure

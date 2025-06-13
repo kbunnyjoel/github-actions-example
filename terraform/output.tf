@@ -36,3 +36,40 @@ output "external_dns_role_arn" {
 output "bastion_public_ip" {
   value = aws_instance.bastion.public_ip
 }
+
+output "argocd_role_arn" {
+  value = aws_iam_role.argocd_role.arn
+}
+
+output "cognito_client_secret" {
+  value     = aws_cognito_user_pool_client.argocd.client_secret
+  sensitive = true
+}
+
+output "cognito_issuer_url" {
+  value = "https://cognito-idp.${data.aws_region.current.name}.amazonaws.com/${aws_cognito_user_pool.argocd.id}"
+}
+
+output "cognito_client_id" {
+  value = aws_cognito_user_pool_client.argocd.id
+}
+
+output "cognito_domain" {
+  value = "https://${aws_cognito_user_pool_domain.argocd.domain}.auth.${data.aws_region.current.name}.amazoncognito.com"
+}
+
+output "cognito_users" {
+  value = {
+    admin = {
+      username = aws_cognito_user.admin_user.username
+      email    = "admin@example.com"
+      password = "Temp123!" # Note: In production, don't output passwords
+    }
+    developer = {
+      username = aws_cognito_user.dev_user.username
+      email    = "dev@example.com"
+      password = "Temp123!" # Note: In production, don't output passwords
+    }
+  }
+  sensitive = true
+}

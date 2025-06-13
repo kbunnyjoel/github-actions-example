@@ -119,3 +119,8 @@ resource "aws_iam_role_policy_attachment" "cluster_autoscaler" {
   role       = aws_iam_role.cluster_autoscaler.name
   policy_arn = aws_iam_policy.cluster_autoscaler_policy.arn
 }
+
+resource "aws_iam_user" "argocd_users" {
+  for_each = toset(["user1", "user2", "admin1"])
+  name     = each.key
+}
