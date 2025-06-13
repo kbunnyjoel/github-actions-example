@@ -793,8 +793,8 @@ jobs:
             --set server.config.oidc.clientSecret="${{ env.COGNITO_CLIENT_SECRET }}" \
             --set server.config.oidc.requestedScopes="{openid,profile,email}" \
             --set server.config.oidc.requestedIDTokenClaims.groups.essential=true \
-            --set server.rbacConfig.policy.csv="g, Admins, role:admin\ng, Developers, role:readonly" \
-            --set server.rbacConfig.scopes="[cognito:groups]" \
+            --set "server.rbacConfig.policy.csv=g, Admins, role:admin\ng, Developers, role:readonly" \
+            --set "server.rbacConfig.scopes=[cognito:groups]" \
             --reuse-values
             
           # Restart ArgoCD server to apply changes
@@ -803,6 +803,7 @@ jobs:
           
           echo "ArgoCD configured with Cognito OIDC"
           echo "Users can now log in using their Cognito credentials"
+
 
 
       - name: Get ExternalDNS role ARN from Terraform
