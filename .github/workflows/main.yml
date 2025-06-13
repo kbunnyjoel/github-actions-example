@@ -630,14 +630,17 @@ jobs:
             --set server.ingress.annotations."kubernetes\.io/ingress\.class"=nginx \
             --set server.ingress.annotations."nginx\.ingress\.kubernetes\.io/ssl-redirect"=false \
             --set server.ingress.annotations."nginx\.ingress\.kubernetes\.io/force-ssl-redirect"=false \
+            --set server.ingress.annotations."nginx\.ingress\.kubernetes\.io/backend-protocol"=HTTPS \
+            --set server.ingress.annotations."nginx\.ingress\.kubernetes\.io/ssl-passthrough"=true \
             --set server.ingress.annotations."external-dns\.alpha\.kubernetes\.io/hostname"=argocd.bunnycloud.xyz. \
             --set server.ingress.annotations."service\.beta\.kubernetes\.io/aws-load-balancer-backend-protocol"=http \
             --set server.ingress.annotations."service\.beta\.kubernetes\.io/aws-load-balancer-ssl-ports"=https \
             --set server.ingress.annotations."service\.beta\.kubernetes\.io/aws-load-balancer-ssl-cert"="${{ env.ACM_CERTIFICATE_ARN }}" \
             --set server.ingress.tls=null \
             --set server.extraArgs[0]="--grpc-web" \
+            --set server.extraArgs[1]="--grpc-web-root-path=/argocd" \
             --set configs.secret.createSecret=true \
-            --set configs.secret.argocdServerAdminPassword='admin' \
+            --set configs.secret.clearPassword=admin \
             --version 6.11.1 \
             --wait
           
@@ -645,6 +648,15 @@ jobs:
           kubectl get pods -n argocd
           echo "Waiting for ArgoCD deployments to be ready..."
           kubectl wait --for=condition=Available deployment --all -n argocd --timeout=5m || true
+          
+          # Reset admin password if needed
+          echo "Resetting ArgoCD admin password..."
+          kubectl -n argocd delete secret argocd-secret || true
+          kubectl -n argocd create secret generic argocd-initial-admin-secret \
+            --from-literal=password=admin \
+            --from-literal=clearPassword=admin || true
+          kubectl -n argocd rollout restart deployment argocd-server
+          
           echo "ArgoCD installation completed."
 
       - name: Get ExternalDNS role ARN from Terraform
