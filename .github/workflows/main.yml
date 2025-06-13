@@ -728,7 +728,12 @@ jobs:
           
           # Wait a moment for resources to be fully deleted
           sleep 5
-          
+
+      - name: Patch ArgoCD resources with Helm ownership
+        run: bash k8s/argocd/patch-argocd-helm-ownership.sh
+
+      - name: Install ArgoCD with IAM role
+        run: |
           # Install ArgoCD with IAM role annotation
           helm install argocd argo/argo-cd \
             --namespace argocd \
