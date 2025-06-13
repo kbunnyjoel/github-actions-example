@@ -23,8 +23,8 @@ ingress:
   pathType: "Prefix"
   acmCertArn: "" # Will be populated by ArgoCD/Helm with the ACM certificate ARN
   annotations:
-    "nginx.ingress.kubernetes.io/ssl-redirect": "true"
-    "nginx.ingress.kubernetes.io/force-ssl-redirect": "true"
+    "nginx.ingress.kubernetes.io/ssl-redirect": "false"
+    "nginx.ingress.kubernetes.io/force-ssl-redirect": "false"
     "external-dns.alpha.kubernetes.io/target": ""
     "external-dns.alpha.kubernetes.io/ttl": "60"
     "external-dns.alpha.kubernetes.io/hostname": "github-actions-example.bunnycloud.xyz."
