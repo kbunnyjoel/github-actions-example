@@ -622,13 +622,42 @@ jobs:
         run: |
           echo "Installing ArgoCD..."
           
-          # Delete existing ArgoCD namespace and all resources
-          echo "Removing existing ArgoCD installation completely..."
-          kubectl delete namespace argocd --ignore-not-found
-          sleep 10
+          # Check if argocd namespace exists and its status
+          if kubectl get namespace argocd &>/dev/null; then
+            NS_STATUS=$(kubectl get namespace argocd -o jsonpath='{.status.phase}')
+            if [ "$NS_STATUS" == "Terminating" ]; then
+              echo "ArgoCD namespace is stuck in Terminating state. Attempting force removal..."
+              
+              # Get finalizers on the namespace
+              FINALIZERS=$(kubectl get namespace argocd -o json | jq '.spec.finalizers')
+              
+              if [ "$FINALIZERS" != "null" ] && [ "$FINALIZERS" != "[]" ]; then
+                echo "Removing finalizers from namespace..."
+                kubectl get namespace argocd -o json | jq '.spec.finalizers = []' | kubectl replace --raw "/api/v1/namespaces/argocd/finalize" -f -
+                sleep 5
+              fi
+              
+              # If still exists, try patching it
+              if kubectl get namespace argocd &>/dev/null; then
+                echo "Namespace still exists, trying direct patch..."
+                kubectl patch namespace argocd -p '{"metadata":{"finalizers":[]}}' --type=merge
+                sleep 5
+              fi
+            else
+              echo "Deleting ArgoCD namespace normally..."
+              kubectl delete namespace argocd --timeout=30s
+              sleep 10
+            fi
+          fi
           
-          # Create namespace
-          kubectl create namespace argocd
+          # Check if namespace still exists
+          if kubectl get namespace argocd &>/dev/null; then
+            echo "WARNING: ArgoCD namespace still exists and might be stuck. Will attempt to use it anyway."
+          else
+            # Create namespace if it doesn't exist
+            echo "Creating ArgoCD namespace..."
+            kubectl create namespace argocd
+          fi
           
           # Install ArgoCD with Helm
           helm upgrade --install argocd argo/argo-cd \
