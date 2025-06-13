@@ -680,14 +680,17 @@ jobs:
           # Create a known admin password
           echo "Setting up ArgoCD admin password..."
           
-          # Create a bcrypt hash for 'admin' password
+          # Create a simple admin password
           ADMIN_PASSWORD="admin"
-          BCRYPT_HASH='$2a$10$rRyBsGSHK6.uc8fntPwVIuLVHgsAhAX7TcdrqW/RADU0uh7CaChLa'
           
-          # Update the argocd-secret with the admin password
-          kubectl -n argocd patch secret argocd-secret \
-            --type='json' \
-            -p='[{"op": "replace", "path": "/data/admin.password", "value":"'$(echo -n "$BCRYPT_HASH" | base64)'"}]'
+          # Create a new secret with the admin password
+          kubectl -n argocd create secret generic argocd-initial-admin-secret \
+            --from-literal=password=$ADMIN_PASSWORD \
+            --from-literal=clearPassword=$ADMIN_PASSWORD \
+            --dry-run=client -o yaml | kubectl apply -f -
+            
+          # Set admin.password in argocd-cm
+          kubectl -n argocd patch configmap argocd-cm --type=merge -p '{"data":{"admin.enabled":"true"}}'
           
           # Restart the server to apply changes
           kubectl -n argocd rollout restart deployment argocd-server
