@@ -744,17 +744,36 @@ jobs:
 
       - name: Install ArgoCD with IAM role
         run: |
-          # Install ArgoCD with IAM role annotation
+          # Debug the ARN value
+          echo "ARN value: ${{ env.ARGOCD_ROLE_ARN }}"
+          
+          # Create a values file for the installation
+          cat > argocd-install-values.yaml <<EOF
+          global:
+            dualStack:
+              enabled: false
+          notifications:
+            enabled: false
+          commitServer:
+            enabled: false
+          server:
+            serviceAccount:
+              annotations:
+                eks.amazonaws.com/role-arn: "${{ env.ARGOCD_ROLE_ARN }}"
+          EOF
+          
+          # Install ArgoCD with the values file
           helm install argocd argo/argo-cd \
             --namespace argocd \
             --create-namespace \
-            --set global.dualStack.enabled=false \
-            --set notifications.enabled=false \
-            --set commitServer.enabled=false \
-            --set server.serviceAccount.annotations."eks\.amazonaws\.com/role-arn"="${{ env.ARGOCD_ROLE_ARN }}" \
+            --values argocd-install-values.yaml \
             --version 6.11.1 \
             --timeout 5m \
             --wait
+          
+          # Verify the annotation was set correctly
+          kubectl get serviceaccount argocd-server -n argocd -o yaml
+
 
       - name: Validate ArgoCD IAM role integration
         run: |
