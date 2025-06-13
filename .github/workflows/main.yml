@@ -1246,11 +1246,14 @@ jobs:
             exit 1
           fi
           
-          # Check SSL redirect settings
-          SSL_REDIRECT=$(echo "$INGRESS_CONFIG" | grep "ssl-redirect" | awk '{print $2}')
-          FORCE_SSL_REDIRECT=$(echo "$INGRESS_CONFIG" | grep "force-ssl-redirect" | awk '{print $2}')
+          # Check SSL redirect settings - more robust approach
+          SSL_REDIRECT=$(kubectl get ingress github-actions-example -n github-actions-example -o jsonpath='{.metadata.annotations.nginx\.ingress\.kubernetes\.io/ssl-redirect}')
+          FORCE_SSL_REDIRECT=$(kubectl get ingress github-actions-example -n github-actions-example -o jsonpath='{.metadata.annotations.nginx\.ingress\.kubernetes\.io/force-ssl-redirect}')
           
-          if [ "$SSL_REDIRECT" != "\"false\"" ] || [ "$FORCE_SSL_REDIRECT" != "\"false\"" ]; then
+          echo "SSL redirect: $SSL_REDIRECT"
+          echo "Force SSL redirect: $FORCE_SSL_REDIRECT"
+          
+          if [ "$SSL_REDIRECT" != "false" ] || [ "$FORCE_SSL_REDIRECT" != "false" ]; then
             echo "Error: SSL redirect not properly disabled"
             exit 1
           fi
