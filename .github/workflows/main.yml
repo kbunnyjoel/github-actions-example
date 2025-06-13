@@ -637,7 +637,8 @@ jobs:
             --set server.ingress.annotations."service\.beta\.kubernetes\.io/aws-load-balancer-ssl-ports"=https \
             --set server.ingress.annotations."service\.beta\.kubernetes\.io/aws-load-balancer-ssl-cert"="${{ env.ACM_CERTIFICATE_ARN }}" \
             --set server.ingress.tls=null \
-            --set configs.secret.createSecret=false \
+            --set configs.secret.createSecret=true \
+            --set configs.secret.argocdServerAdminPassword=Z079WjdD78HP1QDu \
             --version 6.11.1 \
             --timeout 10m \
             --wait
@@ -647,18 +648,12 @@ jobs:
           echo "Waiting for ArgoCD deployments to be ready..."
           kubectl wait --for=condition=Available deployment --all -n argocd --timeout=5m || true
           
-          # Create or update the argocd-secret with proper bcrypt hash
-          echo "Creating/updating argocd-secret with admin/admin credentials..."
-          # This is the bcrypt hash for 'admin'
-          ADMIN_PASSWORD_HASH='$2a$10$rRyBsGSHK6.uc8fntPwVIuLVHgsAhAX7TcdrqW/RADU0uh7CaChLa'
-          
-          # Delete existing secret if it exists
-          kubectl -n argocd delete secret argocd-secret --ignore-not-found
-          
-          # Create the secret with the required fields
-          kubectl -n argocd create secret generic argocd-secret \
-            --from-literal=admin.password="$ADMIN_PASSWORD_HASH" \
-            --from-literal=server.secretkey="$(openssl rand -base64 32)"
+          # Make sure the initial admin secret exists and has the correct password
+          echo "Ensuring ArgoCD admin password is set correctly..."
+          kubectl -n argocd create secret generic argocd-initial-admin-secret \
+            --from-literal=password=Z079WjdD78HP1QDu \
+            --from-literal=clearPassword=Z079WjdD78HP1QDu \
+            --dry-run=client -o yaml | kubectl apply -f -
           
           # Restart the server to apply changes
           kubectl -n argocd rollout restart deployment argocd-server
@@ -666,8 +661,10 @@ jobs:
           # Wait for the server to be ready
           kubectl -n argocd rollout status deployment argocd-server --timeout=5m
           
-          echo "ArgoCD installation completed with admin/admin credentials"
-          echo "You can now log in to ArgoCD UI at https://argocd.bunnycloud.xyz with username: admin, password: admin"
+          echo "ArgoCD installation completed"
+          echo "You can now log in to ArgoCD UI at https://argocd.bunnycloud.xyz with:"
+          echo "Username: admin"
+          echo "Password: Z079WjdD78HP1QDu"
 
       - name: Get ExternalDNS role ARN from Terraform
         run: |
