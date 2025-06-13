@@ -798,63 +798,44 @@ jobs:
     
       - name: Configure ArgoCD with Cognito
         run: |
-          # Create values file for Cognito configuration
-          cat > cognito-values.yaml <<EOF
-          global:
-            dualStack:
-              enabled: false
-          notifications:
-            enabled: false
-          commitServer:
-            enabled: false
-          server:
-            serviceAccount:
-              annotations:
-                eks.amazonaws.com/role-arn: ${{ env.ARGOCD_ROLE_ARN }}
-            config:
-              url: https://argocd.bunnycloud.xyz
-              oidc.name: Cognito
-              oidc.issuer: ${{ env.COGNITO_ISSUER_URL }}
-              oidc.clientID: ${{ env.COGNITO_CLIENT_ID }}
-              oidc.clientSecret: ${{ env.COGNITO_CLIENT_SECRET }}
-              oidc.requestedScopes: openid profile email
-              oidc.requestedIDTokenClaims.groups.essential: "true"
-            rbacConfig:
-              policy.csv: |
-                g, Admins, role:admin
-                g, Developers, role:readonly
-              scopes: "[cognito:groups]"
-          EOF
+          # Fix the server URL first
+          kubectl -n argocd patch configmap argocd-cm --type=merge -p '{"data":{"url":"https://argocd.bunnycloud.xyz"}}'
           
-          # Print the values file for debugging
-          echo "Using the following values file:"
-          cat cognito-values.yaml
+          # Generate a server secret key if missing
+          kubectl -n argocd patch secret argocd-secret --type=merge -p '{"stringData":{"server.secretkey":"'$(openssl rand -base64 32)'"}}'
           
-          # Update ArgoCD with the values file
-          helm upgrade argocd argo/argo-cd \
-            --namespace argocd \
-            --values cognito-values.yaml \
-            --reuse-values
+          # Configure Cognito OIDC
+          kubectl -n argocd patch configmap argocd-cm --type=merge -p '{
+            "data": {
+              "oidc.config": "name: Cognito\nissuer: ${{ env.COGNITO_ISSUER_URL }}\nclientID: ${{ env.COGNITO_CLIENT_ID }}\nclientSecret: $oidc.cognito.clientSecret\nrequestedScopes: [\"openid\", \"profile\", \"email\"]\nrequestedIDTokenClaims: {\"groups\": {\"essential\": true}}"
+            }
+          }'
           
-          # Check ArgoCD server status before restart
-          echo "Current ArgoCD server status:"
-          kubectl get pods -n argocd -l app.kubernetes.io/name=argocd-server
+          # Store client secret in argocd-secret
+          kubectl -n argocd patch secret argocd-secret --type=merge -p '{
+            "stringData": {
+              "oidc.cognito.clientSecret": "${{ env.COGNITO_CLIENT_SECRET }}"
+            }
+          }'
           
-          # Restart ArgoCD server to apply changes
-          kubectl -n argocd rollout restart deployment argocd-server
+          # Configure RBAC for Cognito users
+          kubectl -n argocd patch configmap argocd-rbac-cm --type=merge -p '{
+            "data": {
+              "policy.csv": "g, Admins, role:admin\ng, Developers, role:readonly",
+              "scopes": "[cognito:groups]"
+            }
+          }'
           
-          # Wait for restart with increased timeout, but continue on error
-          echo "Waiting for ArgoCD server to restart (may take a few minutes)..."
-          kubectl -n argocd rollout status deployment argocd-server --timeout=10m || true
+          # Force restart all ArgoCD components
+          kubectl -n argocd rollout restart deployment argocd-server argocd-repo-server argocd-application-controller argocd-redis
           
-          # Check status after restart attempt
-          echo "ArgoCD server status after restart attempt:"
-          kubectl get pods -n argocd -l app.kubernetes.io/name=argocd-server
-          kubectl describe pods -n argocd -l app.kubernetes.io/name=argocd-server | grep -A 10 "Events:"
+          # Wait for ArgoCD server to be ready (continue on error)
+          echo "Waiting for ArgoCD components to restart..."
+          kubectl -n argocd wait --for=condition=Available deployment/argocd-redis --timeout=2m || true
+          kubectl -n argocd wait --for=condition=Available deployment/argocd-server --timeout=2m || true
           
           echo "ArgoCD configured with Cognito OIDC"
           echo "Users can now log in using their Cognito credentials"
-
 
 
       - name: Get ExternalDNS role ARN from Terraform
