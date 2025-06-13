@@ -826,17 +826,22 @@ jobs:
             }
           }'
           
-          # Force restart all ArgoCD components
-          kubectl -n argocd rollout restart deployment argocd-server argocd-repo-server argocd-application-controller argocd-redis
+          # Get list of available deployments
+          echo "Available ArgoCD deployments:"
+          kubectl get deployments -n argocd
+          
+          # Restart only existing deployments
+          for deployment in $(kubectl get deployments -n argocd -o jsonpath='{.items[*].metadata.name}'); do
+            echo "Restarting deployment $deployment"
+            kubectl -n argocd rollout restart deployment/$deployment
+          done
           
           # Wait for ArgoCD server to be ready (continue on error)
-          echo "Waiting for ArgoCD components to restart..."
-          kubectl -n argocd wait --for=condition=Available deployment/argocd-redis --timeout=2m || true
+          echo "Waiting for ArgoCD server to restart..."
           kubectl -n argocd wait --for=condition=Available deployment/argocd-server --timeout=2m || true
           
           echo "ArgoCD configured with Cognito OIDC"
           echo "Users can now log in using their Cognito credentials"
-
 
       - name: Get ExternalDNS role ARN from Terraform
         run: |
