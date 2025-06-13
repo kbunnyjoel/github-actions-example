@@ -621,6 +621,12 @@ jobs:
       - name: Install ArgoCD
         run: |
           echo "Installing ArgoCD..."
+          
+          # Delete existing secrets that might conflict with Helm installation
+          echo "Removing existing ArgoCD secrets..."
+          kubectl -n argocd delete secret argocd-secret --ignore-not-found
+          
+          # Install ArgoCD with Helm
           helm upgrade --install argocd argo/argo-cd \
             --namespace argocd \
             --create-namespace \
