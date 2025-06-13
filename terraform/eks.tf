@@ -4,7 +4,6 @@ provider "aws" {
   region = var.aws_region
 }
 
-data "aws_caller_identity" "current" {}
 
 # Using the main Route53 zone defined in bastion.tf
 
