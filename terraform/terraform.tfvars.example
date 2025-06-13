@@ -1,0 +1,6 @@
+# Example terraform.tfvars file
+# Copy this file to terraform.tfvars and update the values
+
+aws_region = "ap-southeast-2"
+cluster_name = "github-actions-eks-example"
+create_dns_records = true

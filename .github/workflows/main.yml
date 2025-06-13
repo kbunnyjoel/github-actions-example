@@ -726,6 +726,7 @@ jobs:
           helm upgrade argocd argo/argo-cd \
             --namespace argocd \
             --values apps/github-actions-example/chart/values.yaml \
+            --set global.dualStack.enabled=false \
             --reuse-values
 
       - name: Validate ArgoCD IAM role integration
