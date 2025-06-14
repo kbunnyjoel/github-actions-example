@@ -110,17 +110,3 @@ resource "aws_route53_record" "bastion_dns" {
   ttl     = 60
   records = [aws_eip.bastion_eip.public_ip]
 }
-
-# Create a kubeconfig file locally
-# Update the kubeconfig template
-resource "local_file" "kubeconfig" {
-  content = templatefile("${path.module}/templates/kubeconfig.tpl", {
-    cluster_name     = var.cluster_name
-    cluster_endpoint = module.eks.cluster_endpoint
-    cluster_ca_data  = module.eks.cluster_certificate_authority_data
-    region           = var.aws_region
-    account_id       = data.aws_caller_identity.current.account_id
-    api_version      = "client.authentication.k8s.io/v1beta1" # Add this line
-  })
-  filename = "${path.module}/kubeconfig"
-}
