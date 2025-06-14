@@ -19,12 +19,6 @@ data "aws_ami" "amazon_linux" {
   }
 }
 
-# data "aws_route53_zone" "main" {
-#   count        = var.create_dns_records ? 1 : 0
-#   name         = "bunnycloud.xyz."
-#   private_zone = false
-# }
-
 resource "tls_private_key" "deployment_key" {
   algorithm = "RSA"
   rsa_bits  = 4096
