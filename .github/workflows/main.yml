@@ -611,12 +611,18 @@ jobs:
           # Get Cognito details
           COGNITO_CLIENT_ID=$(terraform output -raw cognito_user_pool_client_id || echo "")
           COGNITO_ISSUER_URL=$(terraform output -raw cognito_user_pool_endpoint || echo "")
-          COGNITO_CLIENT_SECRET=$(aws secretsmanager get-secret-value --secret-id argocd-cognito-client-secret --query SecretString --output text || echo "")
+          
+          echo "Attempting to retrieve Cognito client secret from AWS Secrets Manager..."
+          COGNITO_CLIENT_SECRET=$(aws secretsmanager get-secret-value --secret-id argocd-cognito-client-secret --query SecretString --output text 2>/dev/null)
+          if [ -z "$COGNITO_CLIENT_SECRET" ]; then
+            echo "Error: Failed to retrieve Cognito client secret (argocd-cognito-client-secret) from AWS Secrets Manager."
+            echo "Please ensure the secret exists (was created by Terraform in the correct region: ap-southeast-2) and that the IAM role has permissions."
+            exit 1
+          fi
           
           echo "COGNITO_CLIENT_ID=$COGNITO_CLIENT_ID" >> $GITHUB_ENV
           echo "COGNITO_ISSUER_URL=$COGNITO_ISSUER_URL" >> $GITHUB_ENV
           echo "COGNITO_CLIENT_SECRET=$COGNITO_CLIENT_SECRET" >> $GITHUB_ENV
-
 
       - name: Update ArgoCD with IAM role
         run: |
@@ -848,48 +854,63 @@ jobs:
         run: |
           sudo apt-get update && sudo apt-get install -y jq
           HOSTED_ZONE_ID="${{ env.HOSTED_ZONE_ID }}"
-          RECORD_NAME="github-actions-example.bunnycloud.xyz."
+          APP_HOSTNAME_BASE="github-actions-example.bunnycloud.xyz" # Base name without trailing dot for prefixing
+          APP_HOSTNAME_FQDN="${APP_HOSTNAME_BASE}." # Fully qualified name with trailing dot
 
-          echo "🔍 Checking for conflicting records in Route 53 for $RECORD_NAME..."
+          RECORDS_TO_CLEANUP=(
+            "$APP_HOSTNAME_FQDN"  # For A or CNAME records of the application
+            "externaldns-cname-${APP_HOSTNAME_FQDN}" # ExternalDNS TXT record
+            "externaldns-${APP_HOSTNAME_FQDN}" # Another ExternalDNS TXT record
+          )
 
-          RECORDS=$(aws route53 list-resource-record-sets --hosted-zone-id "$HOSTED_ZONE_ID" \
-            --query "ResourceRecordSets[?Name == '$RECORD_NAME']" --output json)
+          CHANGES_JSON="[]"
 
-          if [ "$RECORDS" == "[]" ]; then
-            echo "✅ No conflicting DNS records found."
+          for RECORD_NAME_TO_CLEAN in "${RECORDS_TO_CLEANUP[@]}"; do
+            echo "🔍 Checking for records in Route 53 for $RECORD_NAME_TO_CLEAN..."
+            EXISTING_RECORDS=$(aws route53 list-resource-record-sets --hosted-zone-id "$HOSTED_ZONE_ID" \
+              --query "ResourceRecordSets[?Name == '$RECORD_NAME_TO_CLEAN']" --output json)
+
+            if [ "$EXISTING_RECORDS" != "[]" ]; then
+              echo "⚠️ Records found for $RECORD_NAME_TO_CLEAN. Preparing deletion changes..."
+              # Filter for A, CNAME, TXT types and ensure ResourceRecords exist
+              DELETION_CHANGES=$(echo "$EXISTING_RECORDS" | jq --arg rn "$RECORD_NAME_TO_CLEAN" '[.[] | select(.Name == $rn and (.Type == "A" or .Type == "CNAME" or .Type == "TXT") and .ResourceRecords and (.ResourceRecords | length > 0)) | {
+                Action: "DELETE",
+                ResourceRecordSet: {
+                  Name: .Name,
+                  Type: .Type,
+                  TTL: (.TTL // 300),
+                  ResourceRecords: .ResourceRecords
+                }
+              }]')
+              
+              if [ "$(echo "$DELETION_CHANGES" | jq 'length')" -gt 0 ]; then
+                  CHANGES_JSON=$(echo "$CHANGES_JSON $DELETION_CHANGES" | jq -s 'add')
+              fi
+            else
+              echo "✅ No records found for $RECORD_NAME_TO_CLEAN."
+            fi
+          done
+
+          if [ "$(echo "$CHANGES_JSON" | jq 'length')" -eq 0 ]; then
+            echo "✅ No conflicting DNS records found to delete."
             exit 0
           fi
 
-          echo "⚠️ Conflicting records found. Preparing deletion batch..."
+          echo "📦 Combined deletion changes to be applied:"
+          echo "$CHANGES_JSON" | jq .
 
           cat > delete-conflicts.json <<EOF
           {
-            "Comment": "Deleting existing records for $RECORD_NAME",
-            "Changes": $(echo "$RECORDS" | jq '[.[] | select(.ResourceRecords and (.ResourceRecords | length > 0)) | {
-              Action: "DELETE",
-              ResourceRecordSet: {
-                Name: .Name,
-                Type: .Type,
-                TTL: (.TTL // 300),
-                ResourceRecords: .ResourceRecords
-              }
-            }]')
+            "Comment": "Deleting potentially conflicting DNS records for ${APP_HOSTNAME_FQDN} and its ExternalDNS TXT records",
+            "Changes": $(echo "$CHANGES_JSON" | jq '.')
           }
           EOF
 
-          echo "📦 Deletion batch file created: delete-conflicts.json"
           echo "🚨 Deleting records..."
-
-          # Check if any deletions are present before attempting to apply the change batch
-          if [ "$(jq '.Changes | length' delete-conflicts.json)" -eq 0 ]; then
-            echo "✅ No deletable conflicting records found. Skipping Route 53 change batch."
-            exit 0
-          fi
-
           aws route53 change-resource-record-sets --hosted-zone-id "$HOSTED_ZONE_ID" \
             --change-batch file://delete-conflicts.json
 
-          echo "✅ Records deleted successfully."
+          echo "✅ Records deletion request submitted."
       - name: Install ExternalDNS
         run: |
           echo "Installing ExternalDNS..."
@@ -1172,7 +1193,17 @@ jobs:
           else
             echo "No ArgoCD application manifests found in k8s/argocd/applications."
           fi
-
+      
+      - name: Check Application Ingress Resource
+        run: |
+          APP_NAMESPACE="github-actions-example"
+          APP_INGRESS_NAME="github-actions-example"
+          echo "Checking Ingress resource $APP_INGRESS_NAME in namespace $APP_NAMESPACE..."
+          kubectl get ingress -n $APP_NAMESPACE $APP_INGRESS_NAME -o yaml || \
+            echo "Warning: Ingress $APP_INGRESS_NAME not found in $APP_NAMESPACE. This will prevent ExternalDNS from creating a DNS record."
+          echo "Verifying ExternalDNS hostname annotation on Ingress..."
+          kubectl get ingress -n $APP_NAMESPACE $APP_INGRESS_NAME -o jsonpath='{.metadata.annotations.external-dns\.alpha\.kubernetes\.io/hostname}' || \
+            echo "Warning: ExternalDNS hostname annotation not found on Ingress $APP_INGRESS_NAME."
       - name: Ensure application is deployed
         run: |
           APP_NAMESPACE="github-actions-example"
