@@ -10,14 +10,14 @@ resource "aws_iam_policy" "external_dns" {
         Action = [
           "route53:ChangeResourceRecordSets"
         ],
-        Resource = ["arn:aws:route53:::hostedzone/Z0722775AO3VTQLFVQU3"]
+        Resource = ["*"]
       },
       {
         Effect = "Allow",
         Action = [
           "route53:ListResourceRecordSets" // Permission is present
         ],
-        Resource = ["arn:aws:route53:::hostedzone/Z0722775AO3VTQLFVQU3"]
+        Resource = ["*"]
       },
       {
         Effect = "Allow",
