@@ -23,7 +23,7 @@ ingress:
   path: "/"
   pathType: "Prefix"
   acmCertArn: "{{ acm_certificate_arn }}"
-  tls: true
+  tls: false
   annotations:
     "kubernetes.io/ingress.class": "nginx"
     "nginx.ingress.kubernetes.io/ssl-redirect": "false"
