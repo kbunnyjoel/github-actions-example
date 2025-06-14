@@ -1211,13 +1211,47 @@ jobs:
       - name: Check Application Ingress Resource
         run: |
           APP_NAMESPACE="github-actions-example"
-          APP_INGRESS_NAME="github-actions-example"
-          echo "Checking Ingress resource $APP_INGRESS_NAME in namespace $APP_NAMESPACE..."
-          kubectl get ingress -n $APP_NAMESPACE $APP_INGRESS_NAME -o yaml || \
-            echo "Warning: Ingress $APP_INGRESS_NAME not found in $APP_NAMESPACE. This will prevent ExternalDNS from creating a DNS record."
-          echo "Verifying ExternalDNS hostname annotation on Ingress..."
-          kubectl get ingress -n $APP_NAMESPACE $APP_INGRESS_NAME -o jsonpath='{.metadata.annotations.external-dns\.alpha\.kubernetes\.io/hostname}' || \
-            echo "Warning: ExternalDNS hostname annotation not found on Ingress $APP_INGRESS_NAME."
+          APP_INGRESS_NAME="github-actions-example" # Assuming Ingress name matches app name
+
+          echo "Waiting for namespace '$APP_NAMESPACE' to be created by ArgoCD..."
+          for i in {1..30}; do # Wait up to 5 minutes (30 * 10s)
+            if kubectl get namespace "$APP_NAMESPACE" > /dev/null 2>&1; then
+              echo "Namespace '$APP_NAMESPACE' found."
+              break
+            fi
+            if [ $i -eq 30 ]; then
+              echo "Error: Namespace '$APP_NAMESPACE' not found after waiting."
+              exit 1
+            fi
+            echo "Namespace '$APP_NAMESPACE' not yet found, waiting... (Attempt $i/30)"
+            sleep 10
+          done
+
+          echo "Waiting for Ingress '$APP_INGRESS_NAME' in namespace '$APP_NAMESPACE' to be created by ArgoCD..."
+          for i in {1..60}; do # Wait up to 10 minutes (60 * 10s)
+            if kubectl get ingress -n "$APP_NAMESPACE" "$APP_INGRESS_NAME" -o yaml > /dev/null 2>&1; then
+              echo "Ingress '$APP_INGRESS_NAME' found."
+              INGRESS_YAML=$(kubectl get ingress -n "$APP_NAMESPACE" "$APP_INGRESS_NAME" -o yaml)
+              echo "Ingress YAML:"
+              echo "$INGRESS_YAML"
+              
+              echo "Verifying ExternalDNS hostname annotation on Ingress..."
+              ANNOTATION_VALUE=$(kubectl get ingress -n "$APP_NAMESPACE" "$APP_INGRESS_NAME" -o jsonpath='{.metadata.annotations.external-dns\.alpha\.kubernetes\.io/hostname}' 2>/dev/null)
+              if [ -n "$ANNOTATION_VALUE" ]; then
+                echo "ExternalDNS hostname annotation found: $ANNOTATION_VALUE"
+                exit 0 # Success, Ingress and annotation found
+              else
+                echo "Warning: ExternalDNS hostname annotation not found on Ingress '$APP_INGRESS_NAME'. Will retry... (Attempt $i/60)"
+              fi
+            fi
+            if [ $i -eq 60 ]; then
+              echo "Error: Ingress '$APP_INGRESS_NAME' or its ExternalDNS annotation not found after waiting."
+              kubectl get ingress -n "$APP_NAMESPACE" "$APP_INGRESS_NAME" -o yaml || echo "Ingress '$APP_INGRESS_NAME' still not found in namespace '$APP_NAMESPACE'."
+              exit 1
+            fi
+            echo "Ingress '$APP_INGRESS_NAME' not yet found or annotation missing in namespace '$APP_NAMESPACE', waiting... (Attempt $i/60)"
+            sleep 10
+          done
       - name: Ensure application is deployed
         run: |
           APP_NAMESPACE="github-actions-example"
@@ -1226,30 +1260,8 @@ jobs:
           kubectl create namespace $APP_NAMESPACE --dry-run=client -o yaml | kubectl apply -f -
           kubectl get pods -n $APP_NAMESPACE
           kubectl rollout status deployment/$APP_NAME -n $APP_NAMESPACE --timeout=2m || true
-          
-          # Check if service exists and has correct port
-          echo "Checking service configuration..."
-          if ! kubectl get service $APP_NAME -n $APP_NAMESPACE &>/dev/null; then
-            echo "Service $APP_NAME not found, creating it..."
-            kubectl apply -f - <<EOF
-          apiVersion: v1
-          kind: Service
-          metadata:
-            name: $APP_NAME
-            namespace: $APP_NAMESPACE
-          spec:
-            ports:
-            - port: 80
-              targetPort: 3000
-              protocol: TCP
-              name: http
-            selector:
-              app.kubernetes.io/name: $APP_NAME
-          EOF
-          else
-            echo "Service $APP_NAME exists, ensuring it has correct port configuration..."
-            kubectl patch service $APP_NAME -n $APP_NAMESPACE --type=json -p='[{"op": "replace", "path": "/spec/ports", "value": [{"port": 80, "targetPort": 3000, "protocol": "TCP", "name": "http"}]}]'
-          fi
+
+          echo "Service for $APP_NAME should be managed by ArgoCD via the Helm chart."
 
       - name: List ExternalDNS TXT records
         run: |

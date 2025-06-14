@@ -10,15 +10,21 @@ resource "aws_iam_policy" "external_dns" {
         Action = [
           "route53:ChangeResourceRecordSets"
         ],
-        Resource = [aws_route53_zone.main.arn]
+        Resource = [aws_route53_zone.main.arn] # Specific to the managed zone
+      },
+      {
+        Effect = "Allow",
+        Action = [
+          "route53:ListResourceRecordSets"
+        ],
+        Resource = [aws_route53_zone.main.arn] # Specific to the managed zone
       },
       {
         Effect = "Allow",
         Action = [
           "route53:ListHostedZones",
-          "route53:ListResourceRecordSets"
         ],
-        Resource = ["*", aws_route53_zone.main.arn]
+        Resource = ["*"] # Required to be "*" for ListHostedZones
       }
     ]
   })
