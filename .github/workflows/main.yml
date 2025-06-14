@@ -1028,15 +1028,17 @@ jobs:
           
           echo "Waiting for NGINX Ingress Controller LoadBalancer to get an address..."
           NGINX_LB_HOSTNAME=""
-          for i in {1..15}; do
-            # Get the NGINX Ingress controller's LoadBalancer hostname
+          RETRIES=15
+
+          for i in $(seq 1 $RETRIES); do
             NGINX_LB_HOSTNAME=$(kubectl get svc -n ingress-nginx ingress-nginx-controller -o jsonpath='{.status.loadBalancer.ingress[0].hostname}' 2>/dev/null)
-            
-            if [ ! -z "$NGINX_LB_HOSTNAME" ]; then
-              echo "NGINX Ingress Controller LoadBalancer hostname found: $NGINX_LB_HOSTNAME"
+
+            if [ -n "$NGINX_LB_HOSTNAME" ]; then
+              echo "✅ NGINX LoadBalancer hostname found: $NGINX_LB_HOSTNAME"
               break
             fi
-            echo "Waiting for NGINX Ingress Controller LoadBalancer hostname... ($i/15)"
+
+            echo "⏳ Attempt $i/$RETRIES: Waiting for LoadBalancer hostname..."
             sleep 20
           done
           
