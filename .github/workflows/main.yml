@@ -712,6 +712,15 @@ jobs:
           # Debug the ARN value
           echo "ARN value: ${{ env.ARGOCD_ROLE_ARN }}"
           
+          # Check if ArgoCD is already installed
+          if helm list -n argocd | grep -q argocd; then
+            echo "ArgoCD is already installed, upgrading instead of installing..."
+            HELM_CMD="upgrade"
+          else
+            echo "ArgoCD is not installed, performing fresh installation..."
+            HELM_CMD="install"
+          fi
+          
           # Create a values file for the installation
           cat > argocd-install-values.yaml <<EOF
           global:
@@ -727,8 +736,8 @@ jobs:
                 eks.amazonaws.com/role-arn: "${{ env.ARGOCD_ROLE_ARN }}"
           EOF
           
-          # Install ArgoCD with the values file
-          helm install argocd argo/argo-cd \
+          # Install or upgrade ArgoCD with the values file
+          helm $HELM_CMD argocd argo/argo-cd \
             --namespace argocd \
             --create-namespace \
             --values argocd-install-values.yaml \
