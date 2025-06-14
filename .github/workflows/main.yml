@@ -854,37 +854,51 @@ jobs:
         run: |
           sudo apt-get update && sudo apt-get install -y jq
           HOSTED_ZONE_ID="${{ env.HOSTED_ZONE_ID }}"
-          APP_HOSTNAME_BASE="github-actions-example.bunnycloud.xyz" # Base name without trailing dot for prefixing
-          APP_HOSTNAME_FQDN="${APP_HOSTNAME_BASE}." # Fully qualified name with trailing dot
-
-          RECORDS_TO_CLEANUP=(
-            "$APP_HOSTNAME_FQDN"  # For A or CNAME records of the application
-            "externaldns-cname-${APP_HOSTNAME_FQDN}" # ExternalDNS TXT record
-            "externaldns-${APP_HOSTNAME_FQDN}" # Another ExternalDNS TXT record
+          
+          # Define all base hostnames that ExternalDNS will manage
+          BASE_HOSTNAMES=(
+            "github-actions-example.bunnycloud.xyz"
+            "argocd.bunnycloud.xyz"
           )
+
+          RECORDS_TO_QUERY_AND_DELETE=()
+
+          for HOSTNAME_BASE in "${BASE_HOSTNAMES[@]}"; do
+            HOSTNAME_FQDN="${HOSTNAME_BASE}."
+            RECORDS_TO_QUERY_AND_DELETE+=(
+              "${HOSTNAME_FQDN}" # A or CNAME for the hostname itself
+              "externaldns-cname-${HOSTNAME_FQDN}" # ExternalDNS TXT record for CNAME ownership
+              "externaldns-${HOSTNAME_FQDN}"       # ExternalDNS TXT record for A record ownership (if applicable)
+            )
+          done
+          
+          echo "Will query and attempt to delete the following records if they exist:"
+          printf "%s\n" "${RECORDS_TO_QUERY_AND_DELETE[@]}"
 
           CHANGES_JSON="[]"
 
-          for RECORD_NAME_TO_CLEAN in "${RECORDS_TO_CLEANUP[@]}"; do
+          for RECORD_NAME_TO_CLEAN in "${RECORDS_TO_QUERY_AND_DELETE[@]}"; do
             echo "🔍 Checking for records in Route 53 for $RECORD_NAME_TO_CLEAN..."
-            EXISTING_RECORDS=$(aws route53 list-resource-record-sets --hosted-zone-id "$HOSTED_ZONE_ID" \
+            # Ensure we only attempt to delete records that actually exist and have ResourceRecords
+            EXISTING_RECORDS_FOR_NAME=$(aws route53 list-resource-record-sets --hosted-zone-id "$HOSTED_ZONE_ID" \
               --query "ResourceRecordSets[?Name == '$RECORD_NAME_TO_CLEAN']" --output json)
 
-            if [ "$EXISTING_RECORDS" != "[]" ]; then
+            if [ "$EXISTING_RECORDS_FOR_NAME" != "[]" ]; then
               echo "⚠️ Records found for $RECORD_NAME_TO_CLEAN. Preparing deletion changes..."
               # Filter for A, CNAME, TXT types and ensure ResourceRecords exist
-              DELETION_CHANGES=$(echo "$EXISTING_RECORDS" | jq --arg rn "$RECORD_NAME_TO_CLEAN" '[.[] | select(.Name == $rn and (.Type == "A" or .Type == "CNAME" or .Type == "TXT") and .ResourceRecords and (.ResourceRecords | length > 0)) | {
+              # This jq query processes each record found for the given name
+              DELETION_CHANGES_FOR_NAME=$(echo "$EXISTING_RECORDS_FOR_NAME" | jq '[.[] | select((.Type == "A" or .Type == "CNAME" or .Type == "TXT") and .ResourceRecords and (.ResourceRecords | length > 0)) | {
                 Action: "DELETE",
                 ResourceRecordSet: {
                   Name: .Name,
                   Type: .Type,
-                  TTL: (.TTL // 300),
+                  TTL: .TTL, # Use the actual TTL of the record to be deleted
                   ResourceRecords: .ResourceRecords
                 }
               }]')
               
-              if [ "$(echo "$DELETION_CHANGES" | jq 'length')" -gt 0 ]; then
-                  CHANGES_JSON=$(echo "$CHANGES_JSON $DELETION_CHANGES" | jq -s 'add')
+              if [ "$(echo "$DELETION_CHANGES_FOR_NAME" | jq 'length')" -gt 0 ]; then
+                  CHANGES_JSON=$(echo "$CHANGES_JSON $DELETION_CHANGES_FOR_NAME" | jq -s 'add')
               fi
             else
               echo "✅ No records found for $RECORD_NAME_TO_CLEAN."
@@ -892,7 +906,7 @@ jobs:
           done
 
           if [ "$(echo "$CHANGES_JSON" | jq 'length')" -eq 0 ]; then
-            echo "✅ No conflicting DNS records found to delete."
+            echo "✅ No DNS records found that require cleanup."
             exit 0
           fi
 
@@ -901,8 +915,8 @@ jobs:
 
           cat > delete-conflicts.json <<EOF
           {
-            "Comment": "Deleting potentially conflicting DNS records for ${APP_HOSTNAME_FQDN} and its ExternalDNS TXT records",
-            "Changes": $(echo "$CHANGES_JSON" | jq '.')
+            "Comment": "Deleting potentially conflicting DNS records for managed hostnames and their ExternalDNS TXT records",
+            "Changes": $CHANGES_JSON
           }
           EOF
 
