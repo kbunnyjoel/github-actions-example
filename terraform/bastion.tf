@@ -19,11 +19,11 @@ data "aws_ami" "amazon_linux" {
   }
 }
 
-data "aws_route53_zone" "main" {
-  count        = var.create_dns_records ? 1 : 0
-  name         = "bunnycloud.xyz."
-  private_zone = false
-}
+# data "aws_route53_zone" "main" {
+#   count        = var.create_dns_records ? 1 : 0
+#   name         = "bunnycloud.xyz."
+#   private_zone = false
+# }
 
 resource "tls_private_key" "deployment_key" {
   algorithm = "RSA"
@@ -110,7 +110,7 @@ resource "aws_eip" "bastion_eip" {
 
 resource "aws_route53_record" "bastion_dns" {
   count   = var.create_dns_records ? 1 : 0
-  zone_id = data.aws_route53_zone.main[0].zone_id
+  zone_id = aws_route53_zone.main.zone_id
   name    = "bastion"
   type    = "A"
   ttl     = 60

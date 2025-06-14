@@ -10,7 +10,7 @@ resource "aws_iam_policy" "external_dns" {
         Action = [
           "route53:ChangeResourceRecordSets"
         ],
-        Resource = [data.aws_route53_zone.bunnycloud.arn]
+        Resource = [aws_route53_zone.main.arn]
       },
       {
         Effect = "Allow",
@@ -18,15 +18,10 @@ resource "aws_iam_policy" "external_dns" {
           "route53:ListHostedZones",
           "route53:ListResourceRecordSets"
         ],
-        Resource = ["*", data.aws_route53_zone.bunnycloud.arn]
+        Resource = ["*", aws_route53_zone.main.arn]
       }
     ]
   })
-}
-
-data "aws_eks_cluster" "github_cluster" {
-  name       = var.cluster_name
-  depends_on = [module.eks]
 }
 
 data "aws_iam_openid_connect_provider" "this" {

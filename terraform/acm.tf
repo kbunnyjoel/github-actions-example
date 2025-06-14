@@ -22,7 +22,7 @@ resource "aws_route53_record" "cert_validation" {
   # For simplicity, assuming data.aws_route53_zone.main[0] is always available when this is desired.
   count = var.create_dns_records ? 1 : 0 # Match conditionality if needed
 
-  zone_id = data.aws_route53_zone.bunnycloud.zone_id
+  zone_id = aws_route53_zone.main.zone_id
   name    = element(aws_acm_certificate.wildcard_certificate.domain_validation_options.*.resource_record_name, 0)
   type    = element(aws_acm_certificate.wildcard_certificate.domain_validation_options.*.resource_record_type, 0)
   records = [element(aws_acm_certificate.wildcard_certificate.domain_validation_options.*.resource_record_value, 0)]
@@ -36,8 +36,4 @@ resource "aws_acm_certificate_validation" "acm_cert_validation" {
 
   certificate_arn         = aws_acm_certificate.wildcard_certificate.arn
   validation_record_fqdns = [aws_route53_record.cert_validation[0].fqdn] # Use the FQDN of the created record
-}
-
-data "aws_route53_zone" "bunnycloud" {
-  name = "bunnycloud.xyz"
 }
