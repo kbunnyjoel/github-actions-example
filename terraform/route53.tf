@@ -8,11 +8,6 @@ resource "aws_route53_zone" "main" {
   # }
 }
 
-output "route53_zone_id" {
-  description = "The ID of the Route53 hosted zone."
-  value       = aws_route53_zone.main.zone_id
-}
-
 output "route53_zone_name_servers" {
   description = "Name servers for the Route53 hosted zone."
   value       = aws_route53_zone.main.name_servers
