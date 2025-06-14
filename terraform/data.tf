@@ -9,3 +9,8 @@ data "aws_eks_cluster" "github_cluster" {
 data "aws_region" "current" {
   name = var.aws_region
 }
+
+data "aws_route53_zone" "main" {
+  name         = "bunnycloud.xyz"
+  private_zone = false
+}
