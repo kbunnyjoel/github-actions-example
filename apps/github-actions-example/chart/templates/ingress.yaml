@@ -33,6 +33,7 @@ metadata:
     {{- end }}
     nginx.ingress.kubernetes.io/ssl-redirect: "false"
     nginx.ingress.kubernetes.io/force-ssl-redirect: "false"
+    nginx.ingress.kubernetes.io/rewrite-target: /
     external-dns.alpha.kubernetes.io/hostname: "{{ .Values.ingress.hostname }}"
     external-dns.alpha.kubernetes.io/ttl: "60"
     {{- if .Values.ingress.acmCertArn }}
@@ -59,5 +60,9 @@ spec:
               service:
                 name: {{ include "github-actions-example.fullname" . }}
                 port:
+                  {{- if $svcPortName }}
                   name: {{ $svcPortName }}
+                  {{- else }}
+                  number: 80
+                  {{- end }}
 {{- end }}
