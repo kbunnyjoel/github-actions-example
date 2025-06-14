@@ -698,7 +698,7 @@ jobs:
             --create-namespace \
             --values argocd-install-values.yaml \
             --version 6.11.1 \
-            --timeout 10m \ # Increased timeout for Helm operations
+            --timeout 10m \
             --wait
           
           # Verify the annotation was set correctly
@@ -1050,7 +1050,6 @@ jobs:
     env:
       IS_DESTROY: ${{ github.event.inputs.destroy == 'true' }}
     runs-on: ubuntu-latest
-    needs: deploy-argocd # Ensures ACM_CERT_ARN and NGINX_LB_HOSTNAME are available
     permissions:
       contents: write
       pull-requests: write
@@ -1179,10 +1178,33 @@ jobs:
           APP_NAMESPACE="github-actions-example"
           APP_NAME="github-actions-example"
           
-          echo "Ensuring namespace $APP_NAMESPACE exists (ArgoCD should create it if defined in Application manifest or Helm chart)..."
-          kubectl create namespace $APP_NAMESPACE --dry-run=client -o yaml | kubectl apply -f - || echo "Namespace $APP_NAMESPACE likely already exists."
+          kubectl create namespace $APP_NAMESPACE --dry-run=client -o yaml | kubectl apply -f -
           kubectl get pods -n $APP_NAMESPACE
           kubectl rollout status deployment/$APP_NAME -n $APP_NAMESPACE --timeout=2m || true
+          
+          # Check if service exists and has correct port
+          echo "Checking service configuration..."
+          if ! kubectl get service $APP_NAME -n $APP_NAMESPACE &>/dev/null; then
+            echo "Service $APP_NAME not found, creating it..."
+            kubectl apply -f - <<EOF
+          apiVersion: v1
+          kind: Service
+          metadata:
+            name: $APP_NAME
+            namespace: $APP_NAMESPACE
+          spec:
+            ports:
+            - port: 80
+              targetPort: 3000
+              protocol: TCP
+              name: http
+            selector:
+              app.kubernetes.io/name: $APP_NAME
+          EOF
+          else
+            echo "Service $APP_NAME exists, ensuring it has correct port configuration..."
+            kubectl patch service $APP_NAME -n $APP_NAMESPACE --type=json -p='[{"op": "replace", "path": "/spec/ports", "value": [{"port": 80, "targetPort": 3000, "protocol": "TCP", "name": "http"}]}]'
+          fi
 
       - name: List ExternalDNS TXT records
         run: |
