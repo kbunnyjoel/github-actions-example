@@ -1001,50 +1001,17 @@ jobs:
       - name: Verify DNS records
         run: |
           HOSTED_ZONE_ID="${{ env.HOSTED_ZONE_ID }}"
-          RECORD_NAME="github-actions-example.bunnycloud.xyz."
+          ARGO_RECORD_NAME="argocd.bunnycloud.xyz."
+          APP_RECORD_NAME="github-actions-example.bunnycloud.xyz."
           
-          # Get NGINX LoadBalancer hostname
-          NGINX_LB_HOSTNAME=$(kubectl get svc -n ingress-nginx ingress-nginx-controller -o jsonpath='{.status.loadBalancer.ingress[0].hostname}')
-          if [ -z "$NGINX_LB_HOSTNAME" ]; then
-            echo "Error: Could not find NGINX Ingress Controller LoadBalancer hostname."
-            exit 1
-          fi
-          echo "NGINX LoadBalancer hostname: $NGINX_LB_HOSTNAME"
-          
-          # Verify DNS records
-          echo "Verifying DNS records for $RECORD_NAME..."
+          echo "Verifying DNS records for $ARGO_RECORD_NAME (managed by ExternalDNS/manual step)..."
           aws route53 list-resource-record-sets --hosted-zone-id "$HOSTED_ZONE_ID" \
-            --query "ResourceRecordSets[?Name=='$RECORD_NAME']" --output json
+            --query "ResourceRecordSets[?Name=='$ARGO_RECORD_NAME']" --output json
             
+          echo "Verifying DNS records for $APP_RECORD_NAME (should be managed by ExternalDNS via Ingress)..."
+          aws route53 list-resource-record-sets --hosted-zone-id "$HOSTED_ZONE_ID" \
+            --query "ResourceRecordSets[?Name=='$APP_RECORD_NAME']" --output json
 
-        # continue-on-error: true # Recommended to remove this to catch Helm installation errors
-
-      - name: Fix Ingress SSL redirect configuration
-        run: |
-          echo "Patching Ingress resources to prevent redirect loops..."
-          
-          # Create the namespace if it doesn't exist
-          kubectl create namespace github-actions-example --dry-run=client -o yaml | kubectl apply -f -
-          
-          # Check if the ingress exists before trying to patch it
-          if kubectl get ingress github-actions-example -n github-actions-example &>/dev/null; then
-            # Patch the main application ingress
-            kubectl patch ingress github-actions-example -n github-actions-example --type=merge -p '{
-              "metadata": {
-                "annotations": {
-                  "nginx.ingress.kubernetes.io/ssl-redirect": "false",
-                  "nginx.ingress.kubernetes.io/force-ssl-redirect": "false"
-                }
-              }
-            }'
-            
-            # Verify the patch was applied
-            echo "Verifying ingress configuration:"
-            kubectl get ingress github-actions-example -n github-actions-example -o jsonpath='{.metadata.annotations}'
-          else
-            echo "Ingress 'github-actions-example' not found in namespace 'github-actions-example'. It will be created later."
-          fi
-          
       - name: Verify ArgoCD Installation and DNS
         # Changed from manual creation to verification as ExternalDNS handles it
         run: |
@@ -1099,23 +1066,6 @@ jobs:
             fi
           done
           
-      - name: Verify DNS and connectivity
-        run: |
-          echo "Verifying DNS record for github-actions-example.bunnycloud.xyz..."
-          NGINX_LB_HOSTNAME=$(kubectl get svc -n ingress-nginx ingress-nginx-controller -o jsonpath='{.status.loadBalancer.ingress[0].hostname}')
-          EXPECTED_CNAME_TARGET="${NGINX_LB_HOSTNAME}."
-          
-          echo "Expected CNAME target: $EXPECTED_CNAME_TARGET"
-          echo "Current DNS resolution:"
-          dig +short -t CNAME github-actions-example.bunnycloud.xyz @8.8.8.8
-          
-          echo "Testing connectivity to the application..."
-          curl -v --connect-timeout 10 -k https://github-actions-example.bunnycloud.xyz/ || echo "Connection failed"
-          
-          echo "Testing connectivity to the load balancer directly..."
-          curl -v --connect-timeout 10 -k https://$NGINX_LB_HOSTNAME/ || echo "Connection to load balancer failed"
-        continue-on-error: true  # Don't fail the workflow if verification fails
-
       # Security group rules are now managed by Terraform in eks_sg_rules.tf
       - name: Verify EKS security group rules
         run: |
@@ -1304,47 +1254,6 @@ jobs:
               --query "ResourceRecordSets[?Name=='$txt_record' && Type=='TXT']"
           done
           
-      - name: Create DNS record for application
-        run: |
-          HOSTED_ZONE_ID=$(aws route53 list-hosted-zones --query "HostedZones[?Name=='bunnycloud.xyz.'].Id" --output text | sed 's/\/hostedzone\///')
-          RECORD_NAME="github-actions-example.bunnycloud.xyz."
-          
-          # Get NGINX LoadBalancer hostname
-          NGINX_LB_HOSTNAME=$(kubectl get svc -n ingress-nginx ingress-nginx-controller -o jsonpath='{.status.loadBalancer.ingress[0].hostname}')
-          if [ -z "$NGINX_LB_HOSTNAME" ]; then
-            echo "Error: Could not find NGINX Ingress Controller LoadBalancer hostname."
-            exit 1
-          fi
-          echo "NGINX LoadBalancer hostname: $NGINX_LB_HOSTNAME"
-          
-          # Create or update the CNAME record
-          echo "Creating/updating CNAME record..."
-          aws route53 change-resource-record-sets --hosted-zone-id "$HOSTED_ZONE_ID" \
-            --change-batch '{
-              "Changes": [
-                {
-                  "Action": "UPSERT",
-                  "ResourceRecordSet": {
-                    "Name": "'"$RECORD_NAME"'",
-                    "Type": "CNAME",
-                    "TTL": 60,
-                    "ResourceRecords": [
-                      {
-                        "Value": "'"$NGINX_LB_HOSTNAME"'."
-                      }
-                    ]
-                  }
-                }
-              ]
-            }'
-          
-          # Verify the DNS record was created
-          echo "Verifying DNS record creation..."
-          sleep 10
-          aws route53 list-resource-record-sets --hosted-zone-id "$HOSTED_ZONE_ID" \
-            --query "ResourceRecordSets[?Name=='$RECORD_NAME']"
-
-
       - name: Verify DNS record for application
         run: |
           APP_TARGET_HOSTNAME="github-actions-example.bunnycloud.xyz"
@@ -1358,76 +1267,31 @@ jobs:
           
           echo "NGINX LoadBalancer hostname: $NGINX_LB_HOSTNAME"
           echo "Checking DNS record for $APP_TARGET_HOSTNAME..."
-          dig $APP_TARGET_HOSTNAME
           
-          # Wait for DNS propagation with longer timeout
-          echo "Waiting for DNS propagation..."
+          echo "Waiting for DNS CNAME propagation (ExternalDNS should create this)..."
+          EXPECTED_CNAME_TARGET_FOR_DIG_SHORT="${NGINX_LB_HOSTNAME}." 
+
           for i in {1..12}; do
-            if dig +short $APP_TARGET_HOSTNAME | grep -q "$NGINX_LB_HOSTNAME"; then
-              echo "✅ DNS record propagated successfully"
+            RESOLVED_CNAME_VALUE=$(dig +short -t CNAME $APP_TARGET_HOSTNAME @8.8.8.8)
+            if [ "$RESOLVED_CNAME_VALUE" = "$EXPECTED_CNAME_TARGET_FOR_DIG_SHORT" ]; then
+              echo "✅ DNS CNAME record for $APP_TARGET_HOSTNAME propagated and correctly points to $NGINX_LB_HOSTNAME."
               break
             fi
-            echo "Waiting for DNS propagation... attempt $i/12"
-            sleep 10
-            
-            # If we're on the last attempt, try to refresh the DNS record
-            if [ $i -eq 10 ]; then
-              echo "Refreshing DNS record..."
-              HOSTED_ZONE_ID=$(aws route53 list-hosted-zones --query "HostedZones[?Name=='bunnycloud.xyz.'].Id" --output text | sed 's/\/hostedzone\///')
-              RECORD_NAME="github-actions-example.bunnycloud.xyz."
-              
-              aws route53 change-resource-record-sets --hosted-zone-id "$HOSTED_ZONE_ID" \
-                --change-batch '{
-                  "Changes": [
-                    {
-                      "Action": "UPSERT",
-                      "ResourceRecordSet": {
-                        "Name": "'"$RECORD_NAME"'",
-                        "Type": "CNAME",
-                        "TTL": 30,
-                        "ResourceRecords": [
-                          {
-                            "Value": "'"$NGINX_LB_HOSTNAME"'."
-                          }
-                        ]
-                      }
-                    }
-                  ]
-                }'
+            echo "Waiting for DNS CNAME propagation for $APP_TARGET_HOSTNAME... Attempt $i/12. Found: '$RESOLVED_CNAME_VALUE', Expected: '$EXPECTED_CNAME_TARGET_FOR_DIG_SHORT'"
+            if [ $i -eq 12 ]; then
+              echo "Warning: DNS CNAME propagation for $APP_TARGET_HOSTNAME timed out or record does not point to $NGINX_LB_HOSTNAME."
+              echo "Final DNS CNAME resolution check for $APP_TARGET_HOSTNAME (using 8.8.8.8):"
+              dig -t CNAME $APP_TARGET_HOSTNAME @8.8.8.8
+              echo "Final DNS A record resolution check for $APP_TARGET_HOSTNAME (using 8.8.8.8):"
+              dig -t A $APP_TARGET_HOSTNAME @8.8.8.8
+              echo "Hint: Check ExternalDNS logs: kubectl logs -n external-dns -l app.kubernetes.io/name=external-dns --tail=200"
+              echo "Hint: Check Ingress annotations: kubectl get ingress github-actions-example -n github-actions-example -o yaml"
             fi
+            sleep 10
           done
           
-          # Create or update ingress with SSL redirect disabled and external-dns annotations
-          kubectl apply -f - <<EOF
-          apiVersion: networking.k8s.io/v1
-          kind: Ingress
-          metadata:
-            name: github-actions-example
-            namespace: github-actions-example
-            annotations:
-              kubernetes.io/ingress.class: "nginx"
-              nginx.ingress.kubernetes.io/ssl-redirect: "false"
-              nginx.ingress.kubernetes.io/force-ssl-redirect: "false"
-              nginx.ingress.kubernetes.io/rewrite-target: /
-              external-dns.alpha.kubernetes.io/hostname: "github-actions-example.bunnycloud.xyz"
-              external-dns.alpha.kubernetes.io/ttl: "60"
-          spec:
-            ingressClassName: nginx
-            rules:
-            - host: github-actions-example.bunnycloud.xyz
-              http:
-                paths:
-                - path: /
-                  pathType: Prefix
-                  backend:
-                    service:
-                      name: github-actions-example
-                      port:
-                        number: 80
-          EOF
-          
           # Wait for ingress to be properly configured
-          echo "Waiting for ingress to be configured..."
+          echo "Brief wait for Ingress object to be processed by controller if recently updated by ArgoCD..."
           sleep 15
 
       - name: Verify application accessibility
