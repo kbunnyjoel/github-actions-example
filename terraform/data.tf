@@ -11,6 +11,5 @@ data "aws_region" "current" {
 }
 
 data "aws_route53_zone" "main" {
-  name         = "bunnycloud.xyz"
-  private_zone = false
+  zone_id = "Z0722775AO3VTQLFVQU3"
 }
