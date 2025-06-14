@@ -1015,23 +1015,22 @@ jobs:
             --query "ResourceRecordSets[?Name=='$APP_RECORD_NAME']" --output json
 
       - name: Verify ArgoCD Installation and DNS
-        # Changed from manual creation to verification as ExternalDNS handles it
         run: |
           echo "Checking ArgoCD installation status..."
           kubectl get pods -n argocd
-          
+
           echo "Checking ArgoCD service..."
           kubectl get svc -n argocd
-          
+
           echo "Checking ArgoCD ingress..."
           kubectl get ingress -n argocd
-          
+
           echo "Waiting for NGINX Ingress Controller LoadBalancer to get an address..."
           NGINX_LB_HOSTNAME=""
           RETRIES=15
 
           for i in $(seq 1 $RETRIES); do
-            NGINX_LB_HOSTNAME=$(kubectl get svc -n ingress-nginx ingress-nginx-controller -o jsonpath='{.status.loadBalancer.ingress[0].hostname}' 2>/dev/null)
+            NGINX_LB_HOSTNAME=$(kubectl get svc -n ingress-nginx ingress-nginx-controller -o jsonpath="{.status.loadBalancer.ingress[0].hostname}" 2>/dev/null)
 
             if [ -n "$NGINX_LB_HOSTNAME" ]; then
               echo "✅ NGINX LoadBalancer hostname found: $NGINX_LB_HOSTNAME"
@@ -1041,30 +1040,29 @@ jobs:
             echo "⏳ Attempt $i/$RETRIES: Waiting for LoadBalancer hostname..."
             sleep 20
           done
-          
+
           if [ -z "$NGINX_LB_HOSTNAME" ]; then
-            echo "Error: Could not find NGINX Ingress Controller LoadBalancer hostname after timeout."
-            exit 1 # Fail the step
+            echo "❌ Error: Could not find NGINX Ingress Controller LoadBalancer hostname after timeout."
+            exit 1
           fi
-          
-          echo "Verifying DNS record for argocd.bunnycloud.xyz (should point to $NGINX_LB_HOSTNAME)..."
+
+          echo "🔍 Verifying DNS record for argocd.bunnycloud.xyz (should point to $NGINX_LB_HOSTNAME)..."
           echo "Waiting for DNS propagation (max 5 minutes)..."
           for i in {1..10}; do
-            # ExternalDNS should create a CNAME record pointing to the NLB hostname.
-            # Add a trailing dot to NGINX_LB_HOSTNAME for exact CNAME match, as dig output for CNAME includes it.
             EXPECTED_CNAME_TARGET="${NGINX_LB_HOSTNAME}."
             RESOLVED_CNAME_VALUE=$(dig +short -t CNAME argocd.bunnycloud.xyz @8.8.8.8)
 
             if [ "$RESOLVED_CNAME_VALUE" = "$EXPECTED_CNAME_TARGET" ]; then
-              echo "DNS CNAME record for argocd.bunnycloud.xyz propagated and correctly points to $NGINX_LB_HOSTNAME."
+              echo "✅ DNS CNAME record for argocd.bunnycloud.xyz propagated and correctly points to $NGINX_LB_HOSTNAME."
               break
             fi
-            echo "Waiting for DNS CNAME propagation for argocd.bunnycloud.xyz... Attempt $i/10. Found: '$RESOLVED_CNAME_VALUE', Expected: '$EXPECTED_CNAME_TARGET'"
+
+            echo "⏳ Attempt $i/10: DNS not ready. Found: '$RESOLVED_CNAME_VALUE', Expected: '$EXPECTED_CNAME_TARGET'"
             sleep 30
+
             if [ $i -eq 10 ]; then
-              echo "Warning: DNS propagation for argocd.bunnycloud.xyz timed out or record does not point to $NGINX_LB_HOSTNAME."
-              echo "Current DNS resolution for argocd.bunnycloud.xyz:"
-              echo "Checking CNAME using 8.8.8.8:"
+              echo "⚠️ Warning: DNS propagation for argocd.bunnycloud.xyz timed out or record mismatch."
+              echo "Current DNS resolution:"
               dig -t CNAME argocd.bunnycloud.xyz @8.8.8.8
               dig argocd.bunnycloud.xyz +trace
             fi
