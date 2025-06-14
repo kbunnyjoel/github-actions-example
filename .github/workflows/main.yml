@@ -1256,49 +1256,20 @@ jobs:
           kubectl get pods -n $APP_NAMESPACE
           kubectl rollout status deployment/$APP_NAME -n $APP_NAMESPACE --timeout=2m || true
 
-      - name: Clean up ExternalDNS TXT records
+      - name: List ExternalDNS TXT records
         run: |
           # Get hosted zone ID
           HOSTED_ZONE_ID=$(aws route53 list-hosted-zones --query "HostedZones[?Name=='bunnycloud.xyz.'].Id" --output text | sed 's/\/hostedzone\///')
           APP_DOMAIN="github-actions-example.bunnycloud.xyz."
           
-          echo "Cleaning up ExternalDNS TXT records..."
+          echo "Listing ExternalDNS TXT records..."
           
-          # Delete ExternalDNS TXT records
+          # List ExternalDNS TXT records
           for txt_record in "externaldns-cname-github-actions-example.bunnycloud.xyz." "externaldns-github-actions-example.bunnycloud.xyz."; do
-            TXT_RECORD=$(aws route53 list-resource-record-sets --hosted-zone-id "$HOSTED_ZONE_ID" \
-              --query "ResourceRecordSets[?Name=='$txt_record' && Type=='TXT']" --output json | jq -r '.[0]')
-            
-            if [ "$TXT_RECORD" != "null" ] && [ ! -z "$TXT_RECORD" ]; then
-              echo "Found TXT record $txt_record, deleting..."
-              TXT_VALUE=$(echo "$TXT_RECORD" | jq -r '.ResourceRecords[0].Value')
-              TXT_TTL=$(echo "$TXT_RECORD" | jq -r '.TTL')
-              
-              aws route53 change-resource-record-sets --hosted-zone-id "$HOSTED_ZONE_ID" \
-                --change-batch '{
-                  "Changes": [
-                    {
-                      "Action": "DELETE",
-                      "ResourceRecordSet": {
-                        "Name": "'"$txt_record"'",
-                        "Type": "TXT",
-                        "TTL": '"$TXT_TTL"',
-                        "ResourceRecords": [
-                          {
-                            "Value": '"$TXT_VALUE"'
-                          }
-                        ]
-                      }
-                    }
-                  ]
-                }'
-              echo "TXT record $txt_record deleted."
-            else
-              echo "No TXT record found for $txt_record."
-            fi
+            echo "Checking for TXT record: $txt_record"
+            aws route53 list-resource-record-sets --hosted-zone-id "$HOSTED_ZONE_ID" \
+              --query "ResourceRecordSets[?Name=='$txt_record' && Type=='TXT']"
           done
-          
-          echo "DNS cleanup completed."
 
 
       - name: Verify DNS record for application
