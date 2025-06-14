@@ -552,34 +552,7 @@ jobs:
           echo "Using NGINX LoadBalancer hostname: $NGINX_LB_HOSTNAME"
           
           # Update ArgoCD DNS record
-          ARGOCD_RECORD_NAME="argocd.bunnycloud.xyz."
-          echo "Updating ArgoCD DNS record to point to $NGINX_LB_HOSTNAME..."
-          
-          # Create or update ArgoCD CNAME record using UPSERT
-          echo "Creating/updating ArgoCD CNAME record..."
-          aws route53 change-resource-record-sets --hosted-zone-id "$HOSTED_ZONE_ID" \
-            --change-batch '{
-              "Changes": [
-                {
-                  "Action": "UPSERT",
-                  "ResourceRecordSet": {
-                    "Name": "'"$ARGOCD_RECORD_NAME"'",
-                    "Type": "CNAME",
-                    "TTL": 60,
-                    "ResourceRecords": [
-                      {
-                        "Value": "'"$NGINX_LB_HOSTNAME"'."
-                      }
-                    ]
-                  }
-                }
-              ]
-            }' || echo "Warning: Failed to update ArgoCD DNS record, continuing workflow"
-            
-          # Verify DNS record was created
-          echo "Verifying ArgoCD DNS record:"
-          aws route53 list-resource-record-sets --hosted-zone-id "$HOSTED_ZONE_ID" \
-            --query "ResourceRecordSets[?Name=='$ARGOCD_RECORD_NAME']"
+          echo "DNS record for argocd.bunnycloud.xyz will be managed by ExternalDNS via Ingress annotations in the ArgoCD Helm chart."
 
           kubectl get pods -n ingress-nginx
 
@@ -587,6 +560,9 @@ jobs:
         run: bash k8s/argocd/patch-argocd-helm-ownership.sh
 
       - name: Install ArgoCD
+        # This initial ArgoCD installation step is being removed because its configurations
+        # were being overridden by the subsequent 'Install ArgoCD with IAM role' step.
+        # All necessary configurations will be consolidated into that final Helm install using a comprehensive values file.
         run: |
           echo "Installing ArgoCD..."
           
@@ -619,57 +595,7 @@ jobs:
           echo "Ensuring ArgoCD namespace exists..."
           kubectl create namespace argocd --dry-run=client -o yaml | kubectl apply -f -
           
-          # Install ArgoCD with Helm
-          helm upgrade --install argocd argo/argo-cd \
-            --namespace argocd \
-            --create-namespace \
-            --set server.ingress.enabled=true \
-            --set server.ingress.ingressClassName=nginx \
-            --set server.ingress.hostname=argocd.bunnycloud.xyz \
-            --set server.ingress.annotations."kubernetes\.io/ingress\.class"=nginx \
-            --set server.ingress.annotations."nginx\.ingress\.kubernetes\.io/ssl-redirect"=false \
-            --set server.ingress.annotations."nginx\.ingress\.kubernetes\.io/force-ssl-redirect"=false \
-            --set server.ingress.annotations."nginx\.ingress\.kubernetes\.io/backend-protocol"=HTTPS \
-            --set server.ingress.annotations."nginx\.ingress\.kubernetes\.io/ssl-passthrough"=true \
-            --set server.ingress.annotations."external-dns\.alpha\.kubernetes\.io/hostname"=argocd.bunnycloud.xyz. \
-            --set server.ingress.annotations."service\.beta\.kubernetes\.io/aws-load-balancer-backend-protocol"=http \
-            --set server.ingress.annotations."service\.beta\.kubernetes\.io/aws-load-balancer-ssl-ports"=https \
-            --set server.ingress.annotations."service\.beta\.kubernetes\.io/aws-load-balancer-ssl-cert"="${{ env.ACM_CERTIFICATE_ARN }}" \
-            --set server.ingress.tls=null \
-            --version 6.11.1 \
-            --timeout 10m \
-            --wait
-          
-          echo "Checking ArgoCD pods status..."
-          kubectl get pods -n argocd
-          echo "Waiting for ArgoCD deployments to be ready..."
-          kubectl wait --for=condition=Available deployment --all -n argocd --timeout=5m || true
-          
-          # Create a known admin password
-          echo "Setting up ArgoCD admin password..."
-          
-          # Create a simple admin password
-          ADMIN_PASSWORD="admin"
-          
-          # Create a new secret with the admin password
-          kubectl -n argocd create secret generic argocd-initial-admin-secret \
-            --from-literal=password=$ADMIN_PASSWORD \
-            --from-literal=clearPassword=$ADMIN_PASSWORD \
-            --dry-run=client -o yaml | kubectl apply -f -
-            
-          # Set admin.password and URL in argocd-cm
-          kubectl -n argocd patch configmap argocd-cm --type=merge -p '{"data":{"admin.enabled":"true","url":"https://argocd.bunnycloud.xyz"}}'
-          
-          # Restart the server to apply changes
-          kubectl -n argocd rollout restart deployment argocd-server
-          
-          # Wait for the server to be ready
-          kubectl -n argocd rollout status deployment argocd-server --timeout=5m
-          
-          echo "ArgoCD installation completed"
-          echo "You can now log in to ArgoCD UI at https://argocd.bunnycloud.xyz with:"
-          echo "Username: admin"
-          echo "Password: $ADMIN_PASSWORD"
+          echo "Initial ArgoCD Helm install step skipped. Configuration will be applied in the 'Install ArgoCD with IAM role' step using a comprehensive values file."
 
       - name: Get ArgoCD IAM Role ARN
         run: |
@@ -726,14 +652,44 @@ jobs:
           global:
             dualStack:
               enabled: false
-          notifications:
+          # Disable Dex if using Cognito as the primary OIDC provider
+          dex:
             enabled: false
-          commitServer:
-            enabled: false
+          # Example: Disable notifications controller if not used, to save resources
+          # notifications:
+          #   enabled: false
+          # Example: Annotate ApplicationSet controller's SA if it needs AWS permissions
+          # applicationSet:
+          #   serviceAccount:
+          #     annotations:
+          #       eks.amazonaws.com/role-arn: "${{ env.ARGOCD_ROLE_ARN }}" # Or a more specific role
           server:
             serviceAccount:
+              create: true # Ensure Helm manages the SA
+              name: argocd-server # Default name, ensure it matches expectations
               annotations:
                 eks.amazonaws.com/role-arn: "${{ env.ARGOCD_ROLE_ARN }}"
+            ingress:
+              enabled: true
+              ingressClassName: "nginx" # Matches your NGINX Ingress Controller
+              hostname: "argocd.bunnycloud.xyz"
+              annotations:
+                "kubernetes.io/ingress.class": "nginx"
+                "nginx.ingress.kubernetes.io/ssl-redirect": "false" # NLB handles SSL
+                "nginx.ingress.kubernetes.io/force-ssl-redirect": "false" # NLB handles SSL
+                "nginx.ingress.kubernetes.io/backend-protocol": "HTTP" # Traffic from NGINX to ArgoCD server pod is HTTP
+                "external-dns.alpha.kubernetes.io/hostname": "argocd.bunnycloud.xyz." # For ExternalDNS
+              # The ArgoCD chart defaults server.ingress.tls to [], which means no TLS section in the Ingress resource.
+              # This is correct when an external entity (like NLB via NGINX service) handles TLS.
+          # Annotate other SAs if they need AWS permissions (e.g., for specific Git repo access or cluster management tasks)
+          controller:
+            serviceAccount:
+              annotations:
+                eks.amazonaws.com/role-arn: "${{ env.ARGOCD_ROLE_ARN }}" # Use the main ArgoCD role or a more specific one
+          repoServer:
+            serviceAccount:
+              annotations:
+                eks.amazonaws.com/role-arn: "${{ env.ARGOCD_ROLE_ARN }}" # Use the main ArgoCD role or a more specific one
           EOF
           
           # Install or upgrade ArgoCD with the values file
@@ -742,7 +698,7 @@ jobs:
             --create-namespace \
             --values argocd-install-values.yaml \
             --version 6.11.1 \
-            --timeout 5m \
+            --timeout 10m \ # Increased timeout for Helm operations
             --wait
           
           # Verify the annotation was set correctly
@@ -772,6 +728,16 @@ jobs:
     
       - name: Configure ArgoCD with Cognito
         run: |
+          # Set up ArgoCD admin password (can also be managed via Helm values if chart supports it well)
+          # This ensures an admin user is available.
+          echo "Setting up ArgoCD admin password..."
+          ADMIN_PASSWORD="admin" # For production, use a more secure method or a secret
+          kubectl -n argocd create secret generic argocd-initial-admin-secret \
+            --from-literal=password=$ADMIN_PASSWORD \
+            --from-literal=clearPassword=$ADMIN_PASSWORD \
+            --dry-run=client -o yaml | kubectl apply -f - || echo "Admin secret 'argocd-initial-admin-secret' might already exist or failed to apply."
+          kubectl -n argocd patch configmap argocd-cm --type=merge -p '{"data":{"admin.enabled":"true"}}'
+
           # Fix the server URL first
           kubectl -n argocd patch configmap argocd-cm --type=merge -p '{"data":{"url":"https://argocd.bunnycloud.xyz"}}'
           
@@ -814,8 +780,9 @@ jobs:
           echo "Waiting for ArgoCD server to restart..."
           kubectl -n argocd wait --for=condition=Available deployment/argocd-server --timeout=2m || true
           
-          echo "ArgoCD configured with Cognito OIDC"
+          echo "ArgoCD configured with Cognito OIDC."
           echo "Users can now log in using their Cognito credentials"
+          echo "Admin user (if enabled): admin / Password: $ADMIN_PASSWORD (or as set)"
 
       - name: Get ExternalDNS role ARN from Terraform
         run: |
