@@ -15,21 +15,24 @@ service:
       port: 80
       targetPort: 3000
       protocol: TCP
+      
 ingress:
   enabled: true
   className: "nginx"
-  hostname: "github-actions-example.bunnycloud.xyz"
+  hostname: "{{ app_name }}.bunnycloud.xyz"
   path: "/"
   pathType: "Prefix"
-  acmCertArn: "" # Will be populated by ArgoCD/Helm with the ACM certificate ARN
+  acmCertArn: "{{ acm_certificate_arn }}"
+  tls: true
   annotations:
+    "kubernetes.io/ingress.class": "nginx"
     "nginx.ingress.kubernetes.io/ssl-redirect": "false"
     "nginx.ingress.kubernetes.io/force-ssl-redirect": "false"
-    "external-dns.alpha.kubernetes.io/target": ""
+    "external-dns.alpha.kubernetes.io/hostname": "{{ app_name }}.bunnycloud.xyz."
     "external-dns.alpha.kubernetes.io/ttl": "60"
-    "external-dns.alpha.kubernetes.io/hostname": "github-actions-example.bunnycloud.xyz."
     "service.beta.kubernetes.io/aws-load-balancer-backend-protocol": "http"
     "service.beta.kubernetes.io/aws-load-balancer-ssl-ports": "https"
+
   # tls:
   #   - hosts:
   #       - "github-actions-example.bunnycloud.xyz"

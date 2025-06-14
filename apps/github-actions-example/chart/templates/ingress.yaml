@@ -33,12 +33,21 @@ metadata:
     {{- end }}
     nginx.ingress.kubernetes.io/ssl-redirect: "false"
     nginx.ingress.kubernetes.io/force-ssl-redirect: "false"
+    external-dns.alpha.kubernetes.io/hostname: "{{ .Values.ingress.hostname }}"
+    external-dns.alpha.kubernetes.io/ttl: "60"
     {{- if .Values.ingress.acmCertArn }}
     service.beta.kubernetes.io/aws-load-balancer-ssl-cert: {{ .Values.ingress.acmCertArn }}
+    service.beta.kubernetes.io/aws-load-balancer-backend-protocol: "http"
+    service.beta.kubernetes.io/aws-load-balancer-ssl-ports: "https"
     {{- end }}
 spec:
   {{- if and .Values.ingress.className (semverCompare ">=1.18-0" .Capabilities.KubeVersion.GitVersion) }}
   ingressClassName: {{ .Values.ingress.className }}
+  {{- end }}
+  {{- if .Values.ingress.tls }}
+  tls:
+    - hosts:
+        - {{ .Values.ingress.hostname | quote }}
   {{- end }}
   rules:
     - host: {{ .Values.ingress.hostname | quote }}
