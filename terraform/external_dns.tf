@@ -30,10 +30,6 @@ resource "aws_iam_policy" "external_dns" {
   })
 }
 
-data "aws_iam_openid_connect_provider" "this" {
-  url = data.aws_eks_cluster.github_cluster.identity[0].oidc[0].issuer
-}
-
 resource "aws_iam_role" "external_dns" {
   name = "eks-external-dns-role"
 

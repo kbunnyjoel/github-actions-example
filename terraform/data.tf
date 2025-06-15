@@ -9,3 +9,7 @@ data "aws_eks_cluster" "github_cluster" {
 data "aws_region" "current" {
   name = var.aws_region
 }
+
+data "aws_iam_openid_connect_provider" "this" {
+  url = data.aws_eks_cluster.github_cluster.identity[0].oidc[0].issuer
+}
