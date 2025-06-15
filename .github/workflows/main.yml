@@ -614,6 +614,7 @@ jobs:
               annotations:
                 eks.amazonaws.com/role-arn: "${{ env.ARGOCD_ROLE_ARN }}"
             ingress:
+              nanme: argocd-ingress
               enabled: true
               ingressClassName: nginx
               # hostname and hosts[0].name are not valid in the chart, will be set via --set
