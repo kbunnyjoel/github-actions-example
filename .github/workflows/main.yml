@@ -636,7 +636,7 @@ jobs:
               tls:
                 - hosts:
                     - argocd.bunnycloud.xyz
-                  secretName: argocd-tls
+                  secretName: argocd-server-tls
           # Annotate other SAs if they need AWS permissions (e.g., for specific Git repo access or cluster management tasks)
           controller:
             serviceAccount:
@@ -654,6 +654,7 @@ jobs:
           helm upgrade --install argocd argo/argo-cd \
             --namespace argocd \
             --create-namespace \
+            --set server.ingress.annotations."external-dns\.alpha\.kubernetes\.io/hostname"="argocd.bunnycloud.xyz." \
             --values argocd-install-values.yaml \
             --version 6.11.1 \
             --timeout 10m \
