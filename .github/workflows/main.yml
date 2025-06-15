@@ -142,7 +142,8 @@ jobs:
           done
 
   terraform-eks:
-    if: ${{ github.event.inputs.run_terraform != 'false' && github.event.inputs.destroy != 'true' }}
+    # Only run terraform-eks when destroy is not true
+    if: ${{ github.event.inputs.destroy != 'true' }}
     env:
       IS_DESTROY: ${{ github.event.inputs.destroy == 'true' }}
     runs-on: ubuntu-latest
@@ -151,10 +152,21 @@ jobs:
       run:
         working-directory: terraform
     steps:
+      # Only run the Terraform logic if destroy == 'true'
+      - name: Terraform Destroy (only if destroy is true)
+        if: ${{ github.event.inputs.destroy == 'true' }}
+        run: |
+          echo "Running Terraform destroy since destroy input is true"
+          terraform init
+          terraform destroy -auto-approve
+
+      # Run the rest of the deployment logic only if destroy != 'true'
       - name: Checkout code
+        if: ${{ github.event.inputs.destroy != 'true' }}
         uses: actions/checkout@v4
 
       - name: Configure AWS credentials
+        if: ${{ github.event.inputs.destroy != 'true' }}
         uses: aws-actions/configure-aws-credentials@v3
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
@@ -162,11 +174,13 @@ jobs:
           aws-region: ap-southeast-2
 
       - name: Install Terraform
+        if: ${{ github.event.inputs.destroy != 'true' }}
         uses: hashicorp/setup-terraform@v3
         with:
           terraform_version: "1.11.0" # Example: Use a more recent stable version
 
       - name: Run tfsec IaC scan
+        if: ${{ github.event.inputs.destroy != 'true' }}
         uses: aquasecurity/tfsec-action@v1.0.0 # Use a specific version if preferred
         with:
           working_directory: terraform
@@ -174,31 +188,37 @@ jobs:
           soft_fail: true # Uncomment to see warnings without failing the build initially
       
       - name: Upload tfsec report
+        if: ${{ github.event.inputs.destroy != 'true' }}
         uses: actions/upload-artifact@v4
         with:
           name: tfsec-report
           path: terraform/tfsec-report.json
       - name: Terraform Init
+        if: ${{ github.event.inputs.destroy != 'true' }}
         working-directory: terraform
         run: terraform init
 
       - name: Terraform Validate
+        if: ${{ github.event.inputs.destroy != 'true' }}
         run: terraform validate
       - name: Terraform Format
+        if: ${{ github.event.inputs.destroy != 'true' }}
         run: terraform fmt -check
       
       - name: Terraform Unlock
+        if: ${{ github.event.inputs.destroy != 'true' }}
         run: terraform force-unlock -force 1bcecd76-352b-7fd1-1dce-442e67ecb6c8 || echo "No locks to unlock"
       - name: Terraform Plan
+        if: ${{ github.event.inputs.destroy != 'true' }}
         run: terraform plan
 
       - name: Terraform Apply
+        if: ${{ github.event.inputs.destroy != 'true' }}
         working-directory: terraform
-        if: env.IS_DESTROY != 'true'
         run: terraform apply -auto-approve
 
       - name: Generate kubeconfig and upload
-        if: env.IS_DESTROY != 'true'
+        if: ${{ github.event.inputs.destroy != 'true' }}
         run: |
           mkdir -p /tmp/kubeconfig
           aws eks update-kubeconfig --region ap-southeast-2 --name github-actions-eks-example --kubeconfig /tmp/kubeconfig/config
@@ -207,19 +227,21 @@ jobs:
         shell: bash
 
       - name: Upload kubeconfig as artifact
+        if: ${{ github.event.inputs.destroy != 'true' }}
         uses: actions/upload-artifact@v4
         with:
           name: bastion-kubeconfig
           path: /tmp/kubeconfig/config
 
       - name: Upload deployment_key.pem as artifact
+        if: ${{ github.event.inputs.destroy != 'true' }}
         uses: actions/upload-artifact@v4
         with:
           name: deployment-key
           path: terraform/keys/deployment_key.pem
 
       - name: Install kubectl and check EKS status
-        if: env.IS_DESTROY != 'true'
+        if: ${{ github.event.inputs.destroy != 'true' }}
         run: |
           set -e
           VERSION=v1.29.2 # Use a valid and more recent kubectl version
@@ -354,7 +376,7 @@ jobs:
 
       
   deploy-argocd:
-    if: github.event.inputs.run_terraform == 'true' && github.event.inputs.destroy != 'true'
+    if: github.event.inputs.destroy != 'true' && github.event.inputs.run_terraform == 'true'
     env:
       IS_DESTROY: ${{ github.event.inputs.destroy == 'true' }}
     needs: terraform-eks
