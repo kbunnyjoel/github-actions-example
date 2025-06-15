@@ -618,13 +618,6 @@ jobs:
               enabled: true
               ingressClassName: nginx
               # hostname and hosts[0].name are not valid in the chart, will be set via --set
-              annotations:
-                "nginx.ingress.kubernetes.io/ssl-redirect": "true"
-                "nginx.ingress.kubernetes.io/force-ssl-redirect": "true"
-                "nginx.ingress.kubernetes.io/backend-protocol": "HTTPS"
-                "external-dns.alpha.kubernetes.io/hostname": "argocd.bunnycloud.xyz."
-                "external-dns.alpha.kubernetes.io/alias": "false"
-              extraHosts: {}
           controller:
             serviceAccount:
               annotations:
@@ -649,7 +642,6 @@ jobs:
             --set server.ingress.annotations."service\.beta\.kubernetes\.io/aws-load-balancer-ssl-cert"="${{ env.ACM_CERTIFICATE_ARN }}" \
             --set server.ingress.annotations."service\.beta\.kubernetes\.io/aws-load-balancer-backend-protocol"="http" \
             --set server.ingress.annotations."service\.beta\.kubernetes\.io/aws-load-balancer-ssl-ports"="https" \
-            --set server.ingress.extraHosts[0].name=argocd.bunnycloud.xyz \
             --set server.ingress.annotations."external-dns\.alpha\.kubernetes\.io/alias"="false" \
             --values argocd-install-values.yaml \
             --version 6.11.1 \
