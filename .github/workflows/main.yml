@@ -626,17 +626,6 @@ jobs:
             --set server.ingress.annotations."service\.beta\.kubernetes\.io/aws-load-balancer-backend-protocol"="http" \
             --set server.ingress.annotations."service\.beta\.kubernetes\.io/aws-load-balancer-ssl-ports"="https"
 
-      - name: Patch ArgoCD server service account with IAM role
-        run: |
-          echo "Patching ArgoCD server service account with IAM role..."
-
-          kubectl annotate serviceaccount argocd-server \
-            -n argocd \
-            eks.amazonaws.com/role-arn=${{ env.ARGOCD_ROLE_ARN }} \
-            --overwrite
-
-          echo "✅ ArgoCD IAM role successfully attached."
-
       - name: Get ArgoCD IAM Role ARN
         run: |
           cd terraform
@@ -664,6 +653,16 @@ jobs:
           echo "COGNITO_ISSUER_URL=$COGNITO_ISSUER_URL" >> $GITHUB_ENV
           echo "COGNITO_CLIENT_SECRET=$COGNITO_CLIENT_SECRET" >> $GITHUB_ENV
 
+      - name: Patch ArgoCD server service account with IAM role
+        run: |
+          echo "Patching ArgoCD server service account with IAM role..."
+
+          kubectl annotate serviceaccount argocd-server \
+            -n argocd \
+            eks.amazonaws.com/role-arn=${{ env.ARGOCD_ROLE_ARN }} \
+            --overwrite
+
+          echo "✅ ArgoCD IAM role successfully attached."
       - name: Install ArgoCD with IAM role
         run: |
           # Debug the ARN value
