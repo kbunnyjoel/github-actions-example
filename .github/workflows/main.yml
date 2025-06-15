@@ -635,9 +635,9 @@ jobs:
             cm:
               oidc.config: |
                 name: Cognito
-                issuer: ${COGNITO_ISSUER_URL}
-                clientID: ${COGNITO_CLIENT_ID}
-                clientSecret: ${COGNITO_CLIENT_SECRET}
+                issuer: {{ .Env.COGNITO_ISSUER_URL }}
+                clientID: {{ .Env.COGNITO_CLIENT_ID }}
+                clientSecret: {{ .Env.COGNITO_CLIENT_SECRET }}
                 requestedScopes: ["openid", "profile", "email"]
                 requestedIDTokenClaims: {"groups": {"essential": true}}
           controller:
