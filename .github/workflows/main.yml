@@ -616,29 +616,15 @@ jobs:
           echo "Using ArgoCD role ARN: $ARGOCD_ROLE_ARN"
           echo "ARGOCD_ROLE_ARN=$ARGOCD_ROLE_ARN" >> $GITHUB_ENV
 
-          # Get Cognito details
-          echo "Fetching Cognito details..."
-          COGNITO_CLIENT_ID=$(terraform output -raw cognito_user_pool_client_id || echo "")
-          COGNITO_ISSUER_URL=$(terraform output -raw cognito_user_pool_endpoint || echo "")
-
-          echo "Fetching Cognito client secret from Secrets Manager..."
-          COGNITO_CLIENT_SECRET=$(aws secretsmanager get-secret-value \
-            --secret-id argocd-cognito-client-secret \
-            --region ap-southeast-2 \
-            --query SecretString \
-            --output text 2>/dev/null)
-
-          if [ -z "$COGNITO_CLIENT_SECRET" ]; then
-            echo "❌ Error: Cognito client secret not found!"
+          echo "Fetching NGINX Ingress Controller ELB hostname..."
+          ELB_HOSTNAME_FROM_KUBE=$(kubectl get svc -n ingress-nginx ingress-nginx-controller -o jsonpath='{.status.loadBalancer.ingress[0].hostname}')
+          if [ -z "$ELB_HOSTNAME_FROM_KUBE" ]; then
+            echo "❌ Error: NGINX ELB hostname not found via kubectl."
+            # Potentially exit or use a known env var if passed from another job
             exit 1
           fi
-
-          echo "✅ Cognito details retrieved (client ID and issuer URL set)."
-
-          # Export to GitHub environment (secure)
-          echo "COGNITO_CLIENT_ID=$COGNITO_CLIENT_ID" >> $GITHUB_ENV
-          echo "COGNITO_ISSUER_URL=$COGNITO_ISSUER_URL" >> $GITHUB_ENV
-          echo "COGNITO_CLIENT_SECRET=$COGNITO_CLIENT_SECRET" >> $GITHUB_ENV
+          echo "✅ NGINX ELB hostname found: $ELB_HOSTNAME_FROM_KUBE"
+          echo "NGINX_LB_HOSTNAME=$ELB_HOSTNAME_FROM_KUBE" >> $GITHUB_ENV
 
      
       - name: Install/Upgrade ArgoCD with IAM role and Ingress
@@ -674,8 +660,11 @@ jobs:
               hosts:
                 - argocd.bunnycloud.xyz
               annotations:
-                nginx.ingress.kubernetes.io/ssl-redirect: "true"
-                external-dns.alpha.kubernetes.io/hostname: "argocd.bunnycloud.xyz"
+                "nginx.ingress.kubernetes.io/ssl-redirect": "true"
+                "nginx.ingress.kubernetes.io/force-ssl-redirect": "true"
+                "nginx.ingress.kubernetes.io/backend-protocol": "HTTPS"
+                "external-dns.alpha.kubernetes.io/hostname": "argocd.bunnycloud.xyz."
+                # AWS ELB specific annotations (like service.beta.kubernetes.io/*) belong on the NGINX controller's service, not here.
               tls:
                 - hosts:
                     - argocd.bunnycloud.xyz
@@ -691,17 +680,6 @@ jobs:
                 eks.amazonaws.com/role-arn: "${{ env.ARGOCD_ROLE_ARN }}" # Use the main ArgoCD role or a more specific one
           # Ensure other necessary ArgoCD configurations are here
           EOF
-
-          echo "Fetching NGINX Ingress Controller ELB hostname..."
-          ELB_HOSTNAME=$(kubectl get svc -n ingress-nginx ingress-nginx-controller -o jsonpath='{.status.loadBalancer.ingress[0].hostname}')
-          
-          if [ -z "$ELB_HOSTNAME" ]; then
-            echo "❌ Error: ELB hostname not found."
-            exit 1
-          fi
-          
-          echo "✅ ELB hostname found: $ELB_HOSTNAME"
-          echo "ELB_HOSTNAME=$ELB_HOSTNAME" >> $GITHUB_ENV
           
           # Install or upgrade ArgoCD with the values file
           # Use upgrade --install for idempotency
@@ -710,19 +688,6 @@ jobs:
             --create-namespace \
             --values argocd-install-values.yaml \
             --version 6.11.1 \
-            --set server.serviceAccount.create=true \
-            --set server.serviceAccount.name=argocd-server \
-            --set server.ingress.enabled=true \
-            --set server.ingress.ingressClassName=nginx \
-            --set server.ingress.hostname=argocd.bunnycloud.xyz \
-            --set server.ingress.annotations."external-dns\.alpha\.kubernetes\.io/hostname"="argocd.bunnycloud.xyz." \
-            --set server.ingress.annotations."external-dns\.alpha\.kubernetes\.io/target"="a6e6c60febcec44db80786d127e4f021-72f5bc35c18ed8bc.elb.ap-southeast-2.amazonaws.com" \
-            --set server.ingress.annotations."nginx\.ingress\.kubernetes\.io/ssl-redirect"="true" \
-            --set server.ingress.annotations."nginx\.ingress\.kubernetes\.io/force-ssl-redirect"="true" \
-            --set server.ingress.annotations."nginx\.ingress\.kubernetes\.io/backend-protocol"="HTTPS" \
-            --set server.ingress.annotations."service\.beta\.kubernetes\.io/aws-load-balancer-ssl-cert"="${{ env.ACM_CERTIFICATE_ARN }}" \
-            --set server.ingress.annotations."service\.beta\.kubernetes\.io/aws-load-balancer-backend-protocol"="http" \
-            --set server.ingress.annotations."service\.beta\.kubernetes\.io/aws-load-balancer-ssl-ports"="https" \
             --timeout 10m \
             --wait
           
@@ -959,9 +924,8 @@ jobs:
             --set serviceAccount.name=external-dns \
             --set serviceAccount.annotations."eks\.amazonaws\.com/role-arn"="${{ env.EXTERNAL_DNS_ROLE_ARN }}" \
             --set txtOwnerId="${{ env.HOSTED_ZONE_ID }}" \
-            --set aws.zoneIdFilters[0]="${{ env.HOSTED_ZONE_ID }}" \
+            --set extraArgs[0]="--aws-prefer-cname=true" \ # Correct flag for AWS provider
             --set provider=aws \
-            --set extraArgs[0]="--prefer-cname=true" \
             --set txtPrefix=externaldns- \
             --set aws.batchChangeSize=1000 \
             --set logLevel=debug \
@@ -992,8 +956,8 @@ jobs:
               --set serviceAccount.name=external-dns \
               --set serviceAccount.annotations."eks\.amazonaws\.com/role-arn"="${{ env.EXTERNAL_DNS_ROLE_ARN }}" \
               --set txtOwnerId="${{ env.HOSTED_ZONE_ID }}" \
-              --set provider=aws \
-              --set extraArgs[0]="--prefer-cname=true" \
+              --set provider=aws \ # Ensure provider is set if re-using these lines
+              --set extraArgs[0]="--aws-prefer-cname=true" \ # Correct flag for AWS provider
               --set txtPrefix=externaldns- \
               --set aws.batchChangeSize=1000 \
               --set logLevel=debug \
