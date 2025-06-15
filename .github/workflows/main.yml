@@ -605,27 +605,6 @@ jobs:
       - name: Patch ArgoCD resources with Helm ownership
         run: bash k8s/argocd/patch-argocd-helm-ownership.sh
 
-      - name: Install ArgoCD (no IAM role yet)
-        run: |
-          echo "Installing ArgoCD with HTTPS Ingress..."
-
-          helm upgrade --install argocd argo/argo-cd \
-            --namespace argocd --create-namespace \
-            --version 5.51.6 \
-            --wait --timeout 10m \
-            --set server.serviceAccount.create=true \
-            --set server.serviceAccount.name=argocd-server \
-            --set server.ingress.enabled=true \
-            --set server.ingress.ingressClassName=nginx \
-            --set server.ingress.hostname=argocd.bunnycloud.xyz \
-            --set server.ingress.annotations."external-dns\.alpha\.kubernetes\.io/hostname"="argocd.bunnycloud.xyz." \
-            --set server.ingress.annotations."nginx\.ingress\.kubernetes\.io/ssl-redirect"="true" \
-            --set server.ingress.annotations."nginx\.ingress\.kubernetes\.io/force-ssl-redirect"="true" \
-            --set server.ingress.annotations."nginx\.ingress\.kubernetes\.io/backend-protocol"="HTTPS" \
-            --set server.ingress.annotations."service\.beta\.kubernetes\.io/aws-load-balancer-ssl-cert"="${{ env.ACM_CERTIFICATE_ARN }}" \
-            --set server.ingress.annotations."service\.beta\.kubernetes\.io/aws-load-balancer-backend-protocol"="http" \
-            --set server.ingress.annotations."service\.beta\.kubernetes\.io/aws-load-balancer-ssl-ports"="https"
-
       - name: Get ArgoCD IAM Role ARN
         run: |
           cd terraform
@@ -660,19 +639,10 @@ jobs:
           echo "COGNITO_CLIENT_SECRET=$COGNITO_CLIENT_SECRET" >> $GITHUB_ENV
 
      
-      - name: Install ArgoCD with IAM role
+      - name: Install/Upgrade ArgoCD with IAM role and Ingress
         run: |
           # Debug the ARN value
           echo "ARN value: ${{ env.ARGOCD_ROLE_ARN }}"
-          
-          # Check if ArgoCD is already installed
-          if helm list -n argocd | grep -q argocd; then
-            echo "ArgoCD is already installed, upgrading instead of installing..."
-            HELM_CMD="upgrade"
-          else
-            echo "ArgoCD is not installed, performing fresh installation..."
-            HELM_CMD="install"
-          fi
           
           # Create a values file for the installation
           cat > argocd-install-values.yaml <<EOF
@@ -718,10 +688,12 @@ jobs:
             serviceAccount:
               annotations:
                 eks.amazonaws.com/role-arn: "${{ env.ARGOCD_ROLE_ARN }}" # Use the main ArgoCD role or a more specific one
+          # Ensure other necessary ArgoCD configurations are here
           EOF
           
           # Install or upgrade ArgoCD with the values file
-          helm $HELM_CMD argocd argo/argo-cd \
+          # Use upgrade --install for idempotency
+          helm upgrade --install argocd argo/argo-cd \
             --namespace argocd \
             --create-namespace \
             --values argocd-install-values.yaml \
@@ -731,32 +703,6 @@ jobs:
           
           # Verify the annotation was set correctly
           kubectl get serviceaccount argocd-server -n argocd -o yaml
-
-      - name: Patch ArgoCD server service account with IAM role
-        run: |
-          echo "Patching ArgoCD server service account with IAM role..."
-
-          kubectl annotate serviceaccount argocd-server \
-            -n argocd \
-            eks.amazonaws.com/role-arn=${{ env.ARGOCD_ROLE_ARN }} \
-            --overwrite
-
-          echo "✅ ArgoCD IAM role successfully attached."
-
-      - name: Update ArgoCD with IAM role
-        run: |
-          # Uninstall ArgoCD Helm release first to clean up all resources
-          helm uninstall argocd -n argocd || true
-          
-          # Delete any remaining resources that might cause conflicts
-          kubectl delete serviceaccount argocd-server -n argocd --ignore-not-found=true
-          kubectl delete serviceaccount argocd-application-controller -n argocd --ignore-not-found=true
-          kubectl delete serviceaccount argocd-repo-server -n argocd --ignore-not-found=true
-          kubectl delete serviceaccount argocd-dex-server -n argocd --ignore-not-found=true
-          kubectl delete serviceaccount argocd-redis -n argocd --ignore-not-found=true
-          
-          # Wait a moment for resources to be fully deleted
-          sleep 5
 
       - name: Validate ArgoCD IAM role integration
         run: |
