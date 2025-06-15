@@ -886,13 +886,13 @@ jobs:
             --set sources[1]=ingress \
             --set aws.zoneType=public \
             --set aws.region=ap-southeast-2 \
+            --set aws.preferCNAME=true \
             --set domainFilters[0]=bunnycloud.xyz \
             --set policy=upsert-only \
             --set serviceAccount.create=true \
             --set serviceAccount.name=external-dns \
             --set serviceAccount.annotations."eks\.amazonaws\.com/role-arn"="${{ env.EXTERNAL_DNS_ROLE_ARN }}" \
             --set txtOwnerId="${{ env.HOSTED_ZONE_ID }}" \
-            --set extraArgs[0]="--aws-prefer-cname=true" \ # Correct flag for AWS provider
             --set provider=aws \
             --set txtPrefix=externaldns- \
             --set aws.batchChangeSize=1000 \
