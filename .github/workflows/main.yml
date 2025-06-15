@@ -695,7 +695,7 @@ jobs:
               create: true
               name: argocd-server
               annotations:
-                eks.amazonaws.com/role-arn:  "${{ env.ARGOCD_ROLE_ARN }}"
+                eks.amazonaws.com/role-arn: "${{ env.ARGOCD_ROLE_ARN }}"
             ingress:
               enabled: true
               ingressClassName: nginx
