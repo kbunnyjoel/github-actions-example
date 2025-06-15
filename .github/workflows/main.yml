@@ -632,11 +632,13 @@ jobs:
                 "nginx.ingress.kubernetes.io/force-ssl-redirect": "true"
                 "nginx.ingress.kubernetes.io/backend-protocol": "HTTPS"
                 "external-dns.alpha.kubernetes.io/hostname": "argocd.bunnycloud.xyz."
+                "external-dns.alpha.kubernetes.io/alias": "false"
                 # AWS ELB specific annotations (like service.beta.kubernetes.io/*) belong on the NGINX controller's service, not here.
               tls:
                 - hosts:
                     - argocd.bunnycloud.xyz
                   secretName: argocd-server-tls
+              extraHosts: {}
           # Annotate other SAs if they need AWS permissions (e.g., for specific Git repo access or cluster management tasks)
           controller:
             serviceAccount:
@@ -654,7 +656,10 @@ jobs:
           helm upgrade --install argocd argo/argo-cd \
             --namespace argocd \
             --create-namespace \
+            --set server.ingress.hostname=argocd.bunnycloud.xyz \
+            --set server.ingress.extraHosts={} \
             --set server.ingress.annotations."external-dns\.alpha\.kubernetes\.io/hostname"="argocd.bunnycloud.xyz." \
+            --set server.ingress.annotations."external-dns\.alpha\.kubernetes\.io/alias"="false" \
             --values argocd-install-values.yaml \
             --version 6.11.1 \
             --timeout 10m \
