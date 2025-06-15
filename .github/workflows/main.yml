@@ -595,11 +595,20 @@ jobs:
           echo "NGINX_LB_HOSTNAME=$ELB_HOSTNAME_FROM_KUBE" >> $GITHUB_ENV
 
      
-      - name: Install/Upgrade ArgoCD with IAM role and Ingress
+      - name: Export Cognito OIDC environment variables
+        run: |
+          # Example: export your Cognito OIDC values to the GitHub Actions environment
+          # These should be set from terraform outputs or secrets before this step.
+          # Replace the following echo lines with your actual value sources.
+          echo "COGNITO_ISSUER_URL=${{ secrets.COGNITO_ISSUER_URL }}" >> $GITHUB_ENV
+          echo "COGNITO_CLIENT_ID=${{ secrets.COGNITO_CLIENT_ID }}" >> $GITHUB_ENV
+          echo "COGNITO_CLIENT_SECRET=${{ secrets.COGNITO_CLIENT_SECRET }}" >> $GITHUB_ENV
+
+      - name: Install/Upgrade ArgoCD with IAM role, Ingress, and OIDC config
         run: |
           # Debug the ARN value
           echo "ARN value: ${{ env.ARGOCD_ROLE_ARN }}"
-          
+
           # Create a values file for the installation
           cat > argocd-install-values.yaml <<EOF
           global:
@@ -614,10 +623,9 @@ jobs:
               annotations:
                 eks.amazonaws.com/role-arn: "${{ env.ARGOCD_ROLE_ARN }}"
             ingress:
-              nanme: argocd-ingress
+              name: argocd-ingress
               enabled: true
               ingressClassName: nginx
-              # hostname and hosts[0].name are not valid in the chart, will be set via --set
           controller:
             serviceAccount:
               annotations:
@@ -627,29 +635,29 @@ jobs:
               annotations:
                 eks.amazonaws.com/role-arn: "${{ env.ARGOCD_ROLE_ARN }}"
           EOF
-          
-          # Install or upgrade ArgoCD with the values file and correct ingress flags
+
+          # Install or upgrade ArgoCD with the values file, ingress flags, and OIDC config
           helm upgrade --install argocd argo/argo-cd \
             --namespace argocd \
             --create-namespace \
+            --set server.serviceAccount.create=true \
+            --set server.serviceAccount.name=argocd-server \
             --set server.ingress.enabled=true \
             --set server.ingress.ingressClassName=nginx \
             --set server.ingress.hostname=argocd.bunnycloud.xyz \
             --set server.ingress.annotations."external-dns\.alpha\.kubernetes\.io/hostname"="argocd.bunnycloud.xyz." \
-            --set server.ingress.annotations."nginx\.ingress\.kubernetes\.io/ssl-redirect"="false" \
-            --set server.ingress.annotations."nginx\.ingress\.kubernetes\.io/force-ssl-redirect"="false" \
-            --set server.service.servicePortHttps=443 \
+            --set server.ingress.annotations."nginx\.ingress\.kubernetes\.io/ssl-redirect"="true" \
+            --set server.ingress.annotations."nginx\.ingress\.kubernetes\.io/force-ssl-redirect"="true" \
             --set server.ingress.annotations."nginx\.ingress\.kubernetes\.io/backend-protocol"="HTTPS" \
             --set server.ingress.annotations."service\.beta\.kubernetes\.io/aws-load-balancer-ssl-cert"="${{ env.ACM_CERTIFICATE_ARN }}" \
             --set server.ingress.annotations."service\.beta\.kubernetes\.io/aws-load-balancer-backend-protocol"="http" \
             --set server.ingress.annotations."service\.beta\.kubernetes\.io/aws-load-balancer-ssl-ports"="https" \
-            --set server.ingress.annotations."external-dns\.alpha\.kubernetes\.io/alias"="false" \
-            --set configs.params."server.insecure"="true" \
+            --set-string configs.oidc.config="name: Cognito\nissuer: ${{ env.COGNITO_ISSUER_URL }}\nclientID: ${{ env.COGNITO_CLIENT_ID }}\nclientSecret: ${{ env.COGNITO_CLIENT_SECRET }}\nrequestedScopes:\n  - openid\n  - profile\n  - email" \
             --values argocd-install-values.yaml \
             --version 6.11.1 \
             --timeout 10m \
             --wait
-          
+
           # Verify the annotation was set correctly
           kubectl get serviceaccount argocd-server -n argocd -o yaml
 
