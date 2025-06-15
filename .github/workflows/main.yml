@@ -625,7 +625,7 @@ jobs:
             ingress:
               enabled: true
               ingressClassName: nginx
-              hosts:
+              hostname:
                 - argocd.bunnycloud.xyz
               annotations:
                 "nginx.ingress.kubernetes.io/ssl-redirect": "true"
@@ -636,7 +636,7 @@ jobs:
                 # AWS ELB specific annotations (like service.beta.kubernetes.io/*) belong on the NGINX controller's service, not here.
               tls:
                 - hosts:
-                    - argocd.bunnycloud.xyz
+                    - "argocd.bunnycloud.xyz"
                   secretName: argocd-server-tls
               extraHosts: {}
           # Annotate other SAs if they need AWS permissions (e.g., for specific Git repo access or cluster management tasks)
