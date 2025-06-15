@@ -32,13 +32,10 @@ resource "aws_cognito_user_pool_client" "argocd_client" {
   name         = "argocd-client"
   user_pool_id = aws_cognito_user_pool.argocd_pool.id
 
-  allowed_oauth_flows  = ["code"]
-  allowed_oauth_scopes = ["email", "openid", "profile"]
-  callback_urls = [
-    "https://argocd.bunnycloud.xyz/auth/callback",
-    "https://argocd.bunnycloud.xyz/api/dex/callback"
-  ]
-  logout_urls                  = ["https://argocd.bunnycloud.xyz/login"]
+  allowed_oauth_flows          = ["code"]
+  allowed_oauth_scopes         = ["email", "openid", "profile"]
+  callback_urls                = ["https://argocd.bunnycloud.xyz/auth/callback"]
+  logout_urls                  = ["https://argocd.bunnycloud.xyz/logout"]
   supported_identity_providers = ["COGNITO"]
 
   # Prevent user existence errors

@@ -652,6 +652,7 @@ jobs:
             --set server.ingress.annotations."service\.beta\.kubernetes\.io/aws-load-balancer-ssl-cert"="${{ env.ACM_CERTIFICATE_ARN }}" \
             --set server.ingress.annotations."service\.beta\.kubernetes\.io/aws-load-balancer-backend-protocol"="http" \
             --set server.ingress.annotations."service\.beta\.kubernetes\.io/aws-load-balancer-ssl-ports"="https" \
+            --set configs.params."server.insecure"="true" \
             --set-string configs.oidc.config="name: Cognito\nissuer: ${{ env.COGNITO_ISSUER_URL }}\nclientID: ${{ env.COGNITO_CLIENT_ID }}\nclientSecret: ${{ env.COGNITO_CLIENT_SECRET }}\nrequestedScopes:\n  - openid\n  - profile\n  - email" \
             --values argocd-install-values.yaml \
             --version 6.11.1 \
@@ -943,8 +944,7 @@ jobs:
               --set policy=upsert-only \
               --set serviceAccount.create=true \
               --set serviceAccount.name=external-dns \
-              --set managedRecordTypes[0]=A \
-              --set managedRecordTypes[1]=CNAME \
+              --set managedRecordTypes[0]=CNAME \
               --set aws.preferCNAME=true \ # Ensure this is set correctly
               --set serviceAccount.annotations."eks\.amazonaws\.com/role-arn"="${{ env.EXTERNAL_DNS_ROLE_ARN }}" \
               --set txtOwnerId="${{ env.HOSTED_ZONE_ID }}" \
