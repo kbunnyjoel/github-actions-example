@@ -175,7 +175,7 @@ resource "aws_cognito_user_in_group" "dev_in_dev_group" {
 
 # Store the Cognito client secret in AWS Secrets Manager
 resource "aws_secretsmanager_secret" "argocd_cognito_client_secret" {
-  name        = "argocd-cognito-client-secret" # This is the secret ID your workflow expects
+  name        = "argocd-cognito-client-secret-v2" # This is the secret ID your workflow expects
   description = "Client secret for ArgoCD Cognito User Pool Client"
 }
 

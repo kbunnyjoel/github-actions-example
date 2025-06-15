@@ -27,6 +27,8 @@ resource "aws_route53_record" "cert_validation" {
   type    = element(aws_acm_certificate.wildcard_certificate.domain_validation_options.*.resource_record_type, 0)
   records = [element(aws_acm_certificate.wildcard_certificate.domain_validation_options.*.resource_record_value, 0)]
   ttl     = 60
+
+  depends_on = [aws_route53_zone.main] # Ensure the zone is created before this record
 }
 
 # Waits for the ACM certificate to be validated using the DNS record.
@@ -35,5 +37,5 @@ resource "aws_acm_certificate_validation" "acm_cert_validation" {
   count = var.create_dns_records ? 1 : 0
 
   certificate_arn         = aws_acm_certificate.wildcard_certificate.arn
-  validation_record_fqdns = [aws_route53_record.cert_validation[0].fqdn] # Use the FQDN of the created record
+  validation_record_fqdns = [for record in aws_route53_record.cert_validation : record.fqdn] # Use all FQDNs
 }

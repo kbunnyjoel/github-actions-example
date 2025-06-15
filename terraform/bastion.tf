@@ -102,6 +102,10 @@ resource "aws_eip" "bastion_eip" {
   }
 }
 
+# DNS record for the bastion host
+# NOTE: If this record already exists (e.g., created manually or by a previous Terraform run),
+# you must import it using the following command:
+# terraform import aws_route53_record.bastion_dns[0] ZONEID_bastion.bunnycloud.xyz_A
 resource "aws_route53_record" "bastion_dns" {
   count   = var.create_dns_records ? 1 : 0
   zone_id = aws_route53_zone.main.zone_id
@@ -109,4 +113,8 @@ resource "aws_route53_record" "bastion_dns" {
   type    = "A"
   ttl     = 60
   records = [aws_eip.bastion_eip.public_ip]
+
+  lifecycle {
+    ignore_changes = [records]
+  }
 }
