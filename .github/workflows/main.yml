@@ -3,10 +3,14 @@ name: Nodejs CI with code coverage
 on:
   workflow_dispatch:
     inputs:
-      run_terraform:
-        description: "Run Terraform?"
-        required: false
-        default: "true"
+      destroy:
+        description: 'Do you want to destroy infrastructure?'
+        required: true
+        default: 'false'
+        type: choice
+        options:
+          - 'false'
+          - 'true'
   push:
     branches: [ main ]
     paths:
@@ -316,13 +320,37 @@ jobs:
         with:
           terraform_version: "1.11.0" # Example: Use a more recent stable version
 
-      - name: Terraform Init
-        working-directory: terraform
-        run: terraform init
+      - name: Confirm before destroying infrastructure
+        if: github.event.inputs.destroy == 'true'
+        run: |
+          echo "⚠️  You chose to destroy infrastructure."
 
-      - name: Terraform Destroy
-        working-directory: terraform
-        run: terraform destroy -auto-approve
+      - name: Destroy Terraform-managed infrastructure
+        if: github.event.inputs.destroy == 'true'
+        run: |
+          cd terraform
+          terraform init
+          terraform destroy -auto-approve
+
+      - name: Clean up orphaned ELBs and their subnets (manual cleanup)
+        if: github.event.inputs.destroy == 'true'
+        run: |
+          echo "🧹 Cleaning up leftover Load Balancers and subnets..."
+          
+          # Delete classic ELBs
+          for elb in $(aws elb describe-load-balancers --query 'LoadBalancerDescriptions[].LoadBalancerName' --output text); do
+            aws elb delete-load-balancer --load-balancer-name "$elb" || echo "Failed to delete ELB: $elb"
+          done
+
+          # Delete NLBs and ALBs
+          for elbv2 in $(aws elbv2 describe-load-balancers --query 'LoadBalancers[].LoadBalancerArn' --output text); do
+            aws elbv2 delete-load-balancer --load-balancer-arn "$elbv2" || echo "Failed to delete ELBv2: $elbv2"
+          done
+
+          # Delete unused subnets
+          for subnet in $(aws ec2 describe-subnets --query 'Subnets[].SubnetId' --output text); do
+            aws ec2 delete-subnet --subnet-id "$subnet" || echo "Skipping in-use subnet: $subnet"
+          done
 
       
   deploy-argocd:
