@@ -879,6 +879,11 @@ jobs:
       - name: Install ExternalDNS
         run: |
           echo "Installing ExternalDNS..."
+          # Attempt to clean up any existing Helm release lock/secret for external-dns
+          echo "Attempting to delete existing Helm release secret for external-dns to avoid lock issues..."
+          kubectl delete secret -n external-dns -l owner=helm,name=external-dns --ignore-not-found=true
+          # A short pause to ensure the secret deletion is processed if it occurred.
+          sleep 5
           # Install ExternalDNS
           helm upgrade --install external-dns external-dns/external-dns \
             --namespace external-dns --create-namespace \
@@ -909,8 +914,10 @@ jobs:
           if ! kubectl rollout status deployment external-dns -n external-dns --timeout=30s; then
             echo "ExternalDNS deployment failed. Reinstalling..."
             helm uninstall external-dns -n external-dns || true
-            sleep 10
-            kubectl delete secret -n external-dns $(kubectl get secrets -n external-dns | grep sh.helm.release.v1.external-dns | awk '{print $1}') || true
+            # Add a more robust way to delete the Helm secret, similar to the initial install step
+            echo "Attempting to delete existing Helm release secret for external-dns before retry..."
+            kubectl delete secret -n external-dns -l owner=helm,name=external-dns --ignore-not-found=true
+            # Wait for resources to be cleaned up
             sleep 5
             helm upgrade --install external-dns external-dns/external-dns \
               --namespace external-dns --create-namespace \
