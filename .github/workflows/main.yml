@@ -605,17 +605,8 @@ jobs:
           global:
             dualStack:
               enabled: false
-          # Disable Dex if using Cognito as the primary OIDC provider
           dex:
             enabled: false
-          # Example: Disable notifications controller if not used, to save resources
-          # notifications:
-          #   enabled: false
-          # Example: Annotate ApplicationSet controller's SA if it needs AWS permissions
-          # applicationSet:
-          #   serviceAccount:
-          #     annotations:
-          #       eks.amazonaws.com/role-arn: "${{ env.ARGOCD_ROLE_ARN }}" # Or a more specific role
           server:
             serviceAccount:
               create: true
@@ -625,40 +616,43 @@ jobs:
             ingress:
               enabled: true
               ingressClassName: nginx
-              hostname:
-                - argocd.bunnycloud.xyz
+              # hostname and hosts[0].name are not valid in the chart, will be set via --set
               annotations:
                 "nginx.ingress.kubernetes.io/ssl-redirect": "true"
                 "nginx.ingress.kubernetes.io/force-ssl-redirect": "true"
                 "nginx.ingress.kubernetes.io/backend-protocol": "HTTPS"
                 "external-dns.alpha.kubernetes.io/hostname": "argocd.bunnycloud.xyz."
                 "external-dns.alpha.kubernetes.io/alias": "false"
-                # AWS ELB specific annotations (like service.beta.kubernetes.io/*) belong on the NGINX controller's service, not here.
               tls:
                 - hosts:
                     - "argocd.bunnycloud.xyz"
                   secretName: argocd-server-tls
               extraHosts: {}
-          # Annotate other SAs if they need AWS permissions (e.g., for specific Git repo access or cluster management tasks)
           controller:
             serviceAccount:
               annotations:
-                eks.amazonaws.com/role-arn: "${{ env.ARGOCD_ROLE_ARN }}" # Use the main ArgoCD role or a more specific one
+                eks.amazonaws.com/role-arn: "${{ env.ARGOCD_ROLE_ARN }}"
           repoServer:
             serviceAccount:
               annotations:
-                eks.amazonaws.com/role-arn: "${{ env.ARGOCD_ROLE_ARN }}" # Use the main ArgoCD role or a more specific one
-          # Ensure other necessary ArgoCD configurations are here
+                eks.amazonaws.com/role-arn: "${{ env.ARGOCD_ROLE_ARN }}"
           EOF
           
-          # Install or upgrade ArgoCD with the values file
-          # Use upgrade --install for idempotency
+          # Install or upgrade ArgoCD with the values file and correct ingress flags
           helm upgrade --install argocd argo/argo-cd \
             --namespace argocd \
             --create-namespace \
+            --set server.ingress.enabled=true \
+            --set server.ingress.ingressClassName=nginx \
             --set server.ingress.hostname=argocd.bunnycloud.xyz \
-            --set server.ingress.extraHosts={} \
             --set server.ingress.annotations."external-dns\.alpha\.kubernetes\.io/hostname"="argocd.bunnycloud.xyz." \
+            --set server.ingress.annotations."nginx\.ingress\.kubernetes\.io/ssl-redirect"="true" \
+            --set server.ingress.annotations."nginx\.ingress\.kubernetes\.io/force-ssl-redirect"="true" \
+            --set server.ingress.annotations."nginx\.ingress\.kubernetes\.io/backend-protocol"="HTTPS" \
+            --set server.ingress.annotations."service\.beta\.kubernetes\.io/aws-load-balancer-ssl-cert"="${{ env.ACM_CERTIFICATE_ARN }}" \
+            --set server.ingress.annotations."service\.beta\.kubernetes\.io/aws-load-balancer-backend-protocol"="http" \
+            --set server.ingress.annotations."service\.beta\.kubernetes\.io/aws-load-balancer-ssl-ports"="https" \
+            --set server.ingress.extraHosts={} \
             --set server.ingress.annotations."external-dns\.alpha\.kubernetes\.io/alias"="false" \
             --values argocd-install-values.yaml \
             --version 6.11.1 \
