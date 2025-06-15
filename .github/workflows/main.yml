@@ -626,6 +626,9 @@ jobs:
               name: argocd-ingress
               enabled: true
               ingressClassName: nginx
+          configs:
+            params:
+              server.insecure: true # ArgoCD server listens on HTTP
           controller:
             serviceAccount:
               annotations:
@@ -642,7 +645,6 @@ jobs:
             --create-namespace \
             --set server.serviceAccount.create=true \
             --set server.serviceAccount.name=argocd-server \
-            --set configs.params."server.insecure"="true" \
             --set server.ingress.enabled=true \
             --set server.ingress.ingressClassName=nginx \
             --set server.ingress.hostname=argocd.bunnycloud.xyz \
