@@ -85,7 +85,7 @@ output "cognito_client_secret" {
 }
 
 output "cognito_issuer_url" {
-  value = "https://cognito-idp.${data.aws_region.current.name}.amazonaws.com/${aws_cognito_user_pool.argocd.id}"
+  value = "${aws_cognito_user_pool_domain.argocd_domain.domain}.auth.${var.aws_region}.amazoncognito.com/oauth2"
 }
 
 output "cognito_client_id" {
@@ -110,4 +110,9 @@ output "cognito_users" {
     }
   }
   sensitive = true
+}
+
+output "cognito_oidc_issuer_url" {
+  description = "OIDC issuer URL for Cognito with /oauth2 path"
+  value       = "${aws_cognito_user_pool_endpoint}.oauth2"
 }

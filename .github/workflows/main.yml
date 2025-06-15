@@ -652,9 +652,9 @@ jobs:
             --set server.ingress.annotations."nginx\.ingress\.kubernetes\.io/backend-protocol"="HTTP" \
             --set server.ingress.annotations."service\.beta\.kubernetes\.io/aws-load-balancer-backend-protocol"="http" \
             --set server.ingress.annotations."service\.beta\.kubernetes\.io/aws-load-balancer-ssl-cert"="${{ env.ACM_CERTIFICATE_ARN }}" \
-            --set server.ingress.annotations."service\.beta\.kubernetes\.io/aws-load-balancer-ssl-ports"="https" \
             --set server.ingress.annotations."external-dns\.alpha\.kubernetes\.io/hostname"="argocd.bunnycloud.xyz." \
             --set-string configs.oidc.config="name: Cognito\nissuer: ${{ env.COGNITO_ISSUER_URL }}\nclientID: ${{ env.COGNITO_CLIENT_ID }}\nclientSecret: ${{ env.COGNITO_CLIENT_SECRET }}\nrequestedScopes:\n  - openid\n  - profile\n  - email" \
+            --set secret.extra.[oidc.cognito.clientSecret]=${{ secrets.COGNITO_CLIENT_SECRET }} \
             --values argocd-install-values.yaml \
             --version 6.11.1 \
             --timeout 10m \
