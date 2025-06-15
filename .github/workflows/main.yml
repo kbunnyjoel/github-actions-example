@@ -559,6 +559,54 @@ jobs:
       - name: Patch ArgoCD resources with Helm ownership
         run: bash k8s/argocd/patch-argocd-helm-ownership.sh
 
+      - name: Install ArgoCD (no IAM role yet)
+        run: |
+          echo "Installing ArgoCD with HTTPS Ingress..."
+
+          helm upgrade --install argocd argo/argo-cd \
+            --namespace argocd --create-namespace \
+            --version 5.51.6 \
+            --wait --timeout 10m \
+            --set server.serviceAccount.create=true \
+            --set server.serviceAccount.name=argocd-server \
+            --set server.ingress.enabled=true \
+            --set server.ingress.ingressClassName=nginx \
+            --set server.ingress.hostname=argocd.bunnycloud.xyz \
+            --set server.ingress.annotations."external-dns\.alpha\.kubernetes\.io/hostname"="argocd.bunnycloud.xyz." \
+            --set server.ingress.annotations."nginx\.ingress\.kubernetes\.io/ssl-redirect"="true" \
+            --set server.ingress.annotations."nginx\.ingress\.kubernetes\.io/force-ssl-redirect"="true" \
+            --set server.ingress.annotations."nginx\.ingress\.kubernetes\.io/backend-protocol"="HTTPS" \
+            --set server.ingress.annotations."service\.beta\.kubernetes\.io/aws-load-balancer-ssl-cert"="${{ env.ACM_CERTIFICATE_ARN }}" \
+            --set server.ingress.annotations."service\.beta\.kubernetes\.io/aws-load-balancer-backend-protocol"="http" \
+            --set server.ingress.annotations."service\.beta\.kubernetes\.io/aws-load-balancer-ssl-ports"="https"
+
+      - name: Get ArgoCD IAM Role ARN
+        run: |
+          cd terraform
+          ARGOCD_ROLE_ARN=$(terraform output -raw argocd_cognito_role_arn || echo "")
+          if [ -z "$ARGOCD_ROLE_ARN" ]; then
+            echo "Error: Could not get ArgoCD role ARN from Terraform output"
+            exit 1
+          fi
+          echo "Using ArgoCD role ARN: $ARGOCD_ROLE_ARN"
+          echo "ARGOCD_ROLE_ARN=$ARGOCD_ROLE_ARN" >> $GITHUB_ENV
+          
+          # Get Cognito details
+          COGNITO_CLIENT_ID=$(terraform output -raw cognito_user_pool_client_id || echo "")
+          COGNITO_ISSUER_URL=$(terraform output -raw cognito_user_pool_endpoint || echo "")
+          
+          echo "Attempting to retrieve Cognito client secret from AWS Secrets Manager..."
+          COGNITO_CLIENT_SECRET=$(aws secretsmanager get-secret-value --secret-id argocd-cognito-client-secret --query SecretString --output text 2>/dev/null)
+          if [ -z "$COGNITO_CLIENT_SECRET" ]; then
+            echo "Error: Failed to retrieve Cognito client secret (argocd-cognito-client-secret) from AWS Secrets Manager."
+            echo "Please ensure the secret exists (was created by Terraform in the correct region: ap-southeast-2) and that the IAM role has permissions."
+            exit 1
+          fi
+          
+          echo "COGNITO_CLIENT_ID=$COGNITO_CLIENT_ID" >> $GITHUB_ENV
+          echo "COGNITO_ISSUER_URL=$COGNITO_ISSUER_URL" >> $GITHUB_ENV
+          echo "COGNITO_CLIENT_SECRET=$COGNITO_CLIENT_SECRET" >> $GITHUB_ENV
+
       - name: Install ArgoCD with IAM role
         run: |
           # Debug the ARN value
@@ -629,33 +677,6 @@ jobs:
           
           # Verify the annotation was set correctly
           kubectl get serviceaccount argocd-server -n argocd -o yaml
-
-      - name: Get ArgoCD IAM Role ARN
-        run: |
-          cd terraform
-          ARGOCD_ROLE_ARN=$(terraform output -raw argocd_cognito_role_arn || echo "")
-          if [ -z "$ARGOCD_ROLE_ARN" ]; then
-            echo "Error: Could not get ArgoCD role ARN from Terraform output"
-            exit 1
-          fi
-          echo "Using ArgoCD role ARN: $ARGOCD_ROLE_ARN"
-          echo "ARGOCD_ROLE_ARN=$ARGOCD_ROLE_ARN" >> $GITHUB_ENV
-          
-          # Get Cognito details
-          COGNITO_CLIENT_ID=$(terraform output -raw cognito_user_pool_client_id || echo "")
-          COGNITO_ISSUER_URL=$(terraform output -raw cognito_user_pool_endpoint || echo "")
-          
-          echo "Attempting to retrieve Cognito client secret from AWS Secrets Manager..."
-          COGNITO_CLIENT_SECRET=$(aws secretsmanager get-secret-value --secret-id argocd-cognito-client-secret --query SecretString --output text 2>/dev/null)
-          if [ -z "$COGNITO_CLIENT_SECRET" ]; then
-            echo "Error: Failed to retrieve Cognito client secret (argocd-cognito-client-secret) from AWS Secrets Manager."
-            echo "Please ensure the secret exists (was created by Terraform in the correct region: ap-southeast-2) and that the IAM role has permissions."
-            exit 1
-          fi
-          
-          echo "COGNITO_CLIENT_ID=$COGNITO_CLIENT_ID" >> $GITHUB_ENV
-          echo "COGNITO_ISSUER_URL=$COGNITO_ISSUER_URL" >> $GITHUB_ENV
-          echo "COGNITO_CLIENT_SECRET=$COGNITO_CLIENT_SECRET" >> $GITHUB_ENV
 
       - name: Update ArgoCD with IAM role
         run: |
