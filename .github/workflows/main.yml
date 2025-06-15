@@ -878,21 +878,36 @@ jobs:
           echo "✅ Records deletion request submitted."
       - name: Install ExternalDNS
         run: |
-          echo "Installing ExternalDNS..."
-          # Attempt to clean up any existing Helm release lock/secret for external-dns
-          echo "Attempting to delete existing Helm release secret for external-dns to avoid lock issues..."
-          kubectl delete secret -n external-dns -l owner=helm,name=external-dns --ignore-not-found=true
-          # A short pause to ensure the secret deletion is processed if it occurred.
-          sleep 5
-          # Install ExternalDNS
-          helm upgrade --install external-dns external-dns/external-dns \
+          echo "🔧 Installing ExternalDNS..."
+
+          # Define release and chart names explicitly
+          RELEASE_NAME="external-dns"
+          CHART_NAME="external-dns/external-dns"
+
+          # Validate that required values are non-empty
+          if [ -z "$RELEASE_NAME" ] || [ -z "$CHART_NAME" ]; then
+            echo "❌ RELEASE_NAME or CHART_NAME is empty. Aborting Helm install."
+            exit 1
+          fi
+
+          echo "🛠️ Release: $RELEASE_NAME"
+          echo "📦 Chart: $CHART_NAME"
+
+          echo "🧹 Cleaning up potential Helm lock secrets..."
+          for i in {1..10}; do
+            kubectl delete secret "sh.helm.release.v1.${RELEASE_NAME}.v${i}" -n external-dns --ignore-not-found
+          done
+
+          echo "🚀 Running Helm upgrade/install..."
+          helm upgrade --install "$RELEASE_NAME" "$CHART_NAME" \
             --namespace external-dns --create-namespace \
             --set sources[0]=service \
             --set sources[1]=ingress \
             --set aws.zoneType=public \
             --set aws.region=ap-southeast-2 \
-            --set extraArgs[0]="--aws-prefer-cname=true" \ # Explicitly set correct flag
             --set domainFilters[0]=bunnycloud.xyz \
+            --set managedRecordTypes[0]=A \
+            --set managedRecordTypes[1]=CNAME \
             --set policy=upsert-only \
             --set serviceAccount.create=true \
             --set serviceAccount.name=external-dns \
@@ -903,10 +918,10 @@ jobs:
             --set aws.batchChangeSize=1000 \
             --set logLevel=debug \
             --version 1.14.5 \
-            --timeout 20m \
+            --timeout 10m \
             --wait
-          
-          echo "ExternalDNS installed."
+
+          echo "✅ ExternalDNS installation complete."
 
       - name: Retry ExternalDNS install if deployment fails
         run: |
@@ -929,6 +944,9 @@ jobs:
               --set policy=upsert-only \
               --set serviceAccount.create=true \
               --set serviceAccount.name=external-dns \
+              --set managedRecordTypes[0]=A \
+              --set managedRecordTypes[1]=CNAME \
+              --set aws.preferCNAME=true \ # Ensure this is set correctly
               --set serviceAccount.annotations."eks\.amazonaws\.com/role-arn"="${{ env.EXTERNAL_DNS_ROLE_ARN }}" \
               --set txtOwnerId="${{ env.HOSTED_ZONE_ID }}" \
               --set provider=aws \ # Ensure provider is set if re-using these lines
