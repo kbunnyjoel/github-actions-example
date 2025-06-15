@@ -559,86 +559,6 @@ jobs:
       - name: Patch ArgoCD resources with Helm ownership
         run: bash k8s/argocd/patch-argocd-helm-ownership.sh
 
-      - name: Install ArgoCD
-        # This initial ArgoCD installation step is being removed because its configurations
-        # were being overridden by the subsequent 'Install ArgoCD with IAM role' step.
-        # All necessary configurations will be consolidated into that final Helm install using a comprehensive values file.
-        run: |
-          echo "Installing ArgoCD..."
-          
-          # Check if namespace exists and is terminating
-          if kubectl get namespace argocd 2>/dev/null | grep -q Terminating; then
-            echo "ArgoCD namespace is terminating. Waiting for it to be fully deleted..."
-            
-            # Force remove finalizers if any
-            kubectl get namespace argocd -o json | jq '.spec.finalizers = []' | kubectl replace --raw "/api/v1/namespaces/argocd/finalize" -f - || true
-            
-            # Wait for namespace to be fully deleted (max 2 minutes)
-            for i in {1..24}; do
-              if ! kubectl get namespace argocd &>/dev/null; then
-                echo "Namespace argocd has been deleted."
-                break
-              fi
-              echo "Waiting for namespace deletion... ($i/24)"
-              sleep 5
-            done
-            
-            # If namespace still exists after waiting, skip ArgoCD installation
-            if kubectl get namespace argocd &>/dev/null; then
-              echo "ERROR: Namespace argocd is still terminating after waiting. Skipping ArgoCD installation."
-              echo "Please manually delete the namespace and try again."
-              exit 0  # Exit with success to allow workflow to continue
-            fi
-          fi
-          
-          # Create namespace if it doesn't exist
-          echo "Ensuring ArgoCD namespace exists..."
-          kubectl create namespace argocd --dry-run=client -o yaml | kubectl apply -f -
-          
-          echo "Initial ArgoCD Helm install step skipped. Configuration will be applied in the 'Install ArgoCD with IAM role' step using a comprehensive values file."
-
-      - name: Get ArgoCD IAM Role ARN
-        run: |
-          cd terraform
-          ARGOCD_ROLE_ARN=$(terraform output -raw argocd_cognito_role_arn || echo "")
-          if [ -z "$ARGOCD_ROLE_ARN" ]; then
-            echo "Error: Could not get ArgoCD role ARN from Terraform output"
-            exit 1
-          fi
-          echo "Using ArgoCD role ARN: $ARGOCD_ROLE_ARN"
-          echo "ARGOCD_ROLE_ARN=$ARGOCD_ROLE_ARN" >> $GITHUB_ENV
-          
-          # Get Cognito details
-          COGNITO_CLIENT_ID=$(terraform output -raw cognito_user_pool_client_id || echo "")
-          COGNITO_ISSUER_URL=$(terraform output -raw cognito_user_pool_endpoint || echo "")
-          
-          echo "Attempting to retrieve Cognito client secret from AWS Secrets Manager..."
-          COGNITO_CLIENT_SECRET=$(aws secretsmanager get-secret-value --secret-id argocd-cognito-client-secret --query SecretString --output text 2>/dev/null)
-          if [ -z "$COGNITO_CLIENT_SECRET" ]; then
-            echo "Error: Failed to retrieve Cognito client secret (argocd-cognito-client-secret) from AWS Secrets Manager."
-            echo "Please ensure the secret exists (was created by Terraform in the correct region: ap-southeast-2) and that the IAM role has permissions."
-            exit 1
-          fi
-          
-          echo "COGNITO_CLIENT_ID=$COGNITO_CLIENT_ID" >> $GITHUB_ENV
-          echo "COGNITO_ISSUER_URL=$COGNITO_ISSUER_URL" >> $GITHUB_ENV
-          echo "COGNITO_CLIENT_SECRET=$COGNITO_CLIENT_SECRET" >> $GITHUB_ENV
-
-      - name: Update ArgoCD with IAM role
-        run: |
-          # Uninstall ArgoCD Helm release first to clean up all resources
-          helm uninstall argocd -n argocd || true
-          
-          # Delete any remaining resources that might cause conflicts
-          kubectl delete serviceaccount argocd-server -n argocd --ignore-not-found=true
-          kubectl delete serviceaccount argocd-application-controller -n argocd --ignore-not-found=true
-          kubectl delete serviceaccount argocd-repo-server -n argocd --ignore-not-found=true
-          kubectl delete serviceaccount argocd-dex-server -n argocd --ignore-not-found=true
-          kubectl delete serviceaccount argocd-redis -n argocd --ignore-not-found=true
-          
-          # Wait a moment for resources to be fully deleted
-          sleep 5
-
       - name: Install ArgoCD with IAM role
         run: |
           # Debug the ARN value
@@ -710,6 +630,47 @@ jobs:
           # Verify the annotation was set correctly
           kubectl get serviceaccount argocd-server -n argocd -o yaml
 
+      - name: Get ArgoCD IAM Role ARN
+        run: |
+          cd terraform
+          ARGOCD_ROLE_ARN=$(terraform output -raw argocd_cognito_role_arn || echo "")
+          if [ -z "$ARGOCD_ROLE_ARN" ]; then
+            echo "Error: Could not get ArgoCD role ARN from Terraform output"
+            exit 1
+          fi
+          echo "Using ArgoCD role ARN: $ARGOCD_ROLE_ARN"
+          echo "ARGOCD_ROLE_ARN=$ARGOCD_ROLE_ARN" >> $GITHUB_ENV
+          
+          # Get Cognito details
+          COGNITO_CLIENT_ID=$(terraform output -raw cognito_user_pool_client_id || echo "")
+          COGNITO_ISSUER_URL=$(terraform output -raw cognito_user_pool_endpoint || echo "")
+          
+          echo "Attempting to retrieve Cognito client secret from AWS Secrets Manager..."
+          COGNITO_CLIENT_SECRET=$(aws secretsmanager get-secret-value --secret-id argocd-cognito-client-secret --query SecretString --output text 2>/dev/null)
+          if [ -z "$COGNITO_CLIENT_SECRET" ]; then
+            echo "Error: Failed to retrieve Cognito client secret (argocd-cognito-client-secret) from AWS Secrets Manager."
+            echo "Please ensure the secret exists (was created by Terraform in the correct region: ap-southeast-2) and that the IAM role has permissions."
+            exit 1
+          fi
+          
+          echo "COGNITO_CLIENT_ID=$COGNITO_CLIENT_ID" >> $GITHUB_ENV
+          echo "COGNITO_ISSUER_URL=$COGNITO_ISSUER_URL" >> $GITHUB_ENV
+          echo "COGNITO_CLIENT_SECRET=$COGNITO_CLIENT_SECRET" >> $GITHUB_ENV
+
+      - name: Update ArgoCD with IAM role
+        run: |
+          # Uninstall ArgoCD Helm release first to clean up all resources
+          helm uninstall argocd -n argocd || true
+          
+          # Delete any remaining resources that might cause conflicts
+          kubectl delete serviceaccount argocd-server -n argocd --ignore-not-found=true
+          kubectl delete serviceaccount argocd-application-controller -n argocd --ignore-not-found=true
+          kubectl delete serviceaccount argocd-repo-server -n argocd --ignore-not-found=true
+          kubectl delete serviceaccount argocd-dex-server -n argocd --ignore-not-found=true
+          kubectl delete serviceaccount argocd-redis -n argocd --ignore-not-found=true
+          
+          # Wait a moment for resources to be fully deleted
+          sleep 5
 
       - name: Validate ArgoCD IAM role integration
         run: |
