@@ -697,6 +697,7 @@ jobs:
             serviceAccount:
               create: true # Ensure Helm manages the SA
               name: argocd-server # Default name, ensure it matches expectations
+              namespace: argocd
               annotations:
                 eks.amazonaws.com/role-arn: "${{ env.ARGOCD_ROLE_ARN }}"
             ingress:
