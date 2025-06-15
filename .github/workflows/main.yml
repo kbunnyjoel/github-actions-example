@@ -684,7 +684,7 @@ jobs:
                 "nginx.ingress.kubernetes.io/ssl-redirect": "false" # NLB handles SSL
                 "nginx.ingress.kubernetes.io/force-ssl-redirect": "false" # NLB handles SSL
                 "nginx.ingress.kubernetes.io/backend-protocol": "HTTP" # Traffic from NGINX to ArgoCD server pod is HTTP
-                "external-dns.alpha.kubernetes.io/hostname": "argocd.bunnycloud.xyz." # For ExternalDNS
+                "external-dns.alpha.kubernetes.io/hostname": "argocd.bunnycloud.xyz" # For ExternalDNS
               # The ArgoCD chart defaults server.ingress.tls to [], which means no TLS section in the Ingress resource.
               # This is correct when an external entity (like NLB via NGINX service) handles TLS.
           # Annotate other SAs if they need AWS permissions (e.g., for specific Git repo access or cluster management tasks)
