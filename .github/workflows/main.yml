@@ -605,7 +605,7 @@ jobs:
       - name: Patch ArgoCD resources with Helm ownership
         run: bash k8s/argocd/patch-argocd-helm-ownership.sh
 
-      - name: Get ArgoCD IAM Role ARN
+      - name: Get ArgoCD IAM Role ARN and Cognito details
         run: |
           cd terraform
           ARGOCD_ROLE_ARN=$(terraform output -raw argocd_cognito_role_arn || echo "")
@@ -615,12 +615,12 @@ jobs:
           fi
           echo "Using ArgoCD role ARN: $ARGOCD_ROLE_ARN"
           echo "ARGOCD_ROLE_ARN=$ARGOCD_ROLE_ARN" >> $GITHUB_ENV
-          
+
           # Get Cognito details
           echo "Fetching Cognito details..."
           COGNITO_CLIENT_ID=$(terraform output -raw cognito_user_pool_client_id || echo "")
           COGNITO_ISSUER_URL=$(terraform output -raw cognito_user_pool_endpoint || echo "")
-          
+
           echo "Fetching Cognito client secret from Secrets Manager..."
           COGNITO_CLIENT_SECRET=$(aws secretsmanager get-secret-value \
             --secret-id argocd-cognito-client-secret \
@@ -633,7 +633,9 @@ jobs:
             exit 1
           fi
 
-          echo "✅ Cognito details retrieved."
+          echo "✅ Cognito details retrieved (client ID and issuer URL set)."
+
+          # Export to GitHub environment (secure)
           echo "COGNITO_CLIENT_ID=$COGNITO_CLIENT_ID" >> $GITHUB_ENV
           echo "COGNITO_ISSUER_URL=$COGNITO_ISSUER_URL" >> $GITHUB_ENV
           echo "COGNITO_CLIENT_SECRET=$COGNITO_CLIENT_SECRET" >> $GITHUB_ENV
@@ -708,7 +710,7 @@ jobs:
             --set server.ingress.annotations."nginx\.ingress\.kubernetes\.io/backend-protocol"="HTTPS" \
             --set server.ingress.annotations."service\.beta\.kubernetes\.io/aws-load-balancer-ssl-cert"="${{ env.ACM_CERTIFICATE_ARN }}" \
             --set server.ingress.annotations."service\.beta\.kubernetes\.io/aws-load-balancer-backend-protocol"="http" \
-            --set server.ingress.annotations."service\.beta\.kubernetes\.io/aws-load-balancer-ssl-ports"="https"
+            --set server.ingress.annotations."service\.beta\.kubernetes\.io/aws-load-balancer-ssl-ports"="https" \
             --timeout 10m \
             --wait
           
