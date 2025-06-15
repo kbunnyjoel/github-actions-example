@@ -63,7 +63,7 @@ output "acm_certificate_arn" {
 
 output "route53_zone_id" {
   description = "ID of the Route53 hosted zone for bunnycloud.xyz"
-  value       = data.aws_route53_zone.main.zone_id
+  value       = aws_route53_zone.main.zone_id
 }
 
 output "external_dns_role_arn" {
