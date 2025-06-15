@@ -646,7 +646,7 @@ jobs:
             --set server.ingress.enabled=true \
             --set server.ingress.ingressClassName=nginx \
             --set server.ingress.hostname=argocd.bunnycloud.xyz \
-            --set server.ingress.annotations."nginx\.ingress\.kubernetes\.io/force-ssl-redirect"="true" \
+            --set server.ingress.annotations."nginx\.ingress\.kubernetes\.io/force-ssl-redirect"="false" \
             --set server.ingress.annotations."nginx\.ingress\.kubernetes\.io/backend-protocol"="HTTP" \
             --set server.ingress.annotations."service\.beta\.kubernetes\.io/aws-load-balancer-backend-protocol"="http" \
             --set server.ingress.annotations."service\.beta\.kubernetes\.io/aws-load-balancer-ssl-cert"="${{ env.ACM_CERTIFICATE_ARN }}" \
@@ -661,6 +661,11 @@ jobs:
           # Verify the annotation was set correctly
           kubectl get serviceaccount argocd-server -n argocd -o yaml
 
+
+  #         kubectl -n argocd patch configmap argocd-cm \
+  # --type merge \
+  # -p '{"data":{"configs.params.server.insecure":"true"}}'
+  
       - name: Validate ArgoCD IAM role integration
         run: |
           echo "Validating ArgoCD IAM role integration..."
