@@ -570,38 +570,6 @@ jobs:
             echo "Verifying NGINX Ingress Controller configuration..."
             kubectl get configmap -n ingress-nginx ingress-nginx-controller -o yaml
 
-      - name: Update ArgoCD DNS record
-        run: |
-          # Get the hosted zone ID from Terraform output
-          cd terraform
-          HOSTED_ZONE_ID=$(terraform output -raw route53_zone_id || echo "")
-          
-          if [ -z "$HOSTED_ZONE_ID" ]; then
-            echo "Error: Could not get hosted zone ID from Terraform output"
-            # Fallback to looking up the hosted zone
-            HOSTED_ZONE_ID=$(aws route53 list-hosted-zones --query "HostedZones[?Name=='bunnycloud.xyz.'].Id" --output text | sed 's/\/hostedzone\///')
-            
-            if [ -z "$HOSTED_ZONE_ID" ]; then
-              echo "Error: No hosted zone found for bunnycloud.xyz"
-              exit 1
-            fi
-          fi
-          
-          echo "Using hosted zone ID: $HOSTED_ZONE_ID"
-          
-          # Get the NGINX LoadBalancer hostname
-          NGINX_LB_HOSTNAME=$(kubectl get svc -n ingress-nginx ingress-nginx-controller -o jsonpath='{.status.loadBalancer.ingress[0].hostname}')
-          if [ -z "$NGINX_LB_HOSTNAME" ]; then
-            echo "Error: Could not get NGINX Ingress Controller LoadBalancer hostname"
-            exit 1
-          fi
-          echo "Using NGINX LoadBalancer hostname: $NGINX_LB_HOSTNAME"
-          
-          # Update ArgoCD DNS record
-          echo "DNS record for argocd.bunnycloud.xyz will be managed by ExternalDNS via Ingress annotations in the ArgoCD Helm chart."
-
-          kubectl get pods -n ingress-nginx
-
       - name: Patch ArgoCD resources with Helm ownership
         run: bash k8s/argocd/patch-argocd-helm-ownership.sh
 
@@ -1068,6 +1036,7 @@ jobs:
   generate-argo-apps:
     if: ${{ github.event.inputs.destroy != 'true' }}
     env:
+      # These env vars are set by the deploy-argocd job and should be available if 'needs' is correct
       IS_DESTROY: ${{ github.event.inputs.destroy == 'true' }}
     runs-on: ubuntu-latest
     permissions:
@@ -1075,6 +1044,7 @@ jobs:
       pull-requests: write
     steps:
       - uses: actions/checkout@v4
+      # This job needs ACM_CERT_ARN and NGINX_LB_HOSTNAME from deploy-argocd job
       - name: Set up Python and install Jinja2
         run: |
           sudo apt-get update
