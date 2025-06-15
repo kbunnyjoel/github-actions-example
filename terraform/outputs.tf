@@ -114,5 +114,5 @@ output "cognito_users" {
 
 output "cognito_oidc_issuer_url" {
   description = "OIDC issuer URL for Cognito with /oauth2 path"
-  value       = "${aws_cognito_user_pool_endpoint}.oauth2"
+  value       = "${aws_cognito_user_pool_domain.argocd_domain.domain}.oauth2"
 }
