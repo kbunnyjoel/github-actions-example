@@ -691,6 +691,17 @@ jobs:
                 eks.amazonaws.com/role-arn: "${{ env.ARGOCD_ROLE_ARN }}" # Use the main ArgoCD role or a more specific one
           # Ensure other necessary ArgoCD configurations are here
           EOF
+
+          echo "Fetching NGINX Ingress Controller ELB hostname..."
+          ELB_HOSTNAME=$(kubectl get svc -n ingress-nginx ingress-nginx-controller -o jsonpath='{.status.loadBalancer.ingress[0].hostname}')
+          
+          if [ -z "$ELB_HOSTNAME" ]; then
+            echo "❌ Error: ELB hostname not found."
+            exit 1
+          fi
+          
+          echo "✅ ELB hostname found: $ELB_HOSTNAME"
+          echo "ELB_HOSTNAME=$ELB_HOSTNAME" >> $GITHUB_ENV
           
           # Install or upgrade ArgoCD with the values file
           # Use upgrade --install for idempotency
@@ -705,6 +716,7 @@ jobs:
             --set server.ingress.ingressClassName=nginx \
             --set server.ingress.hostname=argocd.bunnycloud.xyz \
             --set server.ingress.annotations."external-dns\.alpha\.kubernetes\.io/hostname"="argocd.bunnycloud.xyz." \
+            --set server.ingress.annotations."external-dns\.alpha\.kubernetes\.io/target"="a6e6c60febcec44db80786d127e4f021-72f5bc35c18ed8bc.elb.ap-southeast-2.amazonaws.com" \
             --set server.ingress.annotations."nginx\.ingress\.kubernetes\.io/ssl-redirect"="true" \
             --set server.ingress.annotations."nginx\.ingress\.kubernetes\.io/force-ssl-redirect"="true" \
             --set server.ingress.annotations."nginx\.ingress\.kubernetes\.io/backend-protocol"="HTTPS" \
