@@ -3,14 +3,10 @@ name: Nodejs CI with code coverage
 on:
   workflow_dispatch:
     inputs:
-      destroy:
-        description: 'Set to true to destroy the EKS cluster'
-        required: false
-        default: 'false'
       run_terraform:
-        description: 'Run Terraform? (true/false)'
+        description: "Run Terraform?"
         required: false
-        default: 'true'
+        default: "true"
   push:
     branches: [ main ]
     paths:
@@ -142,7 +138,7 @@ jobs:
           done
 
   terraform-eks:
-    if: ${{ github.event.inputs.run_terraform == 'true' && github.event.inputs.destroy != 'true' }}
+    if: ${{ github.event.inputs.run_terraform != 'false' && github.event.inputs.destroy != 'true' }}
     env:
       IS_DESTROY: ${{ github.event.inputs.destroy == 'true' }}
     runs-on: ubuntu-latest
@@ -579,6 +575,17 @@ jobs:
             --set server.ingress.annotations."service\.beta\.kubernetes\.io/aws-load-balancer-ssl-cert"="${{ env.ACM_CERTIFICATE_ARN }}" \
             --set server.ingress.annotations."service\.beta\.kubernetes\.io/aws-load-balancer-backend-protocol"="http" \
             --set server.ingress.annotations."service\.beta\.kubernetes\.io/aws-load-balancer-ssl-ports"="https"
+
+      - name: Patch ArgoCD server service account with IAM role
+        run: |
+          echo "Patching ArgoCD server service account with IAM role..."
+
+          kubectl annotate serviceaccount argocd-server \
+            -n argocd \
+            eks.amazonaws.com/role-arn=${{ env.ARGOCD_ROLE_ARN }} \
+            --overwrite
+
+          echo "✅ ArgoCD IAM role successfully attached."
 
       - name: Get ArgoCD IAM Role ARN
         run: |
