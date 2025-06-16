@@ -353,7 +353,7 @@ jobs:
           echo "⚠️  You chose to destroy infrastructure."
 
       - name: Terraform Unlock
-        if: ${{ github.event.inputs.destroy != 'true' }}
+        if: ${{ github.event.inputs.destroy == 'true' }}
         run: terraform force-unlock -force d94076e6-62cd-4748-fdc6-56e3e5ae080b || echo "No locks to unlock"
 
       - name: Destroy Terraform-managed infrastructure
