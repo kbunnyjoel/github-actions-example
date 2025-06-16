@@ -634,15 +634,8 @@ jobs:
                 external-dns.alpha.kubernetes.io/hostname: "argocd.bunnycloud.xyz."
           configs:
             params:
-              server.insecure: "true"
-            cm:
-              oidc.config: |
-                name: Cognito
-                issuer: ${COGNITO_ISSUER_URL}
-                clientID: ${COGNITO_CLIENT_ID}
-                clientSecret: ${COGNITO_CLIENT_SECRET}
-                requestedScopes: ["openid", "profile", "email"]
-                requestedIDTokenClaims: {"groups": {"essential": true}}
+              server.insecure: "true" # Ensure ArgoCD server listens on HTTP
+            # OIDC configuration will be applied via kubectl patch in the 'Configure ArgoCD with Cognito' step
           controller:
             serviceAccount:
               annotations:
