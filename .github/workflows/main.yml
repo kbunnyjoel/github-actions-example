@@ -697,20 +697,20 @@ jobs:
       - name: Validate Cognito environment values
         run: |
           missing=""
-          if [ -z "$COGNITO_CLIENT_ID" ]; then
+          if [ -z "${{ env.COGNITO_CLIENT_ID }}" ]; then
             echo "❌ COGNITO_CLIENT_ID is not set."
             missing=1
           fi
-          if [ -z "$COGNITO_CLIENT_SECRET" ]; then
+          if [ -z "${{ env.COGNITO_CLIENT_SECRET }}" ]; then
             echo "❌ COGNITO_CLIENT_SECRET is not set."
             missing=1
           fi
-          if [ -z "${{ env.ARGOCD_ROLE_ARN }}" ]; then
-            echo "❌ ${{ env.ARGOCD_ROLE_ARN }} is not set."
+          if [ -z "${{ env.COGNITO_ISSUER_URL }}" ]; then
+            echo "❌ COGNITO_ISSUER_URL is not set."
             missing=1
           fi
           if [ -z "${{ env.ARGOCD_ROLE_ARN }}" ]; then
-            echo "⚠️  ${{ env.ARGOCD_ROLE_ARN }} is not set. Continuing anyway..."
+            echo "⚠️  ARGOCD_ROLE_ARN is not set. Continuing anyway..."
           fi
           if [ "$missing" = "1" ]; then
             echo "🚫 Missing required Cognito configuration. Exiting."
