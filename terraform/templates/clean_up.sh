@@ -2,11 +2,18 @@
 
 set -euo pipefail
 
-DOMAIN_NAME="${1:-}"
+
+echo "🔍 Discovering Hosted Zones..."
+DOMAIN_NAME=$(aws route53 list-hosted-zones \
+  --query "HostedZones[?Config.PrivateZone==\`false\`].[Name]" \
+  --output text | head -n 1 | sed 's/\.$//')
+
 if [[ -z "$DOMAIN_NAME" ]]; then
-  echo "Usage: $0 <domain-name>"
+  echo "❌ No public hosted zones found in Route 53."
   exit 1
 fi
+
+echo "🔍 Using domain: $DOMAIN_NAME"
 
 echo "🔍 Looking up Hosted Zone ID for domain: $DOMAIN_NAME"
 HOSTED_ZONE_ID=$(aws route53 list-hosted-zones-by-name \
