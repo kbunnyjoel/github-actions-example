@@ -19,7 +19,7 @@ output "cognito_user_pool_domain" {
 
 output "cognito_user_pool_endpoint" {
   description = "The endpoint URL of the Cognito User Pool"
-  value       = "https://${aws_cognito_user_pool_domain.argocd_domain.domain}.auth.${var.aws_region}.amazoncognito.com"
+  value       = "https://cognito-idp.${var.aws_region}.amazonaws.com/${aws_cognito_user_pool.argocd_pool.id}"
 }
 
 output "argocd_cognito_role_arn" {
@@ -80,20 +80,13 @@ output "argocd_role_arn" {
 }
 
 output "cognito_client_secret" {
-  value     = aws_cognito_user_pool_client.argocd.client_secret
+  value     = aws_cognito_user_pool_client.argocd.client_secret # This referred to the client of the deleted pool
   sensitive = true
 }
 
-output "cognito_issuer_url" {
-  value = "${aws_cognito_user_pool_domain.argocd_domain.domain}.auth.${var.aws_region}.amazoncognito.com/oauth2"
-}
-
 output "cognito_client_id" {
-  value = aws_cognito_user_pool_client.argocd.id
-}
-
-output "cognito_domain" {
-  value = "https://${aws_cognito_user_pool_domain.argocd.domain}.auth.${data.aws_region.current.name}.amazoncognito.com"
+  description = "The ID of the Cognito User Pool Client ('argocd_client' from cognito.tf)"
+  value       = aws_cognito_user_pool_client.argocd_client.id # Ensure this points to the client in cognito.tf
 }
 
 output "cognito_users" {

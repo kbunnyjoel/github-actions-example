@@ -47,33 +47,3 @@ resource "aws_iam_role_policy_attachment" "argocd_policy_attachment" {
   role       = aws_iam_role.argocd_role.name
   policy_arn = aws_iam_policy.argocd_policy.arn
 }
-
-
-resource "aws_cognito_user_pool" "argocd" {
-  name = "argocd-users"
-
-  password_policy {
-    minimum_length    = 8
-    require_lowercase = true
-    require_numbers   = true
-    require_symbols   = true
-    require_uppercase = true
-  }
-}
-
-resource "aws_cognito_user_pool_client" "argocd" {
-  name         = "argocd-client"
-  user_pool_id = aws_cognito_user_pool.argocd.id
-
-  allowed_oauth_flows          = ["code"]
-  allowed_oauth_scopes         = ["email", "openid", "profile"]
-  callback_urls                = ["https://argocd.bunnycloud.xyz/auth/callback"]
-  supported_identity_providers = ["COGNITO"]
-
-  generate_secret = true
-}
-
-resource "aws_cognito_user_pool_domain" "argocd" {
-  domain       = "argocd-auth"
-  user_pool_id = aws_cognito_user_pool.argocd.id
-}

@@ -68,7 +68,7 @@ resource "aws_cognito_user_pool_domain" "argocd_domain" {
   user_pool_id = aws_cognito_user_pool.argocd_pool.id
 
   # Add custom domain with SSL certificate (uncomment and configure when ready)
-  # certificate_arn = aws_acm_certificate.auth_cert.arn
+  certificate_arn = aws_acm_certificate.wildcard_certificate
 }
 
 resource "random_string" "suffix" {
