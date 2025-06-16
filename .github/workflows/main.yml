@@ -633,8 +633,10 @@ jobs:
                 nginx.ingress.kubernetes.io/backend-protocol: "HTTP"
                 external-dns.alpha.kubernetes.io/hostname: "argocd.bunnycloud.xyz."
           configs:
-            params:
+            cm:
+              url: "https://argocd.bunnycloud.xyz" # Set the correct URL for ArgoCD
               server.insecure: "true" # Ensure ArgoCD server listens on HTTP
+            params: {} # Keep if other params are used, otherwise can be omitted.
             # OIDC configuration will be applied via kubectl patch in the 'Configure ArgoCD with Cognito' step
           controller:
             serviceAccount:
