@@ -705,8 +705,8 @@ jobs:
             echo "❌ COGNITO_CLIENT_SECRET is not set."
             missing=1
           fi
-          if [ -z "$COGNITO_ISSUER_URL" ]; then
-            echo "❌ COGNITO_ISSUER_URL is not set."
+          if [ -z "${{ env.ARGOCD_ROLE_ARN }}" ]; then
+            echo "❌ ${{ env.ARGOCD_ROLE_ARN }} is not set."
             missing=1
           fi
           if [ -z "$COGNITO_ROLE" ]; then
