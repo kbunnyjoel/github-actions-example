@@ -631,8 +631,6 @@ jobs:
               annotations:
                 nginx.ingress.kubernetes.io/force-ssl-redirect: "false"
                 nginx.ingress.kubernetes.io/backend-protocol: "HTTP"
-                service.beta.kubernetes.io/aws-load-balancer-backend-protocol: "http"
-                service.beta.kubernetes.io/aws-load-balancer-ssl-cert: "${{ env.ACM_CERTIFICATE_ARN }}"
                 external-dns.alpha.kubernetes.io/hostname: "argocd.bunnycloud.xyz."
           configs:
             params:
@@ -659,13 +657,15 @@ jobs:
           helm upgrade --install argocd argo/argo-cd \
             --namespace argocd \
             --create-namespace \
-            --set configs.params.server.insecure=true \
             --values argocd-install-values.yaml \
             --version 6.11.1 \
             --timeout 10m \
             --wait
           # Verify the annotation was set correctly
           kubectl get serviceaccount argocd-server -n argocd -o yaml
+          # Print the current argocd-cm ConfigMap after Helm install/upgrade for verification
+          echo "Current argocd-cm ConfigMap after Helm ArgoCD deployment:"
+          kubectl -n argocd get configmap argocd-cm -o yaml
 
 
   #         kubectl -n argocd patch configmap argocd-cm \
