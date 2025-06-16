@@ -599,16 +599,6 @@ jobs:
           echo "✅ NGINX ELB hostname found: $ELB_HOSTNAME_FROM_KUBE"
           echo "NGINX_LB_HOSTNAME=$ELB_HOSTNAME_FROM_KUBE" >> $GITHUB_ENV
 
-     
-      - name: Export Cognito OIDC environment variables
-        run: |
-          # Example: export your Cognito OIDC values to the GitHub Actions environment
-          # These should be set from terraform outputs or secrets before this step.
-          # Replace the following echo lines with your actual value sources.
-          echo "COGNITO_ISSUER_URL=${{ secrets.COGNITO_ISSUER_URL }}" >> $GITHUB_ENV
-          echo "COGNITO_CLIENT_ID=${{ secrets.COGNITO_CLIENT_ID }}" >> $GITHUB_ENV
-          echo "COGNITO_CLIENT_SECRET=${{ secrets.COGNITO_CLIENT_SECRET }}" >> $GITHUB_ENV
-
       - name: Prepare ArgoCD Helm values file
         run: |
           cat > argocd-install-values.yaml <<EOF
@@ -912,8 +902,9 @@ jobs:
             --set aws.zoneType=public \
             --set aws.region=ap-southeast-2 \
             --set domainFilters[0]=bunnycloud.xyz \
-            --set extraArgs[0]="--aws-prefer-cname=true" \
-            --set managedRecordTypes[0]=CNAME \
+            --set extraArgs[0]="--aws-prefer-cname" \ # Remove '=true'
+            # Explicitly prefer CNAME for AWS
+            --set managedRecordTypes[0]=CNAME \ # Primarily manage CNAMEs if preferred
             --set policy=upsert-only \
             --set serviceAccount.create=true \
             --set serviceAccount.name=external-dns \
