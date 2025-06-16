@@ -624,7 +624,7 @@ jobs:
           configs:
             cm:
               url: "https://argocd.bunnycloud.xyz" # Set the correct URL for ArgoCD
-              server.insecure: "false" # Ensure ArgoCD server listens on HTTP
+              server.insecure: "true" # Ensure ArgoCD server listens on HTTP
             params:
               # Configure ArgoCD to trust X-Forwarded-Proto from direct proxies (like NGINX)
               "server.x.forwarded.proto.header.behavior": "trust-if-directly-proxied"
