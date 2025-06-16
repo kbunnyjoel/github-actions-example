@@ -651,6 +651,9 @@ jobs:
           # Print the current argocd-cm ConfigMap after Helm install/upgrade for verification
           echo "Current argocd-cm ConfigMap after Helm ArgoCD deployment:"
           kubectl -n argocd get configmap argocd-cm -o yaml
+          # Print the current argocd-cmd-params-cm ConfigMap for verification
+          echo "Current argocd-cmd-params-cm ConfigMap after Helm ArgoCD deployment:"
+          kubectl -n argocd get configmap argocd-cmd-params-cm -o yaml || echo "argocd-cmd-params-cm not found or error fetching it."
 
 
       - name: Patch ArgoCD resources with Helm ownership
