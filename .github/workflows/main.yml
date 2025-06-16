@@ -629,7 +629,7 @@ jobs:
               ingressClassName: nginx
               hostname: argocd.bunnycloud.xyz
               annotations:
-                nginx.ingress.kubernetes.io/force-ssl-redirect: "false"
+                nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
                 nginx.ingress.kubernetes.io/backend-protocol: "HTTP"
                 external-dns.alpha.kubernetes.io/hostname: "argocd.bunnycloud.xyz."
           configs:
@@ -911,8 +911,8 @@ jobs:
             --set aws.zoneType=public \
             --set aws.region=ap-southeast-2 \
             --set domainFilters[0]=bunnycloud.xyz \
-            --set managedRecordTypes[0]=A \
-            --set managedRecordTypes[1]=CNAME \
+            --set extraArgs[0]="--aws-prefer-cname=true" \ # Explicitly prefer CNAME for AWS
+            --set managedRecordTypes[0]=CNAME \ # Primarily manage CNAMEs if preferred
             --set policy=upsert-only \
             --set serviceAccount.create=true \
             --set serviceAccount.name=external-dns \
@@ -949,8 +949,8 @@ jobs:
               --set policy=upsert-only \
               --set serviceAccount.create=true \
               --set serviceAccount.name=external-dns \
-              --set managedRecordTypes[0]=CNAME \
-              --set aws.preferCNAME=true \ # Ensure this is set correctly
+              # aws.preferCNAME=true is redundant if extraArgs is used
+              # --set aws.preferCNAME=true \
               --set serviceAccount.annotations."eks\.amazonaws\.com/role-arn"="${{ env.EXTERNAL_DNS_ROLE_ARN }}" \
               --set txtOwnerId="${{ env.HOSTED_ZONE_ID }}" \
               --set provider=aws \ # Ensure provider is set if re-using these lines
