@@ -585,19 +585,11 @@ jobs:
             exit 1
           fi
 
-          ARGOCD_ROLE_ARN=$(terraform output -raw argocd_cognito_role_arn)
-          if [ $? -ne 0 ] || [ -z "$ARGOCD_ROLE_ARN" ]; then
-            echo "❌ Error: Failed to get argocd_cognito_role_arn from Terraform output or it is empty."
-            # Not exiting here as it's for SA annotation, but logging the error.
-          fi
+          ARGOCD_ROLE_ARN=$(terraform output -raw argocd_cognito_role_arn || echo "")
           if [ -z "$ARGOCD_ROLE_ARN" ]; then
             echo "Error: Could not get ArgoCD role ARN from Terraform output"
             exit 1
           fi
-          # Get Cognito details
-          echo "Fetching Cognito details..."
-          COGNITO_CLIENT_ID_FROM_TF=$(terraform output -raw cognito_user_pool_client_id)
-          COGNITO_ISSUER_URL_FROM_TF=$(terraform output -raw cognito_user_pool_endpoint)
           echo "Using ArgoCD role ARN: $ARGOCD_ROLE_ARN"
           echo "ARGOCD_ROLE_ARN=$ARGOCD_ROLE_ARN" >> $GITHUB_ENV
 
@@ -633,7 +625,7 @@ jobs:
               annotations:
                 "nginx.ingress.kubernetes.io/ssl-redirect": "false" # Disable SSL redirect at Ingress level
                 "nginx.ingress.kubernetes.io/force-ssl-redirect": "false" # Disable force SSL redirect
-                nginx.ingress.kubernetes.io/backend-protocol: "HTTP" # NGINX must talk HTTP to ArgoCD backend
+                nginx.ingress.kubernetes.io/backend-protocol: "HTTPS"
                 external-dns.alpha.kubernetes.io/hostname: "argocd.bunnycloud.xyz."
           configs:
             cm:
@@ -704,11 +696,6 @@ jobs:
     
       - name: Configure ArgoCD with Cognito
         run: |
-          echo "Debug: COGNITO_ISSUER_URL in Configure ArgoCD step is: '${{ env.COGNITO_ISSUER_URL }}'"
-          echo "Debug: COGNITO_CLIENT_ID in Configure ArgoCD step is: '${{ env.COGNITO_CLIENT_ID }}'"
-          # For secrets, it's often better to check if they are set rather than printing them.
-          if [ -n "${{ env.COGNITO_CLIENT_SECRET }}" ]; then echo "Debug: COGNITO_CLIENT_SECRET is set."; else echo "Debug: COGNITO_CLIENT_SECRET is NOT set."; fi
-
           # Set up ArgoCD admin password (can also be managed via Helm values if chart supports it well)
           # This ensures an admin user is available.
           echo "Setting up ArgoCD admin password..."
