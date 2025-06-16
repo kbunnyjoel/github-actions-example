@@ -709,8 +709,8 @@ jobs:
             echo "❌ ${{ env.ARGOCD_ROLE_ARN }} is not set."
             missing=1
           fi
-          if [ -z "$COGNITO_ROLE" ]; then
-            echo "⚠️  COGNITO_ROLE is not set. Continuing anyway..."
+          if [ -z "${{ env.ARGOCD_ROLE_ARN }}" ]; then
+            echo "⚠️  ${{ env.ARGOCD_ROLE_ARN }} is not set. Continuing anyway..."
           fi
           if [ "$missing" = "1" ]; then
             echo "🚫 Missing required Cognito configuration. Exiting."
