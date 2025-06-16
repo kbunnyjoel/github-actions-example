@@ -616,8 +616,8 @@ jobs:
               ingressClassName: nginx
               hostname: argocd.bunnycloud.xyz
               annotations:
-                nginx.ingress.kubernetes.io/ssl-redirect: "true" # Disable SSL redirect at Ingress level
-                nginx.ingress.kubernetes.io/force-ssl-redirect: "true" # Disable force SSL redirect
+                "nginx.ingress.kubernetes.io/ssl-redirect": "false" # Disable SSL redirect at Ingress level
+                "nginx.ingress.kubernetes.io/force-ssl-redirect": "false" # Disable force SSL redirect
                 nginx.ingress.kubernetes.io/backend-protocol: "HTTP"
                 external-dns.alpha.kubernetes.io/hostname: "argocd.bunnycloud.xyz."
           configs:
