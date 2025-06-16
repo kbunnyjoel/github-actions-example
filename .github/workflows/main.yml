@@ -285,7 +285,7 @@ jobs:
 
           #Get Zone ID for the domain to clean records
 
-          bash templates/cleanup.sh || echo "Cleanup script failed, but continuing with other cleanup tasks."
+          bash templates/clean_up.sh || echo "Cleanup script failed, but continuing with other cleanup tasks."
 
           # Get VPC ID
           VPC_ID=$(aws ec2 describe-vpcs --filters "Name=tag:Name,Values=eks-vpc" --query "Vpcs[0].VpcId" --output text || echo "")
@@ -780,10 +780,6 @@ jobs:
           echo "ArgoCD configured with Cognito OIDC."
           echo "Users can now log in using their Cognito credentials"
           echo "Admin user (if enabled): admin / Password: $ADMIN_PASSWORD (or as set)"
-        env:
-          COGNITO_CLIENT_ID: ${{ secrets.COGNITO_CLIENT_ID }}
-          COGNITO_CLIENT_SECRET: ${{ secrets.COGNITO_CLIENT_SECRET }}
-          COGNITO_ISSUER_URL: ${{ secrets.COGNITO_ISSUER_URL }}
 
       - name: Get ExternalDNS role ARN from Terraform
         run: |
