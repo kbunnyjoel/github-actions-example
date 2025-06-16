@@ -579,6 +579,12 @@ jobs:
       - name: Get ArgoCD IAM Role ARN and Cognito details
         run: |
           cd terraform
+          echo "Initializing Terraform in current context to ensure outputs are fresh..."
+          if ! terraform init -input=false -reconfigure; then
+            echo "❌ Error: Terraform init failed in Get ArgoCD IAM Role ARN and Cognito details step."
+            exit 1
+          fi
+
           ARGOCD_ROLE_ARN=$(terraform output -raw argocd_cognito_role_arn || echo "")
           if [ -z "$ARGOCD_ROLE_ARN" ]; then
             echo "Error: Could not get ArgoCD role ARN from Terraform output"
