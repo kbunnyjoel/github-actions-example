@@ -60,21 +60,9 @@ resource "aws_cognito_user_pool_client" "argocd_client" {
   ]
 }
 
-#
-# The domain for the Cognito hosted UI is now set using the variable `var.cognito_custom_domain`.
-# To use a custom domain, set the `cognito_custom_domain` variable accordingly.
 resource "aws_cognito_user_pool_domain" "argocd_domain" {
-  domain       = var.cognito_custom_domain
+  domain       = "argocd-auth-bunnycloud"
   user_pool_id = aws_cognito_user_pool.argocd_pool.id
-
-  # Add custom domain with SSL certificate (uncomment and configure when ready)
-  certificate_arn = aws_acm_certificate.wildcard_certificate
-}
-
-resource "random_string" "suffix" {
-  length  = 8
-  special = false
-  upper   = false
 }
 
 # Create user groups
@@ -175,7 +163,7 @@ resource "aws_cognito_user_in_group" "dev_in_dev_group" {
 
 # Store the Cognito client secret in AWS Secrets Manager
 resource "aws_secretsmanager_secret" "argocd_cognito_client_secret" {
-  name        = "argocd-cognito-client-secret-v2" # This is the secret ID your workflow expects
+  name        = "argocd-cognito-client-secret-v3" # This is the secret ID your workflow expects
   description = "Client secret for ArgoCD Cognito User Pool Client"
 }
 

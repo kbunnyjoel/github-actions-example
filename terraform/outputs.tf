@@ -80,8 +80,9 @@ output "argocd_role_arn" {
 }
 
 output "cognito_client_secret" {
-  value     = aws_cognito_user_pool_client.argocd.client_secret # This referred to the client of the deleted pool
-  sensitive = true
+  description = "The client secret for the Cognito User Pool Client ('argocd_client' from cognito.tf). This is managed in AWS Secrets Manager."
+  value       = "Stored in AWS Secrets Manager: ${aws_secretsmanager_secret.argocd_cognito_client_secret.name}" # Informational, actual value not outputted
+  sensitive   = true
 }
 
 output "cognito_client_id" {
@@ -107,5 +108,6 @@ output "cognito_users" {
 
 output "cognito_oidc_issuer_url" {
   description = "OIDC issuer URL for Cognito with /oauth2 path"
-  value       = "${aws_cognito_user_pool_domain.argocd_domain.domain}.oauth2"
+  # This construction is likely incorrect for OIDC discovery.
+  value = "NOTE: This output might be incorrect. Use 'cognito_user_pool_endpoint' as the base for OIDC. Current value: ${aws_cognito_user_pool_domain.argocd_domain.domain}.oauth2"
 }

@@ -9,6 +9,13 @@ provider "aws" {
 
 
 terraform {
+  required_providers {
+    aws = {
+      source  = "hashicorp/aws"
+      version = ">= 4.0.0" # Specify a version that supports domain_prefix, e.g., v4.0.0 or newer
+    }
+    # You can add other providers here if needed, e.g., random, tls, etc.
+  }
   backend "s3" {
     bucket       = "my-eks-terraform-state-806210429052"
     key          = "eks/terraform.tfstate"
