@@ -895,21 +895,21 @@ jobs:
           done
 
           echo "🚀 Running Helm upgrade/install..."
-          helm upgrade --install "$RELEASE_NAME" "$CHART_NAME" \
-            --namespace external-dns --create-namespace \
-            --set sources[0]=service \
-            --set sources[1]=ingress \
+          helm upgrade --install external-dns external-dns/external-dns \
+            --namespace external-dns \
+            --create-namespace \
+            --set 'sources[0]=service' \
+            --set 'sources[1]=ingress' \
             --set aws.zoneType=public \
             --set aws.region=ap-southeast-2 \
-            --set domainFilters[0]=bunnycloud.xyz \
-            --set extraArgs[0]="--aws-prefer-cname" \ # Remove '=true'
-            # Explicitly prefer CNAME for AWS
-            --set managedRecordTypes[0]=CNAME \ # Primarily manage CNAMEs if preferred
+            --set 'domainFilters[0]=bunnycloud.xyz' \
+            --set 'extraArgs[0]=--aws-prefer-cname' \
+            --set 'managedRecordTypes[0]=CNAME' \
             --set policy=upsert-only \
             --set serviceAccount.create=true \
             --set serviceAccount.name=external-dns \
             --set serviceAccount.annotations."eks\.amazonaws\.com/role-arn"="${{ env.EXTERNAL_DNS_ROLE_ARN }}" \
-            --set txtOwnerId="${{ env.HOSTED_ZONE_ID }}" \
+            --set txtOwnerId=Z020604219Y32SRYV246B \
             --set provider=aws \
             --set txtPrefix=externaldns- \
             --set aws.batchChangeSize=1000 \
@@ -931,28 +931,29 @@ jobs:
             kubectl delete secret -n external-dns -l owner=helm,name=external-dns --ignore-not-found=true
             # Wait for resources to be cleaned up
             sleep 5
+            
             helm upgrade --install external-dns external-dns/external-dns \
-              --namespace external-dns --create-namespace \
-              --set sources[0]=service \
-              --set sources[1]=ingress \
-              --set aws.zoneType=public \
-              --set aws.region=ap-southeast-2 \
-              --set domainFilters[0]=bunnycloud.xyz \
-              --set policy=upsert-only \
-              --set serviceAccount.create=true \
-              --set serviceAccount.name=external-dns \
-              # aws.preferCNAME=true is redundant if extraArgs is used
-              # --set aws.preferCNAME=true \
-              --set serviceAccount.annotations."eks\.amazonaws\.com/role-arn"="${{ env.EXTERNAL_DNS_ROLE_ARN }}" \
-              --set txtOwnerId="${{ env.HOSTED_ZONE_ID }}" \
-              --set provider=aws \ # Ensure provider is set if re-using these lines
-              --set extraArgs[0]="--aws-prefer-cname=true" \ # Correct flag for AWS provider
-              --set txtPrefix=externaldns- \
-              --set aws.batchChangeSize=1000 \
-              --set logLevel=debug \
-              --version 1.14.5 \
-              --timeout 10m \
-              --wait
+            --namespace external-dns \
+            --create-namespace \
+            --set 'sources[0]=service' \
+            --set 'sources[1]=ingress' \
+            --set aws.zoneType=public \
+            --set aws.region=ap-southeast-2 \
+            --set 'domainFilters[0]=bunnycloud.xyz' \
+            --set 'extraArgs[0]=--aws-prefer-cname' \
+            --set 'managedRecordTypes[0]=CNAME' \
+            --set policy=upsert-only \
+            --set serviceAccount.create=true \
+            --set serviceAccount.name=external-dns \
+            --set serviceAccount.annotations."eks\.amazonaws\.com/role-arn"="${{ env.EXTERNAL_DNS_ROLE_ARN }}" \
+            --set txtOwnerId=Z020604219Y32SRYV246B \
+            --set provider=aws \
+            --set txtPrefix=externaldns- \
+            --set aws.batchChangeSize=1000 \
+            --set logLevel=debug \
+            --version 1.14.5 \
+            --timeout 10m \
+            --wait
           else
             echo "ExternalDNS is already deployed and healthy."
           fi
