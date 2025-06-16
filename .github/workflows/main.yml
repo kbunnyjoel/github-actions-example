@@ -355,8 +355,8 @@ jobs:
         if: github.event.inputs.destroy == 'true'
         run: |
           cd terraform
-          terraform force-unlock -force d94076e6-62cd-4748-fdc6-56e3e5ae080b || echo "No locks to unlock"
           terraform init
+          terraform force-unlock -force d94076e6-62cd-4748-fdc6-56e3e5ae080b || echo "No locks to unlock"
           terraform destroy -auto-approve
 
       - name: Clean up orphaned ELBs and their subnets (manual cleanup)
