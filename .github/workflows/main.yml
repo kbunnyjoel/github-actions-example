@@ -624,7 +624,9 @@ jobs:
             cm:
               url: "https://argocd.bunnycloud.xyz" # Set the correct URL for ArgoCD
               server.insecure: "true" # Ensure ArgoCD server listens on HTTP
-            params: {} # Keep if other params are used, otherwise can be omitted.
+            params:
+              # Configure ArgoCD to trust X-Forwarded-Proto from direct proxies (like NGINX)
+              "server.x.forwarded.proto.header.behavior": "trust-if-directly-proxied"
             # OIDC configuration will be applied via kubectl patch in the 'Configure ArgoCD with Cognito' step
           controller:
             serviceAccount:
