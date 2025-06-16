@@ -619,12 +619,12 @@ jobs:
               annotations:
                 "nginx.ingress.kubernetes.io/ssl-redirect": "false" # Disable SSL redirect at Ingress level
                 "nginx.ingress.kubernetes.io/force-ssl-redirect": "false" # Disable force SSL redirect
-                nginx.ingress.kubernetes.io/backend-protocol: "HTTP"
+                nginx.ingress.kubernetes.io/backend-protocol: "HTTPS"
                 external-dns.alpha.kubernetes.io/hostname: "argocd.bunnycloud.xyz."
           configs:
             cm:
               url: "https://argocd.bunnycloud.xyz" # Set the correct URL for ArgoCD
-              server.insecure: "true" # Ensure ArgoCD server listens on HTTP
+              server.insecure: "false" # Ensure ArgoCD server listens on HTTP
             params:
               # Configure ArgoCD to trust X-Forwarded-Proto from direct proxies (like NGINX)
               "server.x.forwarded.proto.header.behavior": "trust-if-directly-proxied"
