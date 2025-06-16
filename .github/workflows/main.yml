@@ -1293,22 +1293,29 @@ jobs:
           echo "NGINX LoadBalancer hostname: $NGINX_LB_HOSTNAME"
           echo "Checking DNS record for $APP_TARGET_HOSTNAME..."
           
-          echo "Waiting for DNS CNAME propagation (ExternalDNS should create this)..."
-          EXPECTED_CNAME_TARGET_FOR_DIG_SHORT="${NGINX_LB_HOSTNAME}." 
+          echo "Waiting for DNS A (ALIAS) record propagation (ExternalDNS should create this)..."
 
           for i in {1..12}; do
-            RESOLVED_CNAME_VALUE=$(dig +short -t CNAME $APP_TARGET_HOSTNAME @8.8.8.8)
-            if [ "$RESOLVED_CNAME_VALUE" = "$EXPECTED_CNAME_TARGET_FOR_DIG_SHORT" ]; then
-              echo "✅ DNS CNAME record for $APP_TARGET_HOSTNAME propagated and correctly points to $NGINX_LB_HOSTNAME."
+            RESOLVED_APP_IPS=$(dig +short -t A $APP_TARGET_HOSTNAME @8.8.8.8 | sort | tr '\n' ' ')
+            EXPECTED_ELB_IPS_FOR_APP=$(dig +short -t A $NGINX_LB_HOSTNAME @8.8.8.8 | sort | tr '\n' ' ')
+
+            if [ -n "$RESOLVED_APP_IPS" ] && [ "$RESOLVED_APP_IPS" = "$EXPECTED_ELB_IPS_FOR_APP" ]; then
+              echo "✅ DNS A (ALIAS) record for $APP_TARGET_HOSTNAME propagated and correctly points to IPs of $NGINX_LB_HOSTNAME."
+              echo "Resolved App IPs: $RESOLVED_APP_IPS"
+              echo "Expected ELB IPs: $EXPECTED_ELB_IPS_FOR_APP"
               break
             fi
-            echo "Waiting for DNS CNAME propagation for $APP_TARGET_HOSTNAME... Attempt $i/12. Found: '$RESOLVED_CNAME_VALUE', Expected: '$EXPECTED_CNAME_TARGET_FOR_DIG_SHORT'"
+            echo "Waiting for DNS A (ALIAS) propagation for $APP_TARGET_HOSTNAME... Attempt $i/12."
+            echo "   App resolved IPs: '$RESOLVED_APP_IPS'"
+            echo "   ELB expected IPs: '$EXPECTED_ELB_IPS_FOR_APP'"
+            
             if [ $i -eq 12 ]; then
-              echo "Warning: DNS CNAME propagation for $APP_TARGET_HOSTNAME timed out or record does not point to $NGINX_LB_HOSTNAME."
-              echo "Final DNS CNAME resolution check for $APP_TARGET_HOSTNAME (using 8.8.8.8):"
-              dig -t CNAME $APP_TARGET_HOSTNAME @8.8.8.8
+              echo "Warning: DNS A (ALIAS) propagation for $APP_TARGET_HOSTNAME timed out or IP mismatch."
               echo "Final DNS A record resolution check for $APP_TARGET_HOSTNAME (using 8.8.8.8):"
               dig -t A $APP_TARGET_HOSTNAME @8.8.8.8
+              echo "Final DNS A record resolution check for ELB $NGINX_LB_HOSTNAME (using 8.8.8.8):"
+              dig -t A $NGINX_LB_HOSTNAME @8.8.8.8
+
               echo "Hint: Check ExternalDNS logs: kubectl logs -n external-dns -l app.kubernetes.io/name=external-dns --tail=200"
               echo "Hint: Check Ingress annotations: kubectl get ingress github-actions-example -n github-actions-example -o yaml"
             fi
