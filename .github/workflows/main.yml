@@ -629,7 +629,7 @@ jobs:
               ingressClassName: nginx
               hostname: argocd.bunnycloud.xyz
               annotations:
-                nginx.ingress.kubernetes.io/force-ssl-redirect: "false"
+                nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
                 nginx.ingress.kubernetes.io/backend-protocol: "HTTP"
                 external-dns.alpha.kubernetes.io/hostname: "argocd.bunnycloud.xyz."
           configs:
@@ -884,6 +884,7 @@ jobs:
       - name: Install ExternalDNS
         run: |
           echo "🔧 Installing ExternalDNS..."
+          set -x # Enable command tracing
 
           # Define release and chart names explicitly
           RELEASE_NAME="external-dns"
