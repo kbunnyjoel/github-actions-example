@@ -694,6 +694,35 @@ jobs:
 
           echo "✅ ArgoCD IAM role integration validated"
     
+      - name: Validate Cognito environment values
+        run: |
+          missing=""
+          if [ -z "$COGNITO_CLIENT_ID" ]; then
+            echo "❌ COGNITO_CLIENT_ID is not set."
+            missing=1
+          fi
+          if [ -z "$COGNITO_CLIENT_SECRET" ]; then
+            echo "❌ COGNITO_CLIENT_SECRET is not set."
+            missing=1
+          fi
+          if [ -z "$COGNITO_ISSUER_URL" ]; then
+            echo "❌ COGNITO_ISSUER_URL is not set."
+            missing=1
+          fi
+          if [ -z "$COGNITO_ROLE" ]; then
+            echo "⚠️  COGNITO_ROLE is not set. Continuing anyway..."
+          fi
+          if [ "$missing" = "1" ]; then
+            echo "🚫 Missing required Cognito configuration. Exiting."
+            exit 1
+          fi
+          echo "✅ All required Cognito values are present."
+        env:
+          COGNITO_CLIENT_ID: ${{ secrets.COGNITO_CLIENT_ID }}
+          COGNITO_CLIENT_SECRET: ${{ secrets.COGNITO_CLIENT_SECRET }}
+          COGNITO_ISSUER_URL: ${{ secrets.COGNITO_ISSUER_URL }}
+          COGNITO_ROLE: ${{ secrets.COGNITO_ROLE }}
+
       - name: Configure ArgoCD with Cognito
         run: |
           # Set up ArgoCD admin password (can also be managed via Helm values if chart supports it well)
