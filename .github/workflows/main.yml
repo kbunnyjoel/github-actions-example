@@ -279,9 +279,14 @@ jobs:
           chmod +x kubectl && sudo mv kubectl /usr/local/bin/
           aws eks update-kubeconfig --region ap-southeast-2 --name github-actions-eks-example || true
       - name: Clean up AWS resources
+        working-directory: terraform
         run: |
           echo "Cleaning up AWS resources..."
-          
+
+          #Get Zone ID for the domain to clean records
+
+          bash templates/cleanup.sh || echo "Cleanup script failed, but continuing with other cleanup tasks."
+
           # Get VPC ID
           VPC_ID=$(aws ec2 describe-vpcs --filters "Name=tag:Name,Values=eks-vpc" --query "Vpcs[0].VpcId" --output text || echo "")
           if [ -z "$VPC_ID" ] || [ "$VPC_ID" == "None" ]; then

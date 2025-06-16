@@ -27,3 +27,14 @@ variable "create_dns_records" {
   type        = bool
   default     = true
 }
+
+# ACM certificate ARN for Cognito custom domain
+variable "acm_cert_arn" {
+  description = "ARN of the ACM certificate for custom Cognito domain"
+  type        = string
+}
+
+variable "cognito_custom_domain" {
+  description = "The custom domain to associate with the Cognito user pool (e.g., auth.bunnycloud.xyz)"
+  type        = string
+}

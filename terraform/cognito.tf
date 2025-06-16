@@ -60,8 +60,11 @@ resource "aws_cognito_user_pool_client" "argocd_client" {
   ]
 }
 
+#
+# The domain for the Cognito hosted UI is now set using the variable `var.cognito_custom_domain`.
+# To use a custom domain, set the `cognito_custom_domain` variable accordingly.
 resource "aws_cognito_user_pool_domain" "argocd_domain" {
-  domain       = "argocd-auth-${random_string.suffix.result}"
+  domain       = var.cognito_custom_domain
   user_pool_id = aws_cognito_user_pool.argocd_pool.id
 
   # Add custom domain with SSL certificate (uncomment and configure when ready)
