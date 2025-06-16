@@ -483,6 +483,7 @@ jobs:
             --set controller.service.ports.http=80 \
             --set controller.service.enableHttp=true \
             --set controller.config.use-forwarded-headers=true \
+            --set controller.config.ssl-redirect="false" \
             --set controller.config.compute-full-forwarded-for=true \
             --set controller.config.use-proxy-protocol=false \
             --set controller.config.enable-real-ip=false \
@@ -654,6 +655,10 @@ jobs:
           # Print the current argocd-cmd-params-cm ConfigMap for verification
           echo "Current argocd-cmd-params-cm ConfigMap after Helm ArgoCD deployment:"
           kubectl -n argocd get configmap argocd-cmd-params-cm -o yaml || echo "argocd-cmd-params-cm not found or error fetching it."
+          
+          # Print the deployed ArgoCD Ingress for verification
+          echo "Deployed ArgoCD Ingress (argocd-server) configuration:"
+          kubectl -n argocd get ingress argocd-server -o yaml || echo "ArgoCD Ingress 'argocd-server' not found."
 
 
       - name: Patch ArgoCD resources with Helm ownership
