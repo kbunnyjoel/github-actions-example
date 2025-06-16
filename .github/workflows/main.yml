@@ -1032,21 +1032,29 @@ jobs:
           echo "🔍 Verifying DNS record for argocd.bunnycloud.xyz (should point to $NGINX_LB_HOSTNAME)..."
           echo "Waiting for DNS propagation (max 5 minutes)..."
           for i in {1..10}; do
-            EXPECTED_CNAME_TARGET="${NGINX_LB_HOSTNAME}."
-            RESOLVED_CNAME_VALUE=$(dig +short -t CNAME argocd.bunnycloud.xyz @8.8.8.8)
+            # Query for A records as ExternalDNS creates an ALIAS record for ELBs
+            RESOLVED_ARGO_IPS=$(dig +short -t A argocd.bunnycloud.xyz @8.8.8.8 | sort | tr '\n' ' ')
+            EXPECTED_ELB_IPS=$(dig +short -t A $NGINX_LB_HOSTNAME @8.8.8.8 | sort | tr '\n' ' ')
 
-            if [ "$RESOLVED_CNAME_VALUE" = "$EXPECTED_CNAME_TARGET" ]; then
-              echo "✅ DNS CNAME record for argocd.bunnycloud.xyz propagated and correctly points to $NGINX_LB_HOSTNAME."
+            # Check if RESOLVED_ARGO_IPS is not empty and matches EXPECTED_ELB_IPS
+            if [ -n "$RESOLVED_ARGO_IPS" ] && [ "$RESOLVED_ARGO_IPS" = "$EXPECTED_ELB_IPS" ]; then
+              echo "✅ DNS A (ALIAS) record for argocd.bunnycloud.xyz propagated and correctly points to IPs of $NGINX_LB_HOSTNAME."
+              echo "Resolved ArgoCD IPs: $RESOLVED_ARGO_IPS"
+              echo "Expected ELB IPs: $EXPECTED_ELB_IPS"
               break
             fi
 
-            echo "⏳ Attempt $i/10: DNS not ready. Found: '$RESOLVED_CNAME_VALUE', Expected: '$EXPECTED_CNAME_TARGET'"
+            echo "⏳ Attempt $i/10: DNS A (ALIAS) record not ready or IP mismatch."
+            echo "   ArgoCD resolved IPs: '$RESOLVED_ARGO_IPS'"
+            echo "   ELB expected IPs: '$EXPECTED_ELB_IPS'"
             sleep 30
 
             if [ $i -eq 10 ]; then
-              echo "⚠️ Warning: DNS propagation for argocd.bunnycloud.xyz timed out or record mismatch."
-              echo "Current DNS resolution:"
-              dig -t CNAME argocd.bunnycloud.xyz @8.8.8.8
+              echo "⚠️ Warning: DNS A (ALIAS) propagation for argocd.bunnycloud.xyz timed out or IP mismatch."
+              echo "Final DNS A record resolution for argocd.bunnycloud.xyz:"
+              dig -t A argocd.bunnycloud.xyz @8.8.8.8
+              echo "Final DNS A record resolution for ELB $NGINX_LB_HOSTNAME:"
+              dig -t A $NGINX_LB_HOSTNAME @8.8.8.8
               dig argocd.bunnycloud.xyz +trace
             fi
           done
