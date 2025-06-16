@@ -659,6 +659,7 @@ jobs:
           helm upgrade --install argocd argo/argo-cd \
             --namespace argocd \
             --create-namespace \
+            --set configs.params.server.insecure=true \
             --values argocd-install-values.yaml \
             --version 6.11.1 \
             --timeout 10m \
