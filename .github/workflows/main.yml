@@ -913,7 +913,7 @@ jobs:
             --set aws.region=ap-southeast-2 \
             --set domainFilters[0]=bunnycloud.xyz \
             --set extraArgs[0]="--aws-prefer-cname=true" \
-            --set managedRecordTypes[0]=CNAME \ # Primarily manage CNAMEs if preferred
+            --set managedRecordTypes[0]=CNAME \
             --set policy=upsert-only \
             --set serviceAccount.create=true \
             --set serviceAccount.name=external-dns \
