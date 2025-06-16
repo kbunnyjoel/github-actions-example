@@ -575,9 +575,6 @@ jobs:
             echo "Verifying NGINX Ingress Controller configuration..."
             kubectl get configmap -n ingress-nginx ingress-nginx-controller -o yaml
 
-      - name: Patch ArgoCD resources with Helm ownership
-        run: bash k8s/argocd/patch-argocd-helm-ownership.sh
-
       - name: Get ArgoCD IAM Role ARN and Cognito details
         run: |
           cd terraform
@@ -654,6 +651,8 @@ jobs:
           kubectl -n argocd get configmap argocd-cm -o yaml
 
 
+      - name: Patch ArgoCD resources with Helm ownership
+        run: bash k8s/argocd/patch-argocd-helm-ownership.sh
   #         kubectl -n argocd patch configmap argocd-cm \
   # --type merge \
   # -p '{"data":{"configs.params.server.insecure":"true"}}'
