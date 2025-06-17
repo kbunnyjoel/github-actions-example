@@ -602,6 +602,11 @@ jobs:
           fi
           echo "✅ NGINX ELB hostname found: $ELB_HOSTNAME_FROM_KUBE"
           echo "NGINX_LB_HOSTNAME=$ELB_HOSTNAME_FROM_KUBE" >> $GITHUB_ENV
+      
+      - name: Ensure ArgoCD DNS A record is up-to-date
+        run: |
+          chmod +x k8s/argocd/check-argocd-dns.sh
+          k8s/argocd/check-argocd-dns.sh
 
       - name: Prepare ArgoCD Helm values file
         run: |
