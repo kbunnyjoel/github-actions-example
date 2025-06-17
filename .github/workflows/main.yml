@@ -207,7 +207,7 @@ jobs:
       
       - name: Terraform Unlock
         if: ${{ github.event.inputs.destroy != 'true' }}
-        run: terraform force-unlock -force c4cd8c1e-a1dd-091b-1653-697e0d114f1e || echo "No locks to unlock"
+        run: terraform force-unlock -force 89886282-1bd1-fa20-b432-752c6435724a || echo "No locks to unlock"
       - name: Terraform Plan
         if: ${{ github.event.inputs.destroy != 'true' }}
         run: terraform plan
