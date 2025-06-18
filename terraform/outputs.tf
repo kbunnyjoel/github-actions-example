@@ -1,7 +1,3 @@
-# ---------------------------------------------------------------------------------------------------------------------
-# OUTPUTS
-# ---------------------------------------------------------------------------------------------------------------------
-
 output "cognito_user_pool_id" {
   description = "The ID of the Cognito User Pool"
   value       = aws_cognito_user_pool.argocd_pool.id
@@ -107,7 +103,6 @@ output "cognito_users" {
 }
 
 output "cognito_oidc_issuer_url" {
-  description = "OIDC issuer URL for Cognito with /oauth2 path"
-  # This construction is likely incorrect for OIDC discovery.
-  value = "NOTE: This output might be incorrect. Use 'cognito_user_pool_endpoint' as the base for OIDC. Current value: ${aws_cognito_user_pool_domain.argocd_domain.domain}.oauth2"
+  description = "OIDC issuer URL for Cognito"
+  value       = "https://cognito-idp.${var.aws_region}.amazonaws.com/${aws_cognito_user_pool.argocd_pool.id}"
 }
