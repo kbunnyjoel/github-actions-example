@@ -6,4 +6,9 @@ resource "aws_route53_zone" "main" {
     Environment = "production"
     ManagedBy   = "Terraform"
   }
+
+  lifecycle {
+    prevent_destroy = true
+  }
+
 }
