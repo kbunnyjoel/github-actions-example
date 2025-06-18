@@ -720,7 +720,6 @@ jobs:
           COGNITO_CLIENT_ID: ${{ secrets.COGNITO_CLIENT_ID }}
           COGNITO_CLIENT_SECRET: ${{ secrets.COGNITO_CLIENT_SECRET }}
           COGNITO_ISSUER_URL: ${{ secrets.COGNITO_ISSUER_URL }}
-          COGNITO_ROLE: ${{ secrets.COGNITO_ROLE }}
 
       - name: Configure ArgoCD with Cognito
         run: |
