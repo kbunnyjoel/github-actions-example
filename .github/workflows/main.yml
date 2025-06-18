@@ -666,12 +666,6 @@ jobs:
           echo "Deployed ArgoCD Ingress (argocd-server) configuration:"
           kubectl -n argocd get ingress argocd-server -o yaml || echo "ArgoCD Ingress 'argocd-server' not found."
 
-
-      - name: Ensure ArgoCD DNS A record is up-to-date
-        run: |
-          chmod +x k8s/argocd/check-argocd-dns.sh
-          k8s/argocd/check-argocd-dns.sh
-
       - name: Patch ArgoCD resources with Helm ownership
         run: bash k8s/argocd/patch-argocd-helm-ownership.sh
   #         kubectl -n argocd patch configmap argocd-cm \
@@ -1007,6 +1001,11 @@ jobs:
           else
             echo "ExternalDNS is already deployed and healthy."
           fi
+    
+      - name: Ensure ArgoCD DNS A record is up-to-date
+        run: |
+          chmod +x k8s/argocd/check-argocd-dns.sh
+          k8s/argocd/check-argocd-dns.sh
           
       - name: Verify ExternalDNS Service Account and Restart Pods
         run: |
