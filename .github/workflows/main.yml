@@ -1070,33 +1070,31 @@ jobs:
             exit 1
           fi
 
-          echo "🔍 Verifying DNS record for argocd.bunnycloud.xyz (should point to $NGINX_LB_HOSTNAME)..."
+          ARGOCD_HOSTNAME="argocd.bunnycloud.xyz"
+
+          echo "🔍 Verifying DNS CNAME record for $ARGOCD_HOSTNAME (should point to $NGINX_LB_HOSTNAME)..."
           echo "Waiting for DNS propagation (max 5 minutes)..."
           for i in {1..10}; do
-            # Query for A records as ExternalDNS creates an ALIAS record for ELBs
-            RESOLVED_ARGO_IPS=$(dig +short -t A argocd.bunnycloud.xyz @8.8.8.8 | sort | tr '\n' ' ')
-            EXPECTED_ELB_IPS=$(dig +short -t A $NGINX_LB_HOSTNAME @8.8.8.8 | sort | tr '\n' ' ')
+            # Query for CNAME records
+            RESOLVED_CNAME=$(dig +short -t CNAME $ARGOCD_HOSTNAME @8.8.8.8 | sed 's/\.$//')
+            EXPECTED_CNAME=$(echo $NGINX_LB_HOSTNAME | sed 's/\.$//')
 
-            # Check if RESOLVED_ARGO_IPS is not empty and matches EXPECTED_ELB_IPS
-            if [ -n "$RESOLVED_ARGO_IPS" ] && [ "$RESOLVED_ARGO_IPS" = "$EXPECTED_ELB_IPS" ]; then
-              echo "✅ DNS A (ALIAS) record for argocd.bunnycloud.xyz propagated and correctly points to IPs of $NGINX_LB_HOSTNAME."
-              echo "Resolved ArgoCD IPs: $RESOLVED_ARGO_IPS"
-              echo "Expected ELB IPs: $EXPECTED_ELB_IPS"
+            if [ -n "$RESOLVED_CNAME" ] && [ "$RESOLVED_CNAME" = "$EXPECTED_CNAME" ]; then
+              echo "✅ DNS CNAME record for $ARGOCD_HOSTNAME propagated and correctly points to $EXPECTED_CNAME."
               break
             fi
 
-            echo "⏳ Attempt $i/10: DNS A (ALIAS) record not ready or IP mismatch."
-            echo "   ArgoCD resolved IPs: '$RESOLVED_ARGO_IPS'"
-            echo "   ELB expected IPs: '$EXPECTED_ELB_IPS'"
+            echo "⏳ Attempt $i/10: DNS CNAME record not ready or mismatch."
+            echo "   ArgoCD resolved CNAME: '$RESOLVED_CNAME'"
+            echo "   Expected CNAME: '$EXPECTED_CNAME'"
             sleep 30
 
             if [ $i -eq 10 ]; then
-              echo "⚠️ Warning: DNS A (ALIAS) propagation for argocd.bunnycloud.xyz timed out or IP mismatch."
-              echo "Final DNS A record resolution for argocd.bunnycloud.xyz:"
-              dig -t A argocd.bunnycloud.xyz @8.8.8.8
-              echo "Final DNS A record resolution for ELB $NGINX_LB_HOSTNAME:"
-              dig -t A $NGINX_LB_HOSTNAME @8.8.8.8
-              dig argocd.bunnycloud.xyz +trace
+              echo "⚠️ Warning: DNS CNAME propagation for $ARGOCD_HOSTNAME timed out or CNAME mismatch."
+              echo "Final DNS CNAME record resolution for $ARGOCD_HOSTNAME:"
+              dig -t CNAME $ARGOCD_HOSTNAME @8.8.8.8
+              echo "Final CNAME expected: $EXPECTED_CNAME"
+              dig $ARGOCD_HOSTNAME +trace
             fi
           done
           
