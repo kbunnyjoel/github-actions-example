@@ -10,7 +10,7 @@ output "cognito_user_pool_client_id" {
 
 output "cognito_user_pool_domain" {
   description = "The domain name of the Cognito User Pool"
-  value       = aws_cognito_user_pool_domain.argocd_domain.domain
+  value       = aws_cognito_user_pool_domain.custom.domain
 }
 
 output "cognito_user_pool_endpoint" {
