@@ -23,7 +23,8 @@ R53_ELB=$(echo "$ROUTE53_ELB" | tr '[:upper:]' '[:lower:]' | sed 's/\.$//')
 
 if [[ -z "$R53_ELB" ]]; then
   echo "❗ Route53 ALIAS record not found for $DOMAIN in hosted zone $HOSTED_ZONE_ID"
-  exit 1
+  echo "🟢 No existing record to update or delete. Exiting without action."
+  exit 0
 fi
 
 echo "Normalized Ingress ELB: $K8S_ELB"
