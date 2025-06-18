@@ -104,5 +104,5 @@ output "cognito_users" {
 
 output "cognito_oidc_issuer_url" {
   description = "OIDC issuer URL for Cognito"
-  value       = "https://cognito-idp.${var.aws_region}.amazonaws.com/${aws_cognito_user_pool.argocd_pool.id}"
+  value       = "https://${aws_cognito_user_pool_domain.custom.domain}"
 }

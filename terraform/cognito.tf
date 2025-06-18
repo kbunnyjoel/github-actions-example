@@ -24,9 +24,9 @@ resource "aws_cognito_user_pool" "argocd_pool" {
   # MFA configuration
   mfa_configuration = "OFF"
 
-  lifecycle {
-    prevent_destroy = true
-  }
+  # lifecycle {
+  #   prevent_destroy = true
+  # }
 
   # Advanced security features are not available in ESSENTIALS tier
   # Removing user_pool_add_ons block
@@ -63,9 +63,9 @@ resource "aws_cognito_user_pool_client" "argocd_client" {
     "ALLOW_REFRESH_TOKEN_AUTH"
   ]
 
-  lifecycle {
-    prevent_destroy = true
-  }
+  # lifecycle {
+  #   prevent_destroy = true
+  # }
 }
 
 resource "aws_cognito_user_pool_domain" "custom" {
@@ -81,9 +81,9 @@ resource "aws_cognito_user_pool_domain" "custom" {
     aws_acm_certificate_validation.acm_cert_validation[0] # Use index 0 because count is 1 or 0
   ]
 
-  lifecycle {
-    prevent_destroy = true
-  }
+  # lifecycle {
+  #   prevent_destroy = true
+  # }
 }
 
 # Create user groups

@@ -7,9 +7,9 @@ resource "aws_route53_zone" "main" {
     ManagedBy   = "Terraform"
   }
 
-  lifecycle {
-    prevent_destroy = true
-  }
+  # lifecycle {
+  #   prevent_destroy = true
+  # }
 }
 
 # Add an A record for the apex domain to satisfy Cognito's parent domain validation.
