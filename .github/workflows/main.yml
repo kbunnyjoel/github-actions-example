@@ -742,7 +742,7 @@ jobs:
           # Configure Cognito OIDC
           kubectl -n argocd patch configmap argocd-cm --type=merge -p "{
             \"data\": {
-              \"oidc.config\": \"name: Cognito\\nissuer: ${COGNITO_ISSUER_URL}\\nclientID: ${COGNITO_CLIENT_ID}\\nclientSecret: \$oidc.cognito.clientSecret\\nrequestedScopes: [\\\"openid\\\", \\\"profile\\\", \\\"email\\\"]\\nrequestedIDTokenClaims: {\\\"groups\\\": {\\\"essential\\\": true}}\"
+              \"oidc.config\": \"name: Cognito\\nissuer: ${{ env.COGNITO_ISSUER_URL }}\\nclientID: ${{ env.COGNITO_CLIENT_ID }}\\nclientSecret: \$oidc.cognito.clientSecret\\nrequestedScopes: [\\\"openid\\\", \\\"profile\\\", \\\"email\\\"]\\nrequestedIDTokenClaims: {\\\"groups\\\": {\\\"essential\\\": true}}\"
             }
           }"
           
