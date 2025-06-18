@@ -14,10 +14,22 @@ echo "Fetching Route53 A/ALIAS record..."
 ROUTE53_RECORD=$(aws route53 list-resource-record-sets --hosted-zone-id $HOSTED_ZONE_ID --query "ResourceRecordSets[?Name == '${DOMAIN}.']" --output json)
 ROUTE53_ELB=$(echo "$ROUTE53_RECORD" | jq -r '.[0].AliasTarget.DNSName // empty')
 
-echo "Ingress ELB: $CURRENT_ELB"
-echo "Route53 ALIAS: $ROUTE53_ELB"
+echo "DEBUG: Ingress ELB (from K8s): [$CURRENT_ELB]"
+echo "DEBUG: Route53 ELB (from Route53): [$ROUTE53_ELB]"
 
-if [[ "$CURRENT_ELB" == "${ROUTE53_ELB%.}" ]]; then
+# Normalize: lowercase and remove trailing dot
+K8S_ELB=$(echo "$CURRENT_ELB" | tr '[:upper:]' '[:lower:]' | sed 's/\.$//')
+R53_ELB=$(echo "$ROUTE53_ELB" | tr '[:upper:]' '[:lower:]' | sed 's/\.$//')
+
+if [[ -z "$R53_ELB" ]]; then
+  echo "❗ Route53 ALIAS record not found for $DOMAIN in hosted zone $HOSTED_ZONE_ID"
+  exit 1
+fi
+
+echo "Normalized Ingress ELB: $K8S_ELB"
+echo "Normalized Route53 ELB: $R53_ELB"
+
+if [[ "$K8S_ELB" == "$R53_ELB" ]]; then
   echo "✅ Route53 record matches the current Ingress ELB."
 else
   echo "❌ Mismatch detected! Route53 ALIAS does not match Ingress ELB."
