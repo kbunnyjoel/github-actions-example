@@ -35,7 +35,7 @@ resource "aws_cognito_user_pool_client" "argocd_client" {
   allowed_oauth_flows          = ["code"]
   allowed_oauth_scopes         = ["email", "openid", "profile"]
   callback_urls                = ["https://argocd.bunnycloud.xyz/auth/callback"]
-  logout_urls                  = ["https://argocd.bunnycloud.xyz/logout"]
+  logout_urls                  = ["https://argocd.bunnycloud.xyz/"]
   supported_identity_providers = ["COGNITO"]
 
   # Prevent user existence errors
