@@ -23,7 +23,7 @@ spec:
       values: |
         replicaCount: 1 # Default replica count, can be overridden
         image:
-          repository: 806210429052.dkr.ecr.ap-southeast-2.amazonaws.com/github-actions-example # Docker Hub image repository
+          repository: docker.io/bunnykocharla/github-actions-example:tag # Docker Hub image repository
           tag: 75e0dea5bdd4f89df0321c00c357a2f77d805ab4
           pullPolicy: IfNotPresent
 
