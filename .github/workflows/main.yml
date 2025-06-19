@@ -110,43 +110,16 @@ jobs:
         id: vars
         run: echo "sha_short=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
 
-      - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@v2
-        with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: ${{ env.AWS_REGION }}
-
-      - name: Get AWS Account ID
-        id: aws-account
-        run: |
-          echo "AWS_ACCOUNT_ID=$(aws sts get-caller-identity --query 'Account' --output text)" >> $GITHUB_ENV
-
-      - name: Login to Amazon ECR
-        run: |
-          aws ecr get-login-password --region ${{ env.AWS_REGION }} | \
-          docker login --username AWS --password-stdin ${{ env.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com
-
-      - name: Set AWS ECR details
-        id: ecr
-        run: |
-          AWS_ACCOUNT_ID=$(aws sts get-caller-identity --query "Account" --output text)
-          echo "account_id=$AWS_ACCOUNT_ID" >> $GITHUB_OUTPUT
-          echo "region=${{ env.AWS_REGION }}" >> $GITHUB_OUTPUT
-
-      - name: Ensure ECR repository exists
-        run: |
-          aws ecr describe-repositories --repository-names github-actions-example || \
-          aws ecr create-repository --repository-name github-actions-example
-
       - name: Container Registry push image
         uses: docker/build-push-action@v5
         with:
           context: .
           push: true
           tags: |
-            ${{ steps.ecr.outputs.account_id }}.dkr.ecr.${{ steps.ecr.outputs.region }}.amazonaws.com/${{ env.APP_NAME }}:${{ github.sha }}
+            ${{ secrets.DOCKER_USERNAME }}/${{ env.APP_NAME }}:${{ github.sha }}
+            ghcr.io/${{ github.repository_owner }}/${{ env.APP_NAME }}:${{ github.sha }}
 
+      
       # Scan the image after it has been built and loaded/pushed
       - name: Scan image for vulnerabilities
         uses: aquasecurity/trivy-action@master

@@ -1,7 +1,7 @@
 replicaCount: 1
 
 image:
-  repository: "{{ .Values.aws_account_id }}.dkr.ecr.{{ .Values.aws_region }}.amazonaws.com/{{ .Values.ecr_repo_name }}"
+  repository: your-docker-registry/your-nodejs-app # To be overridden by CI/CD
   tag: "" # To be overridden by CI/CD with a specific version/commit SHA
   pullPolicy: IfNotPresent
 

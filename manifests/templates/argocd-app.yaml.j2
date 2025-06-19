@@ -23,7 +23,7 @@ spec:
       values: |
         replicaCount: 1 # Default replica count, can be overridden
         image:
-          repository: "{{ aws_account_id }}.dkr.ecr.{{ aws_region }}.amazonaws.com/{{ app_name }}"
+          repository: {{ image_repository }} # Docker image repository (e.g., yourdockerhubusername/my-node-app)
           tag: {{ image_tag }}
           pullPolicy: IfNotPresent
 
