@@ -1,7 +1,7 @@
 replicaCount: 1
 
 image:
-  repository: ""
+  repository: "{{ .Values.aws_account_id }}.dkr.ecr.{{ .Values.aws_region }}.amazonaws.com/{{ .Values.ecr_repo_name }}"
   tag: "" # To be overridden by CI/CD with a specific version/commit SHA
   pullPolicy: IfNotPresent
 
@@ -51,7 +51,7 @@ readinessProbe:
   periodSeconds: 10
 
 
-aws_account_id: ""
-aws_region: ""
-ecr_repo_name: ""
-image_tag: "" # or set dynamically from CI
+# aws_account_id: ""
+# aws_region: ""
+# ecr_repo_name: ""
+# image_tag: "" # or set dynamically from CI

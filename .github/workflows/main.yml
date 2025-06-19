@@ -22,6 +22,7 @@ on:
 env:
   APP_NAME: ${{ github.event.repository.name }}
   REGISTRY: docker.io/${{ secrets.DOCKER_USERNAME }}
+  AWS_REGION: ap-southeast-2
 
 jobs:
 
@@ -82,6 +83,7 @@ jobs:
     if: ${{ github.event.inputs.destroy != 'true' }}
     env:
       IS_DESTROY: ${{ github.event.inputs.destroy == 'true' }}
+      AWS_REGION: ${{ env.AWS_REGION }}
     name: Build and push Docker image
     runs-on: ubuntu-latest
     permissions:
@@ -108,14 +110,20 @@ jobs:
         id: vars
         run: echo "sha_short=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
 
+      - name: Set AWS ECR details
+        id: ecr
+        run: |
+          AWS_ACCOUNT_ID=$(aws sts get-caller-identity --query "Account" --output text)
+          echo "account_id=$AWS_ACCOUNT_ID" >> $GITHUB_OUTPUT
+          echo "region=${{ env.AWS_REGION }}" >> $GITHUB_OUTPUT
+
       - name: Container Registry push image
         uses: docker/build-push-action@v5
         with:
           context: .
           push: true
           tags: |
-            ${{ secrets.DOCKER_USERNAME }}/${{ env.APP_NAME }}:${{ github.sha }}
-            ghcr.io/${{ github.repository_owner }}/${{ env.APP_NAME }}:${{ github.sha }}
+            ${{ steps.ecr.outputs.account_id }}.dkr.ecr.${{ steps.ecr.outputs.region }}.amazonaws.com/${{ env.APP_NAME }}:${{ github.sha }}
 
       # Scan the image after it has been built and loaded/pushed
       - name: Scan image for vulnerabilities
@@ -1150,20 +1158,25 @@ jobs:
           
       - name: Generate manifests
         run: |
-          mkdir -p k8s/argo          APPS_JSON='${{ steps.detect.outputs.apps }}'
-          
+          mkdir -p k8s/argo
+          APPS_JSON='${{ steps.detect.outputs.apps }}'
+
           # Use repository variables or defaults
           DOCKER_USERNAME="${{ secrets.DOCKER_USERNAME || '1073286' }}"
           DEPLOYMENT_NAMESPACE="${{ vars.DEPLOYMENT_NAMESPACE || 'github-actions-example' }}"
           IMAGE_NAME="github-actions-example"
           ACM_CERT_ARN="${{ env.ACM_CERTIFICATE_ARN }}"
 
+          # Get AWS Account ID and Region for ECR image repository
+          AWS_ACCOUNT_ID=$(aws sts get-caller-identity --query "Account" --output text)
+          AWS_REGION="${{ env.AWS_REGION }}"
+
           echo "$APPS_JSON" | jq -r '.[]' | while read app; do
             OUTFILE="k8s/argocd/applications/${app}.yaml"
             echo "Rendering $OUTFILE for app: $app"
 
             # Define variables
-            IMAGE_REPOSITORY="${DOCKER_USERNAME}/${IMAGE_NAME}"
+            IMAGE_REPOSITORY="${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/${APP_NAME}"
             IMAGE_TAG="${{ github.sha }}"
             APP_NAME="github-actions-example"
 
@@ -1177,6 +1190,8 @@ jobs:
               -D deployment_namespace="$DEPLOYMENT_NAMESPACE" \
               -D acm_certificate_arn="$ACM_CERT_ARN" \
               -D elb_hostname="${{ env.NGINX_LB_HOSTNAME }}" \
+              -D aws_account_id="$AWS_ACCOUNT_ID" \
+              -D aws_region="$AWS_REGION" \
               > "$OUTFILE"
             echo "Generated manifest for $app (using app_name=$APP_NAME):"
             cat "$OUTFILE"

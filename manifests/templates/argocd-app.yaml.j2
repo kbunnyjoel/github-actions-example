@@ -2,7 +2,7 @@
 # Required variables for this template:
 #   aws_account_id: AWS Account number (string)
 #   aws_region: AWS Region (e.g., ap-southeast-2)
-#   ecr_repo_name: ECR repository name (string)
+#   app_name: ECR repository name (string)
 #   image_tag: Tag for the container image (string)
 
 apiVersion: argoproj.io/v1alpha1
@@ -22,7 +22,7 @@ spec:
       values: |
         replicaCount: 1 # Default replica count, can be overridden
         image:
-          repository: "{{ aws_account_id }}.dkr.ecr.{{ aws_region }}.amazonaws.com/{{ ecr_repo_name }}"
+          repository: "{{ aws_account_id }}.dkr.ecr.{{ aws_region }}.amazonaws.com/{{ app_name }}"
           tag: {{ image_tag }}
           pullPolicy: IfNotPresent
 
