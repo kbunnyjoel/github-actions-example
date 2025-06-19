@@ -68,22 +68,10 @@ resource "aws_cognito_user_pool_client" "argocd_client" {
   # }
 }
 
-resource "aws_cognito_user_pool_domain" "custom" {
-  domain          = "auth.bunnycloud.xyz"
+resource "aws_cognito_user_pool_domain" "cognito_hosted_domain" {
+  domain          = "bunnycloud-auth-example" # Replace with your desired unique prefix
   user_pool_id    = aws_cognito_user_pool.argocd_pool.id
-  certificate_arn = aws_acm_certificate.wildcard_certificate.arn # Use the certificate created in acm.tf
-  depends_on = [
-    # Ensure the parent domain's A record (bunnycloud.xyz) is created
-    # and the ACM certificate is validated before creating the domain.
-    # before attempting to create the Cognito custom domain.
-    aws_route53_record.apex_a_record,
-    # Depend on the certificate validation resource
-    aws_acm_certificate_validation.acm_cert_validation[0] # Use index 0 because count is 1 or 0
-  ]
-
-  # lifecycle {
-  #   prevent_destroy = true
-  # }
+  # No certificate_arn is needed for a Cognito-hosted domain
 }
 
 # Create user groups
@@ -184,25 +172,11 @@ resource "aws_cognito_user_in_group" "dev_in_dev_group" {
 
 # Store the Cognito client secret in AWS Secrets Manager
 resource "aws_secretsmanager_secret" "argocd_cognito_client_secret" {
-  name        = "argocd-cognito-client-secret-v4" # This is the secret ID your workflow expects
+  name        = "argocd-cognito-client-secret-v5" # This is the secret ID your workflow expects
   description = "Client secret for ArgoCD Cognito User Pool Client"
 }
 
 resource "aws_secretsmanager_secret_version" "argocd_cognito_client_secret_value" {
   secret_id     = aws_secretsmanager_secret.argocd_cognito_client_secret.id
   secret_string = aws_cognito_user_pool_client.argocd_client.client_secret
-}
-
-# DNS record for the Cognito custom domain (auth.bunnycloud.xyz)
-# This creates a CNAME record pointing to the CloudFront distribution used by Cognito.
-resource "aws_route53_record" "cognito_cname" {
-  zone_id = aws_route53_zone.main.zone_id # Reference the zone from route53.tf
-  name    = aws_cognito_user_pool_domain.custom.domain
-  type    = "CNAME"
-  ttl     = 300
-  records = [aws_cognito_user_pool_domain.custom.cloudfront_distribution]
-
-  lifecycle {
-    prevent_destroy = true
-  }
 }
