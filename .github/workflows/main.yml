@@ -441,7 +441,7 @@ jobs:
           if [ -z "$CERT_ARN" ]; then
             echo "Warning: Could not get certificate ARN from Terraform output"
             # Fallback to looking up the certificate
-            CERT_ARN=$(aws acm list-certificates --query "CertificateSummaryList[?DomainName=='*.bunnycloud.xyz'].CertificateArn" --output text)
+            CERT_ARN=$(aws acm list-certificates --query "CertificateSummaryList[?DomainName=='*.bunnycloud.xyz' && Status=='ISSUED'].CertificateArn" --output text | head -n 1) # Filter for ISSUED and take the first one
             
             if [ -z "$CERT_ARN" ]; then
               echo "Error: No certificate found for *.bunnycloud.xyz"
