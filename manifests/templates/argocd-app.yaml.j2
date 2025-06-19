@@ -1,3 +1,10 @@
+#
+# Required variables for this template:
+#   aws_account_id: AWS Account number (string)
+#   aws_region: AWS Region (e.g., ap-southeast-2)
+#   ecr_repo_name: ECR repository name (string)
+#   image_tag: Tag for the container image (string)
+
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
@@ -15,8 +22,8 @@ spec:
       values: |
         replicaCount: 1 # Default replica count, can be overridden
         image:
-          repository: {{ image_repository }} # Docker image repository (e.g., yourdockerhubusername/my-node-app)
-          tag: {{ image_tag }} # Docker image tag (e.g., commit SHA or version)
+          repository: "{{ aws_account_id }}.dkr.ecr.{{ aws_region }}.amazonaws.com/{{ ecr_repo_name }}"
+          tag: {{ image_tag }}
           pullPolicy: IfNotPresent
 
         containerPort: 3000 # The port your Node.js application listens on inside the container
@@ -47,7 +54,7 @@ spec:
             # If you were using cert-manager, you'd add its annotations here.
             # Since your NGINX Ingress Controller's NLB is configured with the ACM cert,
             # this Ingress resource doesn't need specific cert-manager annotations for this app.
-          tls: true # Disable TLS section in the ingress
+          tls: false # Disable TLS section in the ingress
 
         # Define resource requests and limits for your application pods
         resources: {} # Leave empty to use Helm chart defaults or override as needed

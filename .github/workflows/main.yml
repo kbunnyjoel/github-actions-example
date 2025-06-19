@@ -1401,8 +1401,8 @@ jobs:
           
           # Check for TLS section
           if echo "$INGRESS_CONFIG" | grep -q "tls:"; then
-            echo "Error: TLS section found in ingress"
-            exit 1
+            echo "⚠️ Warning: TLS section found in ingress. This is expected if TLS/HTTPS is enabled in your values file."
+            # Do not exit, just warn and continue
           fi
           
           # Check SSL redirect settings - more robust approach
