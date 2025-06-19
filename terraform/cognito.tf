@@ -68,15 +68,10 @@ resource "aws_cognito_user_pool_client" "argocd_client" {
   # }
 }
 
-resource "aws_cognito_user_pool_domain" "cognito_hosted_domain" {
-  domain          = "auth.bunnycloud.xyz" # This is your custom domain
-  user_pool_id    = aws_cognito_user_pool.argocd_pool.id
-  certificate_arn = aws_acm_certificate.wildcard_certificate.arn # Reference the ACM cert from us-east-1
-
-  depends_on = [
-    # Ensure the certificate is validated before the domain is created
-    aws_acm_certificate_validation.acm_cert_validation
-  ]
+# Configure an Amazon Cognito domain prefix for the Hosted UI
+resource "aws_cognito_user_pool_domain" "cognito_amazon_domain" {
+  domain       = "argocd-auth-bunnycloud" # CHOOSE A GLOBALLY UNIQUE PREFIX
+  user_pool_id = aws_cognito_user_pool.argocd_pool.id
 }
 
 # Create user groups
@@ -149,14 +144,14 @@ resource "random_password" "dev_password" {
 }
 
 resource "aws_ssm_parameter" "admin_temp_password" {
-  name        = "/argocd/cognito/admin_temp_password"
+  name        = "/k8s/argocd/cognito/admin_temp_password"
   description = "Temporary password for ArgoCD admin user"
   type        = "SecureString"
   value       = random_password.admin_password.result
 }
 
 resource "aws_ssm_parameter" "dev_temp_password" {
-  name        = "/argocd/cognito/dev_temp_password"
+  name        = "/k8s/argocd/cognito/dev_temp_password"
   description = "Temporary password for ArgoCD developer user"
   type        = "SecureString"
   value       = random_password.dev_password.result

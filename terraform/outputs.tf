@@ -8,11 +8,6 @@ output "cognito_user_pool_client_id" {
   value       = aws_cognito_user_pool_client.argocd_client.id
 }
 
-output "cognito_user_pool_domain" {
-  description = "The custom domain or Amazon Cognito hosted domain for the User Pool"
-  value       = aws_cognito_user_pool_domain.cognito_hosted_domain.domain
-}
-
 output "cognito_user_pool_endpoint" {
   description = "The endpoint URL of the Cognito User Pool"
   value       = "https://cognito-idp.${var.aws_region}.amazonaws.com/${aws_cognito_user_pool.argocd_pool.id}"
@@ -104,5 +99,10 @@ output "cognito_users" {
 
 output "cognito_oidc_issuer_url" {
   description = "OIDC issuer URL for Cognito"
-  value       = "https://${aws_cognito_user_pool_domain.cognito_hosted_domain.domain}"
+  value       = "https://cognito-idp.${var.aws_region}.amazonaws.com/${aws_cognito_user_pool.argocd_pool.id}"
+}
+
+output "cognito_hosted_ui_domain" {
+  description = "The domain for the Cognito Hosted UI (e.g., https://<prefix>.auth.<region>.amazoncognito.com)"
+  value       = "https://${aws_cognito_user_pool_domain.cognito_amazon_domain.domain}.auth.${var.aws_region}.amazoncognito.com"
 }
