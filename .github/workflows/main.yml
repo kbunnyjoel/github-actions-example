@@ -134,6 +134,11 @@ jobs:
           echo "account_id=$AWS_ACCOUNT_ID" >> $GITHUB_OUTPUT
           echo "region=${{ env.AWS_REGION }}" >> $GITHUB_OUTPUT
 
+      - name: Ensure ECR repository exists
+        run: |
+          aws ecr describe-repositories --repository-names github-actions-example || \
+          aws ecr create-repository --repository-name github-actions-example
+
       - name: Container Registry push image
         uses: docker/build-push-action@v5
         with:
