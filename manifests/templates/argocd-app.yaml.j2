@@ -23,7 +23,7 @@ spec:
       values: |
         replicaCount: 1 # Default replica count, can be overridden
         image:
-          repository: {{ image_repository }} # Docker image repository (e.g., yourdockerhubusername/my-node-app)
+          repository: docker.io/{{ image_repository }} # Docker Hub image repository
           tag: {{ image_tag }}
           pullPolicy: IfNotPresent
 
