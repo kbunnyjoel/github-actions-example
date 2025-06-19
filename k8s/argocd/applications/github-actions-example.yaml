@@ -24,7 +24,7 @@ spec:
         replicaCount: 1 # Default replica count, can be overridden
         image:
           repository: 806210429052.dkr.ecr.ap-southeast-2.amazonaws.com/github-actions-example # Docker Hub image repository
-          tag: a428ae66128f986eb2cf2fa0e126a46e3340fe37
+          tag: 75e0dea5bdd4f89df0321c00c357a2f77d805ab4
           pullPolicy: IfNotPresent
 
         containerPort: 3000 # The port your Node.js application listens on inside the container
