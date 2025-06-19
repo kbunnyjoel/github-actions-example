@@ -110,6 +110,13 @@ jobs:
         id: vars
         run: echo "sha_short=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
 
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v2
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
       - name: Set AWS ECR details
         id: ecr
         run: |
@@ -1183,9 +1190,9 @@ jobs:
             echo "Rendering $OUTFILE for app: $app"
 
             # Define variables
+            APP_NAME="github-actions-example"
             IMAGE_REPOSITORY="${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/${APP_NAME}"
             IMAGE_TAG="${{ github.sha }}"
-            APP_NAME="github-actions-example"
 
             jinja2 manifests/templates/argocd-app.yaml.j2 \
               -D app_name="$APP_NAME" \

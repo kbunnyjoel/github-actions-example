@@ -28,16 +28,16 @@ metadata:
   labels:
     {{- include "github-actions-example.labels" . | nindent 4 }}
   annotations:
-    {{- with .Values.ingress.annotations }}
-    {{- toYaml . | nindent 4 }}
-    {{- end }}    
-    nginx.ingress.kubernetes.io/rewrite-target: /
+    kubernetes.io/ingress.class: "alb"
+    alb.ingress.kubernetes.io/scheme: internet-facing
+    alb.ingress.kubernetes.io/listen-ports: '[{"HTTPS": 443}]'
+    alb.ingress.kubernetes.io/certificate-arn: "{{ .Values.acm_certificate_arn }}"
+    alb.ingress.kubernetes.io/target-type: ip
+    alb.ingress.kubernetes.io/backend-protocol: HTTP
     external-dns.alpha.kubernetes.io/hostname: "{{ .Values.ingress.hostname }}"
     external-dns.alpha.kubernetes.io/ttl: "60"
 spec:
-  {{- if and .Values.ingress.className (semverCompare ">=1.18-0" .Capabilities.KubeVersion.GitVersion) }}
-  ingressClassName: {{ .Values.ingress.className }}
-  {{- end }}
+  ingressClassName: alb
   rules:
     - host: {{ .Values.ingress.hostname | quote }}
       http:

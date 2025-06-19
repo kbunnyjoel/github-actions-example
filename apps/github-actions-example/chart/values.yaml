@@ -18,17 +18,19 @@ service:
 
 ingress:
   enabled: true
-  className: "nginx"
+  className: "alb"
   hostname: "{{ app_name }}.bunnycloud.xyz"
   path: "/"
   pathType: "Prefix"
   annotations:
-    "kubernetes.io/ingress.class": "nginx"
-    "nginx.ingress.kubernetes.io/ssl-redirect": "true"
-    "nginx.ingress.kubernetes.io/force-ssl-redirect": "true"
-    "nginx.ingress.kubernetes.io/backend-protocol": "HTTP"
-    "external-dns.alpha.kubernetes.io/hostname": "{{ app_name }}.bunnycloud.xyz"
-    "external-dns.alpha.kubernetes.io/ttl": "60"
+    kubernetes.io/ingress.class: "alb"
+    alb.ingress.kubernetes.io/scheme: internet-facing
+    alb.ingress.kubernetes.io/listen-ports: '[{"HTTPS": 443}]'
+    alb.ingress.kubernetes.io/certificate-arn: "{{ .Values.acm_certificate_arn }}"
+    alb.ingress.kubernetes.io/target-type: ip
+    alb.ingress.kubernetes.io/backend-protocol: HTTP
+    external-dns.alpha.kubernetes.io/hostname: "{{ app_name }}.bunnycloud.xyz"
+    external-dns.alpha.kubernetes.io/ttl: "60"
 
 resources: {}
   # We usually recommend not to specify default resources and to leave this as a conscious
@@ -51,7 +53,9 @@ readinessProbe:
   periodSeconds: 10
 
 
-# aws_account_id: ""
-# aws_region: ""
-# ecr_repo_name: ""
-# image_tag: "" # or set dynamically from CI
+aws_account_id: "123456789012"
+aws_region: "ap-southeast-2"
+ecr_repo_name: "github-actions-example"
+image_tag: "" # or set dynamically from CI
+
+acm_certificate_arn: ""  # To be provided via Helm CLI or CI/CD environment
