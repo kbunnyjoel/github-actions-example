@@ -32,6 +32,20 @@ app.use(express.static(path.join(__dirname, 'public')));
 app.use(express.urlencoded({ extended: true }));
 app.use(express.json()); // Add this line to parse JSON request bodies
 
+// Middleware to enforce API key, except on /status
+app.use((req, res, next) => {
+  if (req.path === '/status') return next();
+
+  const apiKey = req.headers['x-api-key'];
+  const expectedKey = process.env.EXPECTED_API_KEY;
+
+  if (!apiKey || apiKey !== expectedKey) {
+    return res.status(401).send('Api Key was not provided.');
+  }
+
+  next();
+});
+
 // Health check endpoint
 app.get('/status', (req, res) => {
   res.status(200).json({ status: 'ok' });
