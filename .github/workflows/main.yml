@@ -83,7 +83,7 @@ jobs:
     if: ${{ github.event.inputs.destroy != 'true' }}
     env:
       IS_DESTROY: ${{ github.event.inputs.destroy == 'true' }}
-      AWS_REGION: ${{ env.AWS_REGION }}
+      AWS_REGION: ap-southeast-2
     name: Build and push Docker image
     runs-on: ubuntu-latest
     permissions:
