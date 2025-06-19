@@ -36,19 +36,12 @@ metadata:
     nginx.ingress.kubernetes.io/rewrite-target: /
     external-dns.alpha.kubernetes.io/hostname: "{{ .Values.ingress.hostname }}"
     external-dns.alpha.kubernetes.io/ttl: "60"
-    {{- with .Values.ingress.acmCertArn }}
-    service.beta.kubernetes.io/aws-load-balancer-ssl-cert: {{ . | quote }}
-    service.beta.kubernetes.io/aws-load-balancer-backend-protocol: "http"
-    service.beta.kubernetes.io/aws-load-balancer-ssl-ports: "https"
-    {{- end }}
 spec:
   {{- if and .Values.ingress.className (semverCompare ">=1.18-0" .Capabilities.KubeVersion.GitVersion) }}
   ingressClassName: {{ .Values.ingress.className }}
   {{- end }}
-  {{- if and .Values.ingress.tls (ne .Values.ingress.tls false) (ne (typeOf .Values.ingress.tls) "bool") }}
-    tls:
-    - hosts:
-        - {{ .Values.ingress.hostname | quote }}
+  {{- if .Values.ingress.tls }}
+  tls: {{- toYaml .Values.ingress.tls | nindent 4 }}
   {{- end }}
   rules:
     - host: {{ .Values.ingress.hostname | quote }}
