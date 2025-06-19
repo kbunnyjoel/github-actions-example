@@ -69,9 +69,9 @@ resource "aws_cognito_user_pool_client" "argocd_client" {
 }
 
 resource "aws_cognito_user_pool_domain" "cognito_hosted_domain" {
-  domain          = "bunnycloud-auth-example" # Replace with your desired unique prefix
+  domain          = "auth.bunnycloud.xyz" # This is your custom domain
   user_pool_id    = aws_cognito_user_pool.argocd_pool.id
-  # No certificate_arn is needed for a Cognito-hosted domain
+  certificate_arn = aws_acm_certificate.wildcard_certificate.arn # Reference the ACM cert from us-east-1
 }
 
 # Create user groups

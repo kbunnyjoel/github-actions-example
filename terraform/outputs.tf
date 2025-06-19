@@ -9,7 +9,7 @@ output "cognito_user_pool_client_id" {
 }
 
 output "cognito_user_pool_domain" {
-  description = "The prefix of the Amazon Cognito hosted domain for the User Pool"
+  description = "The custom domain or Amazon Cognito hosted domain for the User Pool"
   value       = aws_cognito_user_pool_domain.cognito_hosted_domain.domain
 }
 
@@ -104,5 +104,5 @@ output "cognito_users" {
 
 output "cognito_oidc_issuer_url" {
   description = "OIDC issuer URL for Cognito"
-  value       = aws_cognito_user_pool_domain.cognito_hosted_domain.aws_domain # This provides the full https URL for the Cognito domain
+  value       = "https://${aws_cognito_user_pool_domain.cognito_hosted_domain.domain}"
 }

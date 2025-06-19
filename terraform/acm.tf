@@ -1,11 +1,5 @@
-# Provider alias for us-east-1, required for ACM certificates used with CloudFront (Cognito custom domains)
-provider "aws" {
-  alias  = "us_east_1"
-  region = "us-east-1"
-}
-
 resource "aws_acm_certificate" "wildcard_certificate" {
-  provider          = aws.us_east_1
+  provider          = aws.us_east_1 # Ensure certificate is created in us-east-1
   domain_name       = "*.bunnycloud.xyz"
   validation_method = "DNS"
 
@@ -34,8 +28,6 @@ resource "aws_route53_record" "cert_validation" {
   type    = element(aws_acm_certificate.wildcard_certificate.domain_validation_options.*.resource_record_type, 0)
   records = [element(aws_acm_certificate.wildcard_certificate.domain_validation_options.*.resource_record_value, 0)]
   ttl     = 60
-
-  depends_on = [aws_route53_zone.main] # Ensure the zone is created before this record
 }
 
 # Waits for the ACM certificate to be validated using the DNS record.
