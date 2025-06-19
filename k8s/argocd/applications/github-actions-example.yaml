@@ -1,3 +1,10 @@
+#
+# Required variables for this template:
+#   aws_account_id: AWS Account number (string)
+#   aws_region: AWS Region (e.g., ap-southeast-2)
+#   app_name: ECR repository name (string)
+#   image_tag: Tag for the container image (string)
+
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
@@ -15,8 +22,8 @@ spec:
       values: |
         replicaCount: 1 # Default replica count, can be overridden
         image:
-          repository: 1073286/github-actions-example # Docker image repository (e.g., yourdockerhubusername/my-node-app)
-          tag: f9390e596a8e1c07e4a978ca6c54d005e15147d0 # Docker image tag (e.g., commit SHA or version)
+          repository: "806210429052.dkr.ecr.ap-southeast-2.amazonaws.com/github-actions-example"
+          tag: 124afa42767c26a041199bb9bad5eb35ac2d6f99
           pullPolicy: IfNotPresent
 
         containerPort: 3000 # The port your Node.js application listens on inside the container
@@ -30,23 +37,17 @@ spec:
               protocol: TCP
           # annotations: {} # Service annotations are generally not needed for ClusterIP with Ingress
           
+        # SSL/TLS is terminated at the AWS NLB using ACM; do NOT enable TLS/SSL or redirects at the Ingress level.
         ingress:
           enabled: true
           className: "nginx" # Matches the IngressClass of your NGINX controller
           hostname: "github-actions-example.bunnycloud.xyz"
+          path: "/" # Explicit path for better routing
+          pathType: "Prefix" # Path type for better routing
           annotations:
             "kubernetes.io/ingress.class": "nginx" # Legacy annotation, good for compatibility
-            "nginx.ingress.kubernetes.io/ssl-redirect": "true"
-            "nginx.ingress.kubernetes.io/force-ssl-redirect": "true"
-            # This annotation is crucial for ExternalDNS to create the DNS record
             "external-dns.alpha.kubernetes.io/hostname": "github-actions-example.bunnycloud.xyz."
-            # If you were using cert-manager, you'd add its annotations here.
-            # Since your NGINX Ingress Controller's NLB is configured with the ACM cert,
-            # this Ingress resource doesn't need specific cert-manager annotations for this app.
-          tls: # Informs the Ingress controller that this host expects TLS
-            - hosts:
-                - "github-actions-example.bunnycloud.xyz"
-              # secretName is not needed here if the NGINX Ingress Controller's NLB handles SSL termination with the wildcard ACM cert.
+            "external-dns.alpha.kubernetes.io/ttl": "60"
 
         # Define resource requests and limits for your application pods
         resources: {} # Leave empty to use Helm chart defaults or override as needed
@@ -70,6 +71,8 @@ spec:
             port: 3000    # Target the containerPort directly or a named port on the container
           initialDelaySeconds: 5
           periodSeconds: 10
+
+        # No longer using externalDNS.elbTarget as it causes template rendering issues
   destination:
     server: https://kubernetes.default.svc # Target Kubernetes API server
     namespace: github-actions-example # Namespace to deploy the application into (e.g., "nodejs")
