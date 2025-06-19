@@ -37,24 +37,17 @@ spec:
               protocol: TCP
           # annotations: {} # Service annotations are generally not needed for ClusterIP with Ingress
           
+        # SSL/TLS is terminated at the AWS NLB using ACM; do NOT enable TLS/SSL or redirects at the Ingress level.
         ingress:
           enabled: true
           className: "nginx" # Matches the IngressClass of your NGINX controller
           hostname: "{{ app_name }}.bunnycloud.xyz"
           path: "/" # Explicit path for better routing
           pathType: "Prefix" # Path type for better routing
-          acmCertArn: "{{ acm_certificate_arn }}" # Dynamically pass the ACM certificate ARN
           annotations:
             "kubernetes.io/ingress.class": "nginx" # Legacy annotation, good for compatibility
-            "nginx.ingress.kubernetes.io/ssl-redirect": "true"
-            "nginx.ingress.kubernetes.io/force-ssl-redirect": "true"
-            # This annotation is crucial for ExternalDNS to create the DNS record
             "external-dns.alpha.kubernetes.io/hostname": "{{ app_name }}.bunnycloud.xyz."
             "external-dns.alpha.kubernetes.io/ttl": "60"
-            # If you were using cert-manager, you'd add its annotations here.
-            # Since your NGINX Ingress Controller's NLB is configured with the ACM cert,
-            # this Ingress resource doesn't need specific cert-manager annotations for this app.
-          tls: true # Disable TLS section in the ingress
 
         # Define resource requests and limits for your application pods
         resources: {} # Leave empty to use Helm chart defaults or override as needed
