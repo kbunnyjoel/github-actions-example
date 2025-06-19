@@ -23,7 +23,7 @@ spec:
         replicaCount: 1 # Default replica count, can be overridden
         image:
           repository: "806210429052.dkr.ecr.ap-southeast-2.amazonaws.com/github-actions-example"
-          tag: 124afa42767c26a041199bb9bad5eb35ac2d6f99
+          tag: 701c823c4bd05c0f80e7b35f4f16d6d47985b441
           pullPolicy: IfNotPresent
 
         containerPort: 3000 # The port your Node.js application listens on inside the container
