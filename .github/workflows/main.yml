@@ -751,7 +751,8 @@ jobs:
             \"data\": {
               \"oidc.config\": \"name: Cognito\\nissuer: ${{ env.COGNITO_ISSUER_URL }}\\nclientID: ${{ env.COGNITO_CLIENT_ID }}\\nclientSecret: \$oidc.cognito.clientSecret\\nrequestedScopes: [\\\"openid\\\", \\\"profile\\\", \\\"email\\\"]\\nrequestedIDTokenClaims: {\\\"groups\\\": {\\\"essential\\\": true}}\",
               \"oidc.tls.insecure.skip.verify\": \"true\",
-              \"logging.level\": \"debug\"
+              \"logging.level\": \"debug\",
+              \"oidc.token.max.size\": \"0\"
             }
           }"
           
