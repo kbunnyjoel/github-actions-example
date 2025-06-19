@@ -594,12 +594,23 @@ jobs:
           echo "ARGOCD_ROLE_ARN=$ARGOCD_ROLE_ARN" >> $GITHUB_ENV
 
           echo "Fetching NGINX Ingress Controller ELB hostname..."
-          ELB_HOSTNAME_FROM_KUBE=$(kubectl get svc -n ingress-nginx ingress-nginx-controller -o jsonpath='{.status.loadBalancer.ingress[0].hostname}')
-          if [ -z "$ELB_HOSTNAME_FROM_KUBE" ]; then
-            echo "❌ Error: NGINX ELB hostname not found via kubectl."
-            # Potentially exit or use a known env var if passed from another job
-            exit 1
-          fi
+          MAX_RETRIES=30
+          SLEEP_BETWEEN=10
+          for i in $(seq 1 $MAX_RETRIES); do
+            ELB_HOSTNAME_FROM_KUBE=$(kubectl get svc -n ingress-nginx ingress-nginx-controller -o jsonpath='{.status.loadBalancer.ingress[0].hostname}' 2>/dev/null)
+            if [ -n "$ELB_HOSTNAME_FROM_KUBE" ]; then
+              echo "✅ NGINX ELB hostname found: $ELB_HOSTNAME_FROM_KUBE"
+              echo "NGINX_LB_HOSTNAME=$ELB_HOSTNAME_FROM_KUBE" >> $GITHUB_ENV
+              break
+            fi
+            echo "⏳ Attempt $i/$MAX_RETRIES: Waiting for NGINX Ingress Controller LB hostname..."
+            sleep $SLEEP_BETWEEN
+            if [ $i -eq $MAX_RETRIES ]; then
+              echo "❌ Error: NGINX ELB hostname not found after waiting."
+              kubectl get svc -n ingress-nginx ingress-nginx-controller -o yaml || true
+              exit 1
+            fi
+          done
           echo "✅ NGINX ELB hostname found: $ELB_HOSTNAME_FROM_KUBE"
           echo "NGINX_LB_HOSTNAME=$ELB_HOSTNAME_FROM_KUBE" >> $GITHUB_ENV
       
