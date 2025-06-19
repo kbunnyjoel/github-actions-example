@@ -4,6 +4,7 @@
 #   aws_region: AWS Region (e.g., ap-southeast-2)
 #   app_name: ECR repository name (string)
 #   image_tag: Tag for the container image (string)
+#   acm_certificate_arn: ACM Certificate ARN for ALB (string)
 
 apiVersion: argoproj.io/v1alpha1
 kind: Application
@@ -23,7 +24,7 @@ spec:
         replicaCount: 1 # Default replica count, can be overridden
         image:
           repository: "806210429052.dkr.ecr.ap-southeast-2.amazonaws.com/github-actions-example"
-          tag: 701c823c4bd05c0f80e7b35f4f16d6d47985b441
+          tag: 140f3044444ea434e0c6f483c423687e496946cf
           pullPolicy: IfNotPresent
 
         containerPort: 3000 # The port your Node.js application listens on inside the container
@@ -40,14 +41,19 @@ spec:
         # SSL/TLS is terminated at the AWS NLB using ACM; do NOT enable TLS/SSL or redirects at the Ingress level.
         ingress:
           enabled: true
-          className: "nginx" # Matches the IngressClass of your NGINX controller
+          className: "alb"
           hostname: "github-actions-example.bunnycloud.xyz"
-          path: "/" # Explicit path for better routing
-          pathType: "Prefix" # Path type for better routing
+          path: "/"
+          pathType: "Prefix"
           annotations:
-            "kubernetes.io/ingress.class": "nginx" # Legacy annotation, good for compatibility
-            "external-dns.alpha.kubernetes.io/hostname": "github-actions-example.bunnycloud.xyz."
-            "external-dns.alpha.kubernetes.io/ttl": "60"
+            kubernetes.io/ingress.class: "alb"
+            alb.ingress.kubernetes.io/scheme: internet-facing
+            alb.ingress.kubernetes.io/listen-ports: '[{"HTTPS": 443}]'
+            alb.ingress.kubernetes.io/certificate-arn: ""
+            alb.ingress.kubernetes.io/target-type: ip
+            alb.ingress.kubernetes.io/backend-protocol: HTTP
+            external-dns.alpha.kubernetes.io/hostname: "github-actions-example.bunnycloud.xyz."
+            external-dns.alpha.kubernetes.io/ttl: "60"
 
         # Define resource requests and limits for your application pods
         resources: {} # Leave empty to use Helm chart defaults or override as needed
