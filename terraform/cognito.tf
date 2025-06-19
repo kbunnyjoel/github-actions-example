@@ -72,6 +72,11 @@ resource "aws_cognito_user_pool_domain" "cognito_hosted_domain" {
   domain          = "auth.bunnycloud.xyz" # This is your custom domain
   user_pool_id    = aws_cognito_user_pool.argocd_pool.id
   certificate_arn = aws_acm_certificate.wildcard_certificate.arn # Reference the ACM cert from us-east-1
+
+  depends_on = [
+    # Ensure the certificate is validated before the domain is created
+    aws_acm_certificate_validation.acm_cert_validation
+  ]
 }
 
 # Create user groups
