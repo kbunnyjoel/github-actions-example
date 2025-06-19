@@ -473,7 +473,7 @@ jobs:
           fi
 
       - name: Install NGINX Ingress Controller with SSL
-        if: steps.check-nginx.outputs.nginx_exists != 'true'
+        # Removed conditional: Helm upgrade --install is idempotent and will update if exists or install if not.
         run: |
           echo "Installing NGINX Ingress Controller..."
           helm upgrade --install ingress-nginx ingress-nginx/ingress-nginx \
@@ -588,14 +588,6 @@ jobs:
             echo "❌ Error: Terraform init failed in Get ArgoCD IAM Role ARN and Cognito details step."
             exit 1
           fi
-
-          ARGOCD_ROLE_ARN=$(terraform output -raw argocd_cognito_role_arn || echo "")
-          if [ -z "$ARGOCD_ROLE_ARN" ]; then
-            echo "Error: Could not get ArgoCD role ARN from Terraform output"
-            exit 1
-          fi
-          echo "Using ArgoCD role ARN: $ARGOCD_ROLE_ARN"
-          echo "ARGOCD_ROLE_ARN=$ARGOCD_ROLE_ARN" >> $GITHUB_ENV
 
           echo "Fetching NGINX Ingress Controller ELB hostname..."
           MAX_RETRIES=30
