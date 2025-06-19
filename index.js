@@ -32,9 +32,9 @@ app.use(express.static(path.join(__dirname, 'public')));
 app.use(express.urlencoded({ extended: true }));
 app.use(express.json()); // Add this line to parse JSON request bodies
 
-// Middleware to enforce API key, except on /status
+// Middleware to enforce API key, except on /status and POST /add
 app.use((req, res, next) => {
-  if (req.path === '/status') return next();
+  if (req.path === '/status' || (req.path === '/add' && req.method === 'POST')) return next();
 
   const apiKey = req.headers['x-api-key'];
   const expectedKey = process.env.EXPECTED_API_KEY;
