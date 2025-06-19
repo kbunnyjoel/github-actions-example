@@ -750,7 +750,9 @@ jobs:
           kubectl -n argocd patch configmap argocd-cm --type=merge -p "{
             \"data\": {
               \"oidc.config\": \"name: Cognito\\nissuer: ${{ env.COGNITO_ISSUER_URL }}\\nclientID: ${{ env.COGNITO_CLIENT_ID }}\\nclientSecret: \$oidc.cognito.clientSecret\\nrequestedScopes: [\\\"openid\\\", \\\"profile\\\", \\\"email\\\"]\\nrequestedIDTokenClaims: {\\\"groups\\\": {\\\"essential\\\": true}}\"
-            }
+            },
+            \"oidc.tls.insecure.skip.verify\": \"true\",
+            \"logging.level\": \"debug\"
           }"
           
           # Store client secret in argocd-secret
