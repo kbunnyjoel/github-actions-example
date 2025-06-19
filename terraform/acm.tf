@@ -52,7 +52,7 @@ resource "aws_acm_certificate" "wildcard_certificate_ap_southeast_2" {
 
 # DNS validation record for the ap-southeast-2 certificate
 resource "aws_route53_record" "cert_validation_ap_southeast_2" {
-  count = var.create_dns_records ? 1 : 0
+  count           = var.create_dns_records ? 1 : 0
   allow_overwrite = true # Explicitly set, though true is the default
 
   zone_id = aws_route53_zone.main.zone_id
