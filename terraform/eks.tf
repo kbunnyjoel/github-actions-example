@@ -4,7 +4,7 @@
 # tfsec:ignore:aws-ec2-no-public-egress-sgr -- Verified and intentionally allowing public egress for specific EKS node group use cases
 module "vpc" {
   source  = "terraform-aws-modules/vpc/aws"
-  version = ">= 5.21.0"
+  version = "~> 5.21.0"
 
   name = "eks-vpc"
   cidr = "10.0.0.0/16"
