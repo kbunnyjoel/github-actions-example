@@ -1178,12 +1178,11 @@ jobs:
             echo "Rendering $OUTFILE for app: $app"
 
             # Define variables
-            APP_NAME="github-actions-example"
-            IMAGE_REPOSITORY="${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/${APP_NAME}"
+            IMAGE_REPOSITORY="docker.io/${{ secrets.DOCKER_USERNAME }}/${{ env.APP_NAME}}"
             IMAGE_TAG="${{ github.sha }}"
 
             jinja2 manifests/templates/argocd-app.yaml.j2 \
-              -D app_name="$APP_NAME" \
+              -D app_name="${{ env.APP_NAME}}" \
               -D chart_path="apps/$app/chart" \
               -D github_repository_url="${{ github.server_url }}/${{ github.repository }}" \
               -D target_revision="${{ github.ref_name }}" \
@@ -1195,7 +1194,7 @@ jobs:
               -D aws_account_id="$AWS_ACCOUNT_ID" \
               -D aws_region="$AWS_REGION" \
               > "$OUTFILE"
-            echo "Generated manifest for $app (using app_name=$APP_NAME):"
+            echo "Generated manifest for $app (using app_name="${{ env.APP_NAME}}""):"
             cat "$OUTFILE"
           done
 
@@ -1273,33 +1272,33 @@ jobs:
       
       - name: Check Application Ingress Resource
         run: |
-          APP_NAMESPACE="github-actions-example"
+
           APP_INGRESS_NAME="github-actions-example" # Assuming Ingress name matches app name
 
-          echo "Waiting for namespace '$APP_NAMESPACE' to be created by ArgoCD..."
+          echo "Waiting for namespace '${{ env.APP_NAME }}' to be created by ArgoCD..."
           for i in {1..30}; do # Wait up to 5 minutes (30 * 10s)
-            if kubectl get namespace "$APP_NAMESPACE" > /dev/null 2>&1; then
-              echo "Namespace '$APP_NAMESPACE' found."
+            if kubectl get namespace "${{ env.APP_NAME }}" > /dev/null 2>&1; then
+              echo "Namespace '${{ env.APP_NAME }}' found."
               break
             fi
             if [ $i -eq 30 ]; then
-              echo "Error: Namespace '$APP_NAMESPACE' not found after waiting."
+              echo "Error: Namespace '${{ env.APP_NAME }}' not found after waiting."
               exit 1
             fi
-            echo "Namespace '$APP_NAMESPACE' not yet found, waiting... (Attempt $i/30)"
+            echo "Namespace '${{ env.APP_NAME }}' not yet found, waiting... (Attempt $i/30)"
             sleep 10
           done
 
-          echo "Waiting for Ingress '$APP_INGRESS_NAME' in namespace '$APP_NAMESPACE' to be created by ArgoCD..."
+          echo "Waiting for Ingress '$APP_INGRESS_NAME' in namespace '${{ env.APP_NAME }}' to be created by ArgoCD..."
           for i in {1..60}; do # Wait up to 10 minutes (60 * 10s)
-            if kubectl get ingress -n "$APP_NAMESPACE" "$APP_INGRESS_NAME" -o yaml > /dev/null 2>&1; then
+            if kubectl get ingress -n "${{ env.APP_NAME }}" "$APP_INGRESS_NAME" -o yaml > /dev/null 2>&1; then
               echo "Ingress '$APP_INGRESS_NAME' found."
-              INGRESS_YAML=$(kubectl get ingress -n "$APP_NAMESPACE" "$APP_INGRESS_NAME" -o yaml)
+              INGRESS_YAML=$(kubectl get ingress -n "${{ env.APP_NAME }}" "$APP_INGRESS_NAME" -o yaml)
               echo "Ingress YAML:"
               echo "$INGRESS_YAML"
               
               echo "Verifying ExternalDNS hostname annotation on Ingress..."
-              ANNOTATION_VALUE=$(kubectl get ingress -n "$APP_NAMESPACE" "$APP_INGRESS_NAME" -o jsonpath='{.metadata.annotations.external-dns\.alpha\.kubernetes\.io/hostname}' 2>/dev/null)
+              ANNOTATION_VALUE=$(kubectl get ingress -n "${{ env.APP_NAME }}" "$APP_INGRESS_NAME" -o jsonpath='{.metadata.annotations.external-dns\.alpha\.kubernetes\.io/hostname}' 2>/dev/null)
               if [ -n "$ANNOTATION_VALUE" ]; then
                 echo "ExternalDNS hostname annotation found: $ANNOTATION_VALUE"
                 exit 0 # Success, Ingress and annotation found
@@ -1309,22 +1308,21 @@ jobs:
             fi
             if [ $i -eq 60 ]; then
               echo "Error: Ingress '$APP_INGRESS_NAME' or its ExternalDNS annotation not found after waiting."
-              kubectl get ingress -n "$APP_NAMESPACE" "$APP_INGRESS_NAME" -o yaml || echo "Ingress '$APP_INGRESS_NAME' still not found in namespace '$APP_NAMESPACE'."
+              kubectl get ingress -n "${{ env.APP_NAME }}" "$APP_INGRESS_NAME" -o yaml || echo "Ingress '$APP_INGRESS_NAME' still not found in namespace '${{ env.APP_NAME }}'."
               exit 1
             fi
-            echo "Ingress '$APP_INGRESS_NAME' not yet found or annotation missing in namespace '$APP_NAMESPACE', waiting... (Attempt $i/60)"
+            echo "Ingress '$APP_INGRESS_NAME' not yet found or annotation missing in namespace '${{ env.APP_NAME }}', waiting... (Attempt $i/60)"
             sleep 10
           done
       - name: Ensure application is deployed
         run: |
-          APP_NAMESPACE="github-actions-example"
-          APP_NAME="github-actions-example"
+  
           
-          kubectl create namespace $APP_NAMESPACE --dry-run=client -o yaml | kubectl apply -f -
-          kubectl get pods -n $APP_NAMESPACE
-          kubectl rollout status deployment/$APP_NAME -n $APP_NAMESPACE --timeout=2m || true
+          kubectl create namespace "${{ env.APP_NAME }}" --dry-run=client -o yaml | kubectl apply -f -
+          kubectl get pods -n ${{ env.APP_NAME }}
+          kubectl rollout status deployment/${{ env.APP_NAME }} -n ${{ env.APP_NAME }} --timeout=2m || true
 
-          echo "Service for $APP_NAME should be managed by ArgoCD via the Helm chart."
+          echo "Service for ${{ env.APP_NAME }} should be managed by ArgoCD via the Helm chart."
 
       - name: List ExternalDNS TXT records
         run: |
