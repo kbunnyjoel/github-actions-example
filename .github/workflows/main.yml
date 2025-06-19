@@ -1164,8 +1164,8 @@ jobs:
           APPS_JSON='${{ steps.detect.outputs.apps }}'
 
           # Use repository variables or defaults
-          DOCKER_USERNAME="${{ secrets.DOCKER_USERNAME || '1073286' }}"
-          DEPLOYMENT_NAMESPACE="${{ vars.DEPLOYMENT_NAMESPACE || 'github-actions-example' }}"
+          DOCKER_USERNAME="${{ secrets.DOCKER_USERNAME }}""
+          DEPLOYMENT_NAMESPACE="${{ env.APP_NAME}}"
           IMAGE_NAME="github-actions-example"
           ACM_CERT_ARN="${{ env.ACM_CERTIFICATE_ARN }}"
 
