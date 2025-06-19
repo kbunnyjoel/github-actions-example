@@ -48,8 +48,13 @@ output "cluster_name" {
 }
 
 output "acm_certificate_arn" {
-  description = "ARN of the ACM certificate for *.bunnycloud.xyz"
-  value       = aws_acm_certificate.wildcard_certificate.arn
+  description = "ARN of the ACM certificate for *.bunnycloud.xyz in ap-southeast-2 (for EKS Load Balancers)"
+  value       = aws_acm_certificate.wildcard_certificate_ap_southeast_2.arn
+}
+
+output "acm_certificate_arn_us_east_1" {
+  description = "ARN of the ACM certificate for *.bunnycloud.xyz in us-east-1 (e.g., for CloudFront)"
+  value       = aws_acm_certificate.wildcard_certificate_us_east_1.arn
 }
 
 output "route53_zone_id" {
