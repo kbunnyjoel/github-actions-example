@@ -452,6 +452,10 @@ jobs:
           echo "Using certificate ARN: $CERT_ARN"
           echo "ACM_CERTIFICATE_ARN=$CERT_ARN" >> $GITHUB_ENV
 
+      - name: Echo ACM Certificate ARN
+        run: |
+          echo "The ACM_CERTIFICATE_ARN that will be used by Helm is: ${{ env.ACM_CERTIFICATE_ARN }}"
+
       - name: Check NGINX Ingress Controller
         id: check-nginx
         run: |
