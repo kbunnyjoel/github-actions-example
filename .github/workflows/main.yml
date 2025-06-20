@@ -1191,7 +1191,7 @@ jobs:
             IMAGE_TAG="${{ github.sha }}"
 
             jinja2 manifests/templates/argocd-app.yaml.j2 \
-              -D app_name="${{ env.APP_NAME}}" \
+              -D app_name="${{ env.APP_NAME }}" \
               -D chart_path="apps/$app/chart" \
               -D github_repository_url="${{ github.server_url }}/${{ github.repository }}" \
               -D target_revision="${{ github.ref_name }}" \
