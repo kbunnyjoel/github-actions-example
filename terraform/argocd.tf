@@ -48,13 +48,6 @@ resource "aws_iam_role_policy_attachment" "argocd_policy_attachment" {
   policy_arn = aws_iam_policy.argocd_policy.arn
 }
 
-# OIDC Provider for EKS (ensure this is not duplicated if defined elsewhere)
-resource "aws_iam_openid_connect_provider" "eks" {
-  url             = data.aws_eks_cluster.github_cluster.identity[0].oidc[0].issuer
-  client_id_list  = ["sts.amazonaws.com"]
-  thumbprint_list = [data.aws_eks_cluster.github_cluster.certificate_authority[0].data]
-}
-
 # IAM Role for AWS Load Balancer Controller
 resource "aws_iam_role" "alb_controller_role" {
   name = "eks-alb-controller-role"
@@ -65,7 +58,7 @@ resource "aws_iam_role" "alb_controller_role" {
       {
         Effect = "Allow",
         Principal = {
-          Federated = aws_iam_openid_connect_provider.eks.arn
+          Federated = module.eks.oidc_provider_arn
         },
         Action = "sts:AssumeRoleWithWebIdentity",
         Condition = {
