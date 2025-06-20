@@ -384,6 +384,8 @@ jobs:
 
       
   deploy-argocd:
+    outputs:
+      acm-cert-arn: ${{ steps.get-cert-arn.outputs.ACM_CERTIFICATE_ARN }}
     if: ${{ github.event.inputs.destroy_infra != 'true' }}
     env:
       IS_DESTROY: ${{ github.event.inputs.destroy == 'true' }}
@@ -1127,7 +1129,7 @@ jobs:
 
   generate-argo-apps:
     if: ${{ github.event.inputs.destroy != 'true' }}
-    needs: get-cert-arn
+    needs: deploy-argocd
     env:
       # These env vars are set by the deploy-argocd job and should be available if 'needs' is correct
       IS_DESTROY: ${{ github.event.inputs.destroy == 'true' }}
@@ -1175,7 +1177,7 @@ jobs:
           DOCKER_USERNAME="${{ secrets.DOCKER_USERNAME }}"
           DEPLOYMENT_NAMESPACE="${{ env.APP_NAME }}"
           IMAGE_NAME="${{ env.APP_NAME }}"
-          echo "ACM Certificate ARN: ${{ needs.get-cert-arn.outputs.acm-cert-arn }}"
+          echo "ACM Certificate ARN: ${{ needs.deploy-argocd:.outputs.acm-cert-arn }}"
           # Get AWS Account ID and Region for ECR image repository
           AWS_ACCOUNT_ID=$(aws sts get-caller-identity --query "Account" --output text)
           AWS_REGION="${{ env.AWS_REGION }}"
