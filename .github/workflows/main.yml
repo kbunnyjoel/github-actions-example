@@ -1169,6 +1169,8 @@ jobs:
           IMAGE_NAME="github-actions-example"
           ACM_CERT_ARN="${{ env.ACM_CERTIFICATE_ARN }}"
 
+          echo "ACM Certificate ARN: $ACM_CERT_ARN"
+
           # Get AWS Account ID and Region for ECR image repository
           AWS_ACCOUNT_ID=$(aws sts get-caller-identity --query "Account" --output text)
           AWS_REGION="${{ env.AWS_REGION }}"

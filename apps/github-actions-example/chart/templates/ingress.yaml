@@ -34,7 +34,7 @@ metadata:
     external-dns.alpha.kubernetes.io/hostname: "{{ .Values.ingress.hostname }}"
     external-dns.alpha.kubernetes.io/ttl: "60"
 spec:
-  ingressClassName: nginx
+  ingressClassName: {{ .Values.ingress.className }}
   rules:
     - host: {{ .Values.ingress.hostname | quote }}
       http:
