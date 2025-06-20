@@ -210,7 +210,7 @@ jobs:
       
       - name: Terraform Unlock
         if: ${{ github.event.inputs.destroy != 'true' }}
-        run: terraform force-unlock -force 89886282-1bd1-fa20-b432-752c6435724a || echo "No locks to unlock"
+        run: terraform force-unlock -force 8877d196-05be-bc90-9ecf-bf2dff3d5b6d || echo "No locks to unlock"
       - name: Terraform Plan
         if: ${{ github.event.inputs.destroy != 'true' }}
         run: terraform plan
@@ -1177,7 +1177,8 @@ jobs:
           DOCKER_USERNAME="${{ secrets.DOCKER_USERNAME }}"
           DEPLOYMENT_NAMESPACE="${{ env.APP_NAME }}"
           IMAGE_NAME="${{ env.APP_NAME }}"
-          echo "ACM Certificate ARN: ${{ needs.deploy-argocd.outputs.acm-cert-arn }}"
+          ACM_CERT_ARN="${{ needs.deploy-argocd.outputs.acm-cert-arn }}"
+       
           # Get AWS Account ID and Region for ECR image repository
           AWS_ACCOUNT_ID=$(aws sts get-caller-identity --query "Account" --output text)
           AWS_REGION="${{ env.AWS_REGION }}"
