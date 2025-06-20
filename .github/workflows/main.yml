@@ -386,6 +386,7 @@ jobs:
   deploy-argocd:
     outputs:
       acm-cert-arn: ${{ steps.get-cert-arn.outputs.ACM_CERTIFICATE_ARN }}
+      nginx-lb-hostname: ${{ steps.get-nginx-hostname.outputs.NGINX_LB_HOSTNAME }}
     if: ${{ github.event.inputs.destroy_infra != 'true' }}
     env:
       IS_DESTROY: ${{ github.event.inputs.destroy == 'true' }}
@@ -591,23 +592,18 @@ jobs:
           echo "Verifying NGINX Ingress Controller configuration..."
           kubectl get configmap -n ingress-nginx ingress-nginx-controller -o yaml
 
-      - name: Get ArgoCD IAM Role ARN and Cognito details
+      - name: Get NGINX Ingress Controller LB Hostname
+        id: get-nginx-hostname
         run: |
-          cd terraform
-          echo "Initializing Terraform in current context to ensure outputs are fresh..."
-          if ! terraform init -input=false -reconfigure; then
-            echo "❌ Error: Terraform init failed in Get ArgoCD IAM Role ARN and Cognito details step."
-            exit 1
-          fi
-
           echo "Fetching NGINX Ingress Controller ELB hostname..."
           MAX_RETRIES=30
           SLEEP_BETWEEN=10
           for i in $(seq 1 $MAX_RETRIES); do
-            ELB_HOSTNAME_FROM_KUBE=$(kubectl get svc -n ingress-nginx ingress-nginx-controller -o jsonpath='{.status.loadBalancer.ingress[0].hostname}' 2>/dev/null)
-            if [ -n "$ELB_HOSTNAME_FROM_KUBE" ]; then
-              echo "✅ NGINX ELB hostname found: $ELB_HOSTNAME_FROM_KUBE"
-              echo "NGINX_LB_HOSTNAME=$ELB_HOSTNAME_FROM_KUBE" >> $GITHUB_ENV
+            NGINX_LB_HOSTNAME=$(kubectl get svc -n ingress-nginx ingress-nginx-controller -o jsonpath='{.status.loadBalancer.ingress[0].hostname}' 2>/dev/null)
+            if [ -n "$NGINX_LB_HOSTNAME" ]; then
+              echo "✅ NGINX ELB hostname found: $NGINX_LB_HOSTNAME"
+              echo "NGINX_LB_HOSTNAME=$NGINX_LB_HOSTNAME" >> $GITHUB_ENV
+              echo "NGINX_LB_HOSTNAME=$NGINX_LB_HOSTNAME" >> $GITHUB_OUTPUT
               break
             fi
             echo "⏳ Attempt $i/$MAX_RETRIES: Waiting for NGINX Ingress Controller LB hostname..."
@@ -618,8 +614,6 @@ jobs:
               exit 1
             fi
           done
-          echo "✅ NGINX ELB hostname found: $ELB_HOSTNAME_FROM_KUBE"
-          echo "NGINX_LB_HOSTNAME=$ELB_HOSTNAME_FROM_KUBE" >> $GITHUB_ENV
       
       - name: Prepare ArgoCD Helm values file
         run: |
@@ -1181,12 +1175,14 @@ jobs:
           DEPLOYMENT_NAMESPACE="${{ env.APP_NAME }}"
           IMAGE_NAME="${{ env.APP_NAME }}"
           ACM_CERT_ARN="${{ needs.deploy-argocd.outputs.acm-cert-arn }}"
-          echo "$ACM_CERT_ARN"
+          NGINX_LB_HOSTNAME="${{ needs.deploy-argocd.outputs.nginx-lb-hostname }}"
+          echo "NGINX LB Hostname: ${{ needs.deploy-argocd.outputs.nginx-lb-hostname }}"
+          echo "ACM CERT ARN: $ACM_CERT_ARN"
+          echo "NGINX LB Hostname: $NGINX_LB_HOSTNAME"
           # Get AWS Account ID and Region for ECR image repository
           AWS_ACCOUNT_ID=$(aws sts get-caller-identity --query "Account" --output text)
           AWS_REGION="${{ env.AWS_REGION }}"
 
-          
           echo "$APPS_JSON" | jq -r '.[]' | while read app; do
             OUTFILE="k8s/argocd/applications/${app}.yaml"
             echo "Rendering $OUTFILE for app: $app"
@@ -1204,7 +1200,7 @@ jobs:
               -D image_tag="$IMAGE_TAG" \
               -D deployment_namespace="$DEPLOYMENT_NAMESPACE" \
               -D acm_certificate_arn="$ACM_CERT_ARN" \
-              -D elb_hostname="${{ env.NGINX_LB_HOSTNAME }}" \
+              -D elb_hostname="$NGINX_LB_HOSTNAME" \
               -D aws_account_id="$AWS_ACCOUNT_ID" \
               -D aws_region="$AWS_REGION" \
               > "$OUTFILE"
