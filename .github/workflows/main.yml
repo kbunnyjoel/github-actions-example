@@ -1160,13 +1160,12 @@ jobs:
 
       - name: Generate manifests
         run: |
-          mkdir -p k8s/argo
           APPS_JSON='${{ steps.detect.outputs.apps }}'
 
           # Use repository variables or defaults
           DOCKER_USERNAME="${{ secrets.DOCKER_USERNAME }}""
           DEPLOYMENT_NAMESPACE="${{ env.APP_NAME}}"
-          IMAGE_NAME="github-actions-example"
+          IMAGE_NAME="${{ env.APP_NAME}}"
           ACM_CERT_ARN="${{ env.ACM_CERTIFICATE_ARN }}"
 
           echo "ACM Certificate ARN: $ACM_CERT_ARN"
