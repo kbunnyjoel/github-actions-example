@@ -22,8 +22,8 @@ spec:
       values: |
         replicaCount: 1 # Default replica count, can be overridden
         image:
-          repository: docker.io/1073286/github-actions-example # Docker Hub image repository
-          tag: 2bad588241f6ed1fae42502fef0401dbd5a6a35b
+          repository: docker.io/***/github-actions-example # Docker Hub image repository
+          tag: 1796a5038c40c16904e5f3836d23500a3f4499ca
           pullPolicy: IfNotPresent
 
         containerPort: 3000 # The port your Node.js application listens on inside the container
@@ -48,11 +48,11 @@ spec:
             kubernetes.io/ingress.class: "alb"
             alb.ingress.kubernetes.io/scheme: internet-facing
             alb.ingress.kubernetes.io/listen-ports: '[{"HTTPS": 443}]'
-            alb.ingress.kubernetes.io/certificate-arn: "{{ acm_certificate_arn }}" # ACM Certificate ARN for ALB
+            alb.ingress.kubernetes.io/certificate-arn: "arn:aws:acm:ap-southeast-2:806210429052:certificate/d877d8be-7c2c-447a-a397-99fff3ac0ef1"
             alb.ingress.kubernetes.io/target-type: ip
             alb.ingress.kubernetes.io/backend-protocol: HTTP
             external-dns.alpha.kubernetes.io/ttl: "60"
-            external-dns.alpha.kubernetes.io/hostname: "{{ app_name }}.bunnycloud.xyz."
+            external-dns.alpha.kubernetes.io/hostname: "github-actions-example.bunnycloud.xyz."
 
         # Define resource requests and limits for your application pods
         resources: {} # Leave empty to use Helm chart defaults or override as needed
