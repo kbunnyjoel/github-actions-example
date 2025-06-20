@@ -1218,10 +1218,18 @@ jobs:
           git add k8s/argocd/applications/
           if ! git diff --staged --quiet; then
             git commit -m "Generate/Update ArgoCD Application manifests for ${{ github.sha }}"
-            git push origin HEAD:${{ github.ref_name }}
-            echo "Committed and pushed ArgoCD Application manifests to ${{ github.ref_name }}."
           else
             echo "No changes to ArgoCD Application manifests to commit."
+            exit 0
+          fi
+      - name: Pull latest changes before pushing
+        run: |
+          git config --global user.email 'github-actions[bot]@users.noreply.github.com'
+          git config --global user.name 'github-actions[bot]'
+          git pull --rebase origin feature/improvements
+      - name: Push changes to feature/improvements branch
+        run: |
+          git push origin HEAD:feature/improvements
           fi
 
   lint-and-deploy-helm:
