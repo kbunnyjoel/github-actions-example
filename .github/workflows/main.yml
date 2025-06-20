@@ -480,7 +480,32 @@ jobs:
           helm repo add argo https://argoproj.github.io/argo-helm
           helm repo add external-dns https://kubernetes-sigs.github.io/external-dns/
           helm repo add eks https://aws.github.io/eks-charts
+          helm repo add autoscaler https://kubernetes.github.io/autoscaler
           helm repo update
+
+      - name: Get Cluster Autoscaler IAM Role ARN
+        id: tf-output-autoscaler-role
+        run: |
+          echo "CLUSTER_AUTOSCALER_ROLE_ARN=$(terraform -chdir=terraform output -raw cluster_autoscaler_role_arn)" >> $GITHUB_ENV
+
+      - name: Get Cluster Autoscaler IAM Role ARN
+        id: tf-output-autoscaler-role
+        run: |
+          echo "CLUSTER_AUTOSCALER_ROLE_ARN=$(terraform -chdir=terraform output -raw cluster_autoscaler_role_arn)" >> $GITHUB_ENV
+          
+      - name: Install Cluster Autoscaler
+        run: |
+          AWS_ACCOUNT_ID=$(aws sts get-caller-identity --query "Account" --output text)
+          helm upgrade -i cluster-autoscaler eks/cluster-autoscaler \
+            -n kube-system \
+            --set autoDiscovery.clusterName=${{ env.APP_NAME }} \
+            --set awsRegion=${{ env.AWS_REGION }} \
+            --set rbac.serviceAccount.create=false \
+            --set rbac.serviceAccount.name=cluster-autoscaler \
+            --set extraArgs.balance-similar-node-groups=true \
+            --set extraArgs.skip-nodes-with-system-pods=false \
+            --set extraArgs.skip-nodes-with-local-storage=false \
+            --set serviceAccount.annotations."eks\.amazonaws\.com/role-arn"=${{ env.CLUSTER_AUTOSCALER_ROLE_ARN }}
 
       - name: Install AWS Load Balancer Controller
         run: |
