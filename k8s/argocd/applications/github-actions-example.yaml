@@ -24,7 +24,7 @@ spec:
         replicaCount: 1 # Default replica count, can be overridden
         image:
           repository: docker.io/1073286/github-actions-example # Docker Hub image repository
-          tag: 75e0dea5bdd4f89df0321c00c357a2f77d805ab4
+          tag: 2bad588241f6ed1fae42502fef0401dbd5a6a35b
           pullPolicy: IfNotPresent
 
         containerPort: 3000 # The port your Node.js application listens on inside the container
@@ -49,7 +49,7 @@ spec:
             kubernetes.io/ingress.class: "alb"
             alb.ingress.kubernetes.io/scheme: internet-facing
             alb.ingress.kubernetes.io/listen-ports: '[{"HTTPS": 443}]'
-            alb.ingress.kubernetes.io/certificate-arn: ""
+            alb.ingress.kubernetes.io/certificate-arn: 
             alb.ingress.kubernetes.io/target-type: ip
             alb.ingress.kubernetes.io/backend-protocol: HTTP
             external-dns.alpha.kubernetes.io/hostname: "github-actions-example.bunnycloud.xyz."
@@ -88,3 +88,4 @@ spec:
       selfHeal: true # Automatically sync if the live state drifts from the desired state in Git
     syncOptions:
     - CreateNamespace=true # Automatically create the target namespace if it doesn't exist
+ 
