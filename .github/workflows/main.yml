@@ -1158,6 +1158,14 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ap-southeast-2
 
+      - name: Process apps safely
+        run: |
+          APPS_JSON='["github-actions-example"]'
+          for app in $(echo "$APPS_JSON" | jq -r '.[]'); do
+            echo "Processing app: $app"
+            # Insert deployment logic here
+          done
+          
       - name: Generate manifests
         run: |
           APPS_JSON='${{ steps.detect.outputs.apps }}'
