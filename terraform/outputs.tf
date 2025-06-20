@@ -111,3 +111,8 @@ output "cognito_hosted_ui_domain" {
   description = "The domain for the Cognito Hosted UI (e.g., https://<prefix>.auth.<region>.amazoncognito.com)"
   value       = "https://${aws_cognito_user_pool_domain.cognito_amazon_domain.domain}.auth.${var.aws_region}.amazoncognito.com"
 }
+
+output "aws_load_balancer_controller_role_arn" {
+  description = "ARN of the IAM role for AWS Load Balancer Controller"
+  value       = aws_iam_role.alb_controller_role.arn
+}
