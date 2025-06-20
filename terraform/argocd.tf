@@ -47,3 +47,33 @@ resource "aws_iam_role_policy_attachment" "argocd_policy_attachment" {
   role       = aws_iam_role.argocd_role.name
   policy_arn = aws_iam_policy.argocd_policy.arn
 }
+
+# OIDC Provider for EKS (ensure this is not duplicated if defined elsewhere)
+resource "aws_iam_openid_connect_provider" "eks" {
+  url             = data.aws_eks_cluster.github_cluster.identity[0].oidc[0].issuer
+  client_id_list  = ["sts.amazonaws.com"]
+  thumbprint_list = [data.aws_eks_cluster.github_cluster.certificate_authority[0].data]
+}
+
+# IAM Role for AWS Load Balancer Controller
+resource "aws_iam_role" "alb_controller_role" {
+  name = "eks-alb-controller-role"
+
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17",
+    Statement = [
+      {
+        Effect = "Allow",
+        Principal = {
+          Federated = aws_iam_openid_connect_provider.eks.arn
+        },
+        Action = "sts:AssumeRoleWithWebIdentity",
+        Condition = {
+          StringEquals = {
+            "${replace(data.aws_eks_cluster.github_cluster.identity[0].oidc[0].issuer, "https://", "")}:sub" = "system:serviceaccount:kube-system:aws-load-balancer-controller"
+          }
+        }
+      }
+    ]
+  })
+}

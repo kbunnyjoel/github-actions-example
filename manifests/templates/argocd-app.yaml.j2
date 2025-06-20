@@ -41,8 +41,8 @@ spec:
         # SSL/TLS is terminated at the AWS NLB using ACM; do NOT enable TLS/SSL or redirects at the Ingress level.
         ingress:
           enabled: true
-      className: "alb"  # Specify ALB Ingress Class
-      hostname: "{{ app_name }}.bunnycloud.xyz" # Your application's actual hostname
+          className: "alb"  # Specify ALB Ingress Class
+          hostname: "{{ app_name }}.bunnycloud.xyz" # Your application's actual hostname
           path: "/"
           pathType: "Prefix"
           annotations:

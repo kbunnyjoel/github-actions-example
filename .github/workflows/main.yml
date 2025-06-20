@@ -22,7 +22,7 @@ on:
 env:
   APP_NAME: ${{ github.event.repository.name }}
   REGISTRY: docker.io/${{ secrets.DOCKER_USERNAME }}
-  AWS_REGION: ap-southeast-2
+  AWS_REGION: 'ap-southeast-2'
 
 jobs:
 
@@ -425,12 +425,75 @@ jobs:
             kubectl get nodes | grep -q ' Ready ' && break || sleep 10
           done
 
+        # Set VPC_ID using AWS CLI as a global environment variable
+      - name: Get VPC ID
+        id: get-vpc
+        run: |
+          VPC_ID=$(aws ec2 describe-vpcs --query 'Vpcs[0].VpcId' --output text)
+          echo "VPC_ID=$VPC_ID" >> $GITHUB_ENV
+
+      - name: Install AWS Load Balancer Controller
+        run: |
+          helm repo add eks https://aws.github.io/eks-charts
+          helm repo update
+          helm upgrade -i aws-load-balancer-controller eks/aws-load-balancer-controller \
+            -n kube-system \
+            --set clusterName=${{ env.APP_NAME }} \
+            --set serviceAccount.create=false \
+            --set serviceAccount.name=aws-load-balancer-controller \
+            --set region=${{ env.AWS_REGION }} \
+            --set vpcId=${{ env.VPC_ID }} \
+            --set image.repository=602401143452.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/amazon/aws-load-balancer-controller
+
       - name: Apply aws-auth ConfigMap for bastion access
         run: |
           echo "Applying aws-auth ConfigMap for bastion access..."
           kubectl apply -f k8s/argocd/aws-auth-patch.yaml
           echo "aws-auth ConfigMap applied"
 
+      - name: Get AWS Load Balancer Controller role ARN from Terraform
+        run: |
+          echo "Getting AWS Load Balancer Controller role ARN from Terraform..."
+          cd terraform
+
+          # Initialize Terraform to access the state
+          echo "Initializing Terraform..."
+          if ! terraform init -input=false -reconfigure; then
+            echo "Error: Terraform init failed."
+            exit 1
+          fi
+
+          ROLE_ARN_FROM_TF=$(terraform output -raw aws_load_balancer_controller_role_arn 2>/dev/null)
+
+          if [ ! -z "$ROLE_ARN_FROM_TF" ]; then
+            echo "Successfully retrieved ALB Controller role ARN from Terraform output: $ROLE_ARN_FROM_TF"
+            ROLE_ARN="$ROLE_ARN_FROM_TF"
+          else
+            echo "Warning: Could not get ALB Controller role ARN from Terraform output. Attempting fallback."
+            AWS_ACCOUNT_ID=$(aws sts get-caller-identity --query "Account" --output text)
+            if [ -z "$AWS_ACCOUNT_ID" ]; then
+              echo "Error: Could not determine AWS Account ID for fallback."
+              exit 1
+            fi
+            # This ROLE_NAME must exactly match the name defined in your Terraform ALB controller setup
+            FALLBACK_ROLE_NAME="eks-aws-load-balancer-controller-role"
+            ROLE_ARN="arn:aws:iam::${AWS_ACCOUNT_ID}:role/${FALLBACK_ROLE_NAME}"
+            echo "Using fallback ALB Controller role ARN: $ROLE_ARN"
+            # Verify the fallback role actually exists
+            if ! aws iam get-role --role-name "$FALLBACK_ROLE_NAME" > /dev/null 2>&1; then
+                echo "Error: Fallback role '$FALLBACK_ROLE_NAME' does not exist in AWS."
+                echo "Please check Terraform apply job and ensure the role was created with this name."
+                exit 1
+            fi
+          fi
+
+          if [ -z "$ROLE_ARN" ]; then
+            echo "Error: ALB Controller role ARN is empty after all attempts."
+            exit 1
+          fi
+          echo "Using ALB Controller role ARN: $ROLE_ARN"
+          echo "ALB_CONTROLLER_ROLE_ARN=$ROLE_ARN" >> $GITHUB_ENV
+          
       - name: Add Helm repositories
         run: |
           helm repo add ingress-nginx https://kubernetes.github.io/ingress-nginx
