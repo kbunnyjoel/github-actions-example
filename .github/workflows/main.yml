@@ -1398,6 +1398,11 @@ jobs:
             --from-literal=apiKey=${{ secrets.API_KEY }} \
             --namespace=github-actions-example --dry-run=client -o yaml | kubectl apply -f -
 
+      - name: Test deployed API endpoint
+        run: |
+          echo "Testing the application endpoint..."
+          curl -k -H "x-api-key: ${{ secrets.API_KEY }}" https://${{ env.APP_NAME }}.bunnycloud.xyz/status
+
       - name: Ensure application is deployed
         run: |
           kubectl create namespace "${{ env.APP_NAME }}" --dry-run=client -o yaml | kubectl apply -f -
@@ -1490,34 +1495,3 @@ jobs:
             sleep 10
           done
         continue-on-error: true
-
-      # - name: Verify ingress configuration
-      #   run: |
-      #     echo "Verifying ingress configuration..."
-      #     INGRESS_NAME="github-actions-example"
-      #     NAMESPACE="github-actions-example"
-      #     INGRESS_CONFIG=$(kubectl get ingress $INGRESS_NAME -n $NAMESPACE -o yaml)
-      #
-      #     # Check for TLS section
-      #     if echo "$INGRESS_CONFIG" | grep -q "tls:"; then
-      #       echo "Error: TLS section found in ingress for $INGRESS_NAME. It should be disabled as NLB handles TLS."
-      #       exit 1
-      #     fi
-      #
-      #     # Only check SSL redirect annotations if ingressClassName is nginx
-      #     INGRESS_CLASS=$(kubectl get ingress $INGRESS_NAME -n $NAMESPACE -o jsonpath='{.spec.ingressClassName}')
-      #
-      #     if [[ "$INGRESS_CLASS" == "nginx" ]]; then
-      #       echo "Verifying NGINX ingress SSL redirect annotations..."
-      #       SSL_REDIRECT=$(kubectl get ingress $INGRESS_NAME -n $NAMESPACE -o jsonpath='{.metadata.annotations.nginx\.ingress\.kubernetes\.io/ssl-redirect}')
-      #       FORCE_SSL=$(kubectl get ingress $INGRESS_NAME -n $NAMESPACE -o jsonpath='{.metadata.annotations.nginx\.ingress\.kubernetes\.io/force-ssl-redirect}')
-      #
-      #       if [[ "$SSL_REDIRECT" != "true" || "$FORCE_SSL" != "true" ]]; then
-      #         echo "Error: HTTPS will not be enforced by Ingress."
-      #         exit 1
-      #       fi
-      #     else
-      #       echo "Skipping SSL redirect checks for ingress class: $INGRESS_CLASS"
-      #     fi
-      #
-      #     echo "✅ Ingress configuration verified"
