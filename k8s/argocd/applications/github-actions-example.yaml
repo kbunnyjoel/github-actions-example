@@ -1,4 +1,3 @@
-#
 # Required variables for this template:
 #   aws_account_id: AWS Account number (string)
 #   aws_region: AWS Region (e.g., ap-southeast-2)
@@ -52,8 +51,8 @@ spec:
             alb.ingress.kubernetes.io/certificate-arn: "{{ acm_certificate_arn }}" # ACM Certificate ARN for ALB
             alb.ingress.kubernetes.io/target-type: ip
             alb.ingress.kubernetes.io/backend-protocol: HTTP
-            external-dns.alpha.kubernetes.io/hostname: "github-actions-example.bunnycloud.xyz."
             external-dns.alpha.kubernetes.io/ttl: "60"
+            external-dns.alpha.kubernetes.io/hostname: "{{ nginx_lb_hostname }}"
 
         # Define resource requests and limits for your application pods
         resources: {} # Leave empty to use Helm chart defaults or override as needed
@@ -88,4 +87,3 @@ spec:
       selfHeal: true # Automatically sync if the live state drifts from the desired state in Git
     syncOptions:
     - CreateNamespace=true # Automatically create the target namespace if it doesn't exist
- 
