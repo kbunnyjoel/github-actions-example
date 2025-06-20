@@ -1225,7 +1225,7 @@ jobs:
     if: ${{ github.event.inputs.destroy_infra != 'true' }}
     env:
       IS_DESTROY: ${{ github.event.inputs.destroy == 'true' }}
-    needs: [docker, deploy-argocd, generate-argo-apps] # Changed from generate-argo-apps to deploy-argocd
+    needs: generate-argo-apps
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
