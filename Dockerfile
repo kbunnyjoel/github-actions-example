@@ -19,6 +19,7 @@ RUN rm -r /usr/local/lib/node_modules/npm/node_modules/cross-spawn/
 
 # Copy the rest of your application's code into the container
 COPY . .
+RUN rm -rf certs/
 
 EXPOSE 3000
 
