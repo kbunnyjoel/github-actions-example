@@ -436,6 +436,7 @@ jobs:
           helm repo update
 
       - name: Get ACM certificate ARN from Terraform
+        id: get-cert-arn
         run: |
           # Get the certificate ARN from Terraform output
           cd terraform
@@ -678,9 +679,6 @@ jobs:
 
       - name: Patch ArgoCD resources with Helm ownership
         run: bash k8s/argocd/patch-argocd-helm-ownership.sh
-  #         kubectl -n argocd patch configmap argocd-cm \
-  # --type merge \
-  # -p '{"data":{"configs.params.server.insecure":"true"}}'
   
       - name: Validate ArgoCD IAM role integration
         run: |
@@ -1129,6 +1127,7 @@ jobs:
 
   generate-argo-apps:
     if: ${{ github.event.inputs.destroy != 'true' }}
+    needs: set-cert-arn
     env:
       # These env vars are set by the deploy-argocd job and should be available if 'needs' is correct
       IS_DESTROY: ${{ github.event.inputs.destroy == 'true' }}
@@ -1176,8 +1175,7 @@ jobs:
           DOCKER_USERNAME="${{ secrets.DOCKER_USERNAME }}"
           DEPLOYMENT_NAMESPACE="${{ env.APP_NAME }}"
           IMAGE_NAME="${{ env.APP_NAME }}"
-          echo "${ACM_CERT_ARN}"
-          echo "ACM Certificate ARN: $ACM_CERT_ARN"
+          echo "ACM Certificate ARN: ${{ needs.set-cert-arn.outputs.acm-cert-arn }}"
           # Get AWS Account ID and Region for ECR image repository
           AWS_ACCOUNT_ID=$(aws sts get-caller-identity --query "Account" --output text)
           AWS_REGION="${{ env.AWS_REGION }}"
