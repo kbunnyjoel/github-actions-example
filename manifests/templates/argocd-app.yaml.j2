@@ -54,7 +54,7 @@ spec:
             alb.ingress.kubernetes.io/healthcheck-path: "/status"
             alb.ingress.kubernetes.io/backend-protocol: HTTP # ALB terminates SSL, forwards HTTP
             external-dns.alpha.kubernetes.io/ttl: "60"
-            external-dns.alpha.kubernetes.io/hostname: "{{ app_name }}.bunnycloud.xyz"
+            external-dns.alpha.kubernetes.io/hostname: "{{ app_name }}.bunnycloud.xyz."
 
         # Define resource requests and limits for your application pods
         resources: {} # Leave empty to use Helm chart defaults or override as needed
