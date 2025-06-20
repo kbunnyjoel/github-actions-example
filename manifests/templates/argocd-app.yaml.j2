@@ -41,19 +41,16 @@ spec:
         # SSL/TLS is terminated at the AWS NLB using ACM; do NOT enable TLS/SSL or redirects at the Ingress level.
         ingress:
           enabled: true
-          className: "alb"
-          hostname: "{{ app_name }}.bunnycloud.xyz"
+          className: "nginx"
+          hostname: "{{ nginx_lb_hostname }}"
           path: "/"
           pathType: "Prefix"
           annotations:
-            kubernetes.io/ingress.class: "alb"
-            alb.ingress.kubernetes.io/scheme: internet-facing
-            alb.ingress.kubernetes.io/listen-ports: '[{"HTTP": 80}, {"HTTPS": 443}]'
-            alb.ingress.kubernetes.io/certificate-arn: "{{ acm_certificate_arn }}"
-            alb.ingress.kubernetes.io/target-type: ip
-            alb.ingress.kubernetes.io/backend-protocol: HTTP
+            kubernetes.io/ingress.class: "nginx"
             external-dns.alpha.kubernetes.io/ttl: "60"
             external-dns.alpha.kubernetes.io/hostname: "{{ app_name }}.bunnycloud.xyz"
+            nginx.ingress.kubernetes.io/ssl-redirect: "true"
+            nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
 
         # Define resource requests and limits for your application pods
         resources: {} # Leave empty to use Helm chart defaults or override as needed
