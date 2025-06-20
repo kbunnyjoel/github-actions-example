@@ -201,6 +201,16 @@ jobs:
         working-directory: terraform
         run: terraform init
 
+      - name: Remove aws-auth ConfigMap from Terraform state (if present)
+        if: ${{ github.event.inputs.destroy != 'true' }}
+        working-directory: terraform
+        run: |
+          # This step is crucial if you previously used authentication_mode = "API_AND_CONFIG_MAP"
+          # and are now switching to "API". Terraform will try to remove the ConfigMap from the cluster,
+          # which requires the Kubernetes provider. Removing it from state prevents this.
+          terraform state rm 'module.eks.kubernetes_config_map_v1_data.aws_auth[0]' || echo "aws-auth ConfigMap not found in state or already removed."
+          terraform state rm 'module.eks.kubernetes_config_map.aws_auth[0]' || echo "aws-auth ConfigMap (old style) not found in state or already removed."
+
       - name: Terraform Validate
         if: ${{ github.event.inputs.destroy != 'true' }}
         run: terraform validate
