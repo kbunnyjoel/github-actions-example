@@ -118,5 +118,5 @@ output "aws_load_balancer_controller_role_arn" {
 }
 
 output "cluster_autoscaler_role_arn" {
-  value = aws_iam_role.cluster_autoscaler_role.arn
+  value = aws_iam_role.cluster_autoscaler.arn
 }
