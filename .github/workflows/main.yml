@@ -1172,11 +1172,11 @@ jobs:
 
           # Use repository variables or defaults
           DOCKER_USERNAME="${{ secrets.DOCKER_USERNAME }}"
-          DEPLOYMENT_NAMESPACE="${{ env.APP_NAME}}"
-          IMAGE_NAME="${{ env.APP_NAME}}"
+          DEPLOYMENT_NAMESPACE="${{ env.APP_NAME }}"
+          IMAGE_NAME="${{ env.APP_NAME }}"
           ACM_CERT_ARN="${{ env.ACM_CERTIFICATE_ARN }}"
 
-          echo "ACM Certificate ARN: $ACM_CERT_ARN"
+          echo "ACM Certificate ARN: ${ACM_CERT_ARN}"
 
           # Get AWS Account ID and Region for ECR image repository
           AWS_ACCOUNT_ID=$(aws sts get-caller-identity --query "Account" --output text)
@@ -1188,7 +1188,7 @@ jobs:
             echo "Rendering $OUTFILE for app: $app"
 
             # Define variables
-            IMAGE_REPOSITORY="docker.io/${{ secrets.DOCKER_USERNAME }}/${{ env.APP_NAME}}"
+            IMAGE_REPOSITORY="docker.io/${{ secrets.DOCKER_USERNAME }}/${{ env.APP_NAME }}"
             IMAGE_TAG="${{ github.sha }}"
 
             jinja2 manifests/templates/argocd-app.yaml.j2 \
