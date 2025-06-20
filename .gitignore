@@ -192,4 +192,3 @@ awssdk.patch
 
 deployment_key.pem
 terraform/keys/
-certs/
