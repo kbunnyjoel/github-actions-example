@@ -201,6 +201,15 @@ jobs:
           name: tfsec-report
           path: terraform/tfsec-report.json
 
+      - name: Export Kubernetes provider environment variables
+        if: ${{ github.event.inputs.destroy != 'true' }}
+        run: |
+          echo "Setting up Kubernetes provider environment..."
+          echo "KUBERNETES_HOST=$(terraform output -raw eks_cluster_endpoint)" >> $GITHUB_ENV
+          echo "KUBERNETES_TOKEN=$(terraform output -raw eks_cluster_token)" >> $GITHUB_ENV
+          echo "KUBERNETES_CA_CERT=$(terraform output -raw eks_cluster_ca)" >> $GITHUB_ENV
+        working-directory: terraform
+
       - name: Terraform Init
         if: ${{ github.event.inputs.destroy != 'true' }}
         working-directory: terraform
@@ -352,6 +361,15 @@ jobs:
         if: github.event.inputs.destroy == 'true'
         run: |
           echo "⚠️  You chose to destroy infrastructure."
+
+      - name: Export Kubernetes provider environment variables
+        if: ${{ github.event.inputs.destroy != 'true' }}
+        run: |
+          echo "Setting up Kubernetes provider environment..."
+          echo "KUBERNETES_HOST=$(terraform output -raw eks_cluster_endpoint)" >> $GITHUB_ENV
+          echo "KUBERNETES_TOKEN=$(terraform output -raw eks_cluster_token)" >> $GITHUB_ENV
+          echo "KUBERNETES_CA_CERT=$(terraform output -raw eks_cluster_ca)" >> $GITHUB_ENV
+        working-directory: terraform
       - name: Destroy Terraform-managed infrastructure
         if: github.event.inputs.destroy == 'true'
         run: |
