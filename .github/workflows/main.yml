@@ -1177,7 +1177,6 @@ jobs:
           ACM_CERT_ARN="${{ env.ACM_CERTIFICATE_ARN }}"
 
           echo "ACM Certificate ARN: $ACM_CERT_ARN"
-          echo "Current shell: $SHELL"
           # Get AWS Account ID and Region for ECR image repository
           AWS_ACCOUNT_ID=$(aws sts get-caller-identity --query "Account" --output text)
           AWS_REGION="${{ env.AWS_REGION }}"
@@ -1204,7 +1203,7 @@ jobs:
               -D aws_account_id="$AWS_ACCOUNT_ID" \
               -D aws_region="$AWS_REGION" \
               > "$OUTFILE"
-            echo "Generated manifest for $app (using app_name="${{ env.APP_NAME}}""):"
+            echo "Generated manifest for $app (using app_name="${{ env.APP_NAME }}"):"
             cat "$OUTFILE"
           done
 
