@@ -88,14 +88,23 @@ app.post('/add', (req, res) => {
   return res.status(200).json({ result: roundedResult });
 });
 
-const httpsOptions = {
-  key: fs.readFileSync(path.join(__dirname, 'certs', 'key.pem')),
-  cert: fs.readFileSync(path.join(__dirname, 'certs', 'cert.pem')),
-};
-
-const server = https.createServer(httpsOptions, app).listen(port, '0.0.0.0', () => {
-  console.log(`HTTPS server is running on https://0.0.0.0:${port}`);
-});
+if (require.main === module) {
+  if (fs.existsSync(path.join(__dirname, 'certs', 'key.pem')) &&
+      fs.existsSync(path.join(__dirname, 'certs', 'cert.pem'))) {
+    const httpsOptions = {
+      key: fs.readFileSync(path.join(__dirname, 'certs', 'key.pem')),
+      cert: fs.readFileSync(path.join(__dirname, 'certs', 'cert.pem')),
+    };
+    https.createServer(httpsOptions, app).listen(port, '0.0.0.0', () => {
+      console.log(`HTTPS server is running on https://0.0.0.0:${port}`);
+    });
+  } else {
+    app.listen(port, '0.0.0.0', () => {
+      console.log(`HTTP server is running on http://0.0.0.0:${port}`);
+    });
+  }
+}
 
 // Export the app for supertest and server for explicit closing if needed
+const server = app.listen(0);
 module.exports = { app, server };
