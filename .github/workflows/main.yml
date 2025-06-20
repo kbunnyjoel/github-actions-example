@@ -487,8 +487,8 @@ jobs:
         id: tf-output-autoscaler-role
         run: |
           cd terraform
-          echo "CLUSTER_AUTOSCALER_ROLE_ARN=$(terraform -chdir=terraform output -raw cluster_autoscaler_role_arn)" >> $GITHUB_ENV
-          echo "cluster_autoscaler_role_arn=$(terraform -chdir=terraform output -raw cluster_autoscaler_role_arn)" >> $GITHUB_OUTPUT
+          echo "CLUSTER_AUTOSCALER_ROLE_ARN=$(terraform output -raw cluster_autoscaler_role_arn)" >> $GITHUB_ENV
+          echo "cluster_autoscaler_role_arn=$(terraform output -raw cluster_autoscaler_role_arn)" >> $GITHUB_OUTPUT
       - name: Install Cluster Autoscaler
         run: |
           helm upgrade -i cluster-autoscaler autoscaler/cluster-autoscaler \
