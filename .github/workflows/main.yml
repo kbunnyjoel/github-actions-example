@@ -1176,13 +1176,13 @@ jobs:
           IMAGE_NAME="${{ env.APP_NAME }}"
           ACM_CERT_ARN="${{ env.ACM_CERTIFICATE_ARN }}"
 
-          echo "ACM Certificate ARN: ${ACM_CERT_ARN}"
-
+          echo "ACM Certificate ARN: $ACM_CERT_ARN"
+          echo "Current shell: $SHELL"
           # Get AWS Account ID and Region for ECR image repository
           AWS_ACCOUNT_ID=$(aws sts get-caller-identity --query "Account" --output text)
           AWS_REGION="${{ env.AWS_REGION }}"
 
-          echo "Current shell: $SHELL"
+          
           echo "$APPS_JSON" | jq -r '.[]' | while read app; do
             OUTFILE="k8s/argocd/applications/${app}.yaml"
             echo "Rendering $OUTFILE for app: $app"
