@@ -17,10 +17,6 @@ data "aws_eks_cluster_auth" "github_auth" {
   name = var.cluster_name
 }
 
-data "aws_eks_cluster" "github_cluster" {
-  name = var.cluster_name
-}
-
 data "aws_eks_cluster_auth" "github_auth" {
   name = data.aws_eks_cluster.github_cluster.name
 }
