@@ -1398,10 +1398,14 @@ jobs:
             --from-literal=apiKey=${{ secrets.API_KEY }} \
             --namespace=github-actions-example --dry-run=client -o yaml | kubectl apply -f -
 
-      - name: Test deployed API endpoint
+      - name: Test /status endpoint with API key
         run: |
-          echo "Testing the application endpoint..."
-          curl -k -H "x-api-key: ${{ secrets.API_KEY }}" https://${{ env.APP_NAME }}.bunnycloud.xyz/status
+          response=$(curl -ks -H "x-api-key: ${{ secrets.API_KEY }}" https://${{ env.APP_NAME }}.bunnycloud.xyz/status)
+          echo "Response: $response"
+          if [[ "$response" != *'"status":"ok"'* ]]; then
+            echo "Unexpected response: $response"
+            exit 1
+          fi
 
       - name: Ensure application is deployed
         run: |
