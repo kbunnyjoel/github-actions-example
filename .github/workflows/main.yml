@@ -457,6 +457,7 @@ jobs:
           
           echo "Using certificate ARN: $CERT_ARN"
           echo "ACM_CERTIFICATE_ARN=$CERT_ARN" >> $GITHUB_ENV
+          echo "ACM_CERTIFICATE_ARN=$CERT_ARN" >> $GITHUB_OUTPUT
 
       - name: Echo ACM Certificate ARN
         run: |
@@ -1172,8 +1173,6 @@ jobs:
           done
 
       - name: Generate manifests
-        env:
-          ACM_CERT_ARN: ${{ env.ACM_CERTIFICATE_ARN }}
         run: |
           APPS_JSON='${{ steps.detect.outputs.apps }}'
 
