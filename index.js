@@ -1,3 +1,5 @@
+const fs = require('fs');
+const https = require('https');
 const express = require('express');
 const path = require('path');
 const app = express();
@@ -32,13 +34,13 @@ app.use(express.static(path.join(__dirname, 'public')));
 app.use(express.urlencoded({ extended: true }));
 app.use(express.json()); // Add this line to parse JSON request bodies
 
-// Middleware to enforce API key, except on /status and /
+// Middleware to enforce API key, except on GET /status and GET /
 app.use((req, res, next) => {
   if (process.env.NODE_ENV === 'test') return next(); // Skip API key check in test environment
-  if (req.path === '/status' || req.path === '/') return next();
+  if (req.method === 'GET' && (req.path === '/status' || req.path === '/')) return next();
 
-  const apiKey = req.headers['x-api-key'];
-  const expectedKey = process.env.EXPECTED_API_KEY;
+  const apiKey = req.headers['x-api-key'] || (req.headers['authorization'] && req.headers['authorization'].replace('Bearer ', ''));
+  const expectedKey = process.env.API_KEY;
 
   if (!apiKey || apiKey !== expectedKey) {
     return res.status(401).send('Api Key was not provided.');
@@ -86,8 +88,13 @@ app.post('/add', (req, res) => {
   return res.status(200).json({ result: roundedResult });
 });
 
-const server = app.listen(port, '0.0.0.0', () => {
-  console.log(`Server is running on http://0.0.0.0:${port}`);
+const httpsOptions = {
+  key: fs.readFileSync(path.join(__dirname, 'certs', 'key.pem')),
+  cert: fs.readFileSync(path.join(__dirname, 'certs', 'cert.pem')),
+};
+
+const server = https.createServer(httpsOptions, app).listen(port, '0.0.0.0', () => {
+  console.log(`HTTPS server is running on https://0.0.0.0:${port}`);
 });
 
 // Export the app for supertest and server for explicit closing if needed

@@ -1392,10 +1392,14 @@ jobs:
             echo "Ingress '$APP_INGRESS_NAME' not yet found or annotation missing in namespace '${{ env.APP_NAME }}', waiting... (Attempt $i/60)"
             sleep 10
           done
+      - name: Create API Key Secret
+        run: |
+          kubectl create secret generic api-key-secret \
+            --from-literal=apiKey=${{ secrets.API_KEY }} \
+            --namespace=github-actions-example --dry-run=client -o yaml | kubectl apply -f -
+
       - name: Ensure application is deployed
         run: |
-  
-          
           kubectl create namespace "${{ env.APP_NAME }}" --dry-run=client -o yaml | kubectl apply -f -
           kubectl get pods -n ${{ env.APP_NAME }}
           kubectl rollout status deployment/${{ env.APP_NAME }} -n ${{ env.APP_NAME }} --timeout=2m || true
