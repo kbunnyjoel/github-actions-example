@@ -16,7 +16,3 @@ data "aws_iam_openid_connect_provider" "this" {
 data "aws_eks_cluster_auth" "github_auth" {
   name = var.cluster_name
 }
-
-data "aws_eks_cluster_auth" "github_auth" {
-  name = data.aws_eks_cluster.github_cluster.name
-}
