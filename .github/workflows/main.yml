@@ -1167,6 +1167,8 @@ jobs:
           done
 
       - name: Generate manifests
+        env:
+          ACM_CERT_ARN: ${{ env.ACM_CERTIFICATE_ARN }}
         run: |
           APPS_JSON='${{ steps.detect.outputs.apps }}'
 
@@ -1174,8 +1176,7 @@ jobs:
           DOCKER_USERNAME="${{ secrets.DOCKER_USERNAME }}"
           DEPLOYMENT_NAMESPACE="${{ env.APP_NAME }}"
           IMAGE_NAME="${{ env.APP_NAME }}"
-          ACM_CERT_ARN="${{ env.ACM_CERTIFICATE_ARN }}"
-          echo "${{ env.ACM_CERTIFICATE_ARN }}"
+          echo "${ACM_CERT_ARN}"
           echo "ACM Certificate ARN: $ACM_CERT_ARN"
           # Get AWS Account ID and Region for ECR image repository
           AWS_ACCOUNT_ID=$(aws sts get-caller-identity --query "Account" --output text)
