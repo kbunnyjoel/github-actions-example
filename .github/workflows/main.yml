@@ -456,13 +456,6 @@ jobs:
           echo "Getting AWS Load Balancer Controller role ARN from Terraform..."
           cd terraform
 
-          # Initialize Terraform to access the state
-          echo "Initializing Terraform..."
-          if ! terraform init -input=false -reconfigure; then
-            echo "Error: Terraform init failed."
-            exit 1
-          fi
-
           ROLE_ARN_FROM_TF=$(terraform output -raw aws_load_balancer_controller_role_arn 2>/dev/null)
 
           if [ ! -z "$ROLE_ARN_FROM_TF" ]; then
