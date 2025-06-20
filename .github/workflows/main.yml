@@ -1177,7 +1177,7 @@ jobs:
           DOCKER_USERNAME="${{ secrets.DOCKER_USERNAME }}"
           DEPLOYMENT_NAMESPACE="${{ env.APP_NAME }}"
           IMAGE_NAME="${{ env.APP_NAME }}"
-          echo "ACM Certificate ARN: ${{ needs.deploy-argocd:.outputs.acm-cert-arn }}"
+          echo "ACM Certificate ARN: ${{ needs.deploy-argocd.outputs.acm-cert-arn }}"
           # Get AWS Account ID and Region for ECR image repository
           AWS_ACCOUNT_ID=$(aws sts get-caller-identity --query "Account" --output text)
           AWS_REGION="${{ env.AWS_REGION }}"
