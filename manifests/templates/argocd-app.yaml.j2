@@ -51,6 +51,7 @@ spec:
             alb.ingress.kubernetes.io/listen-ports: '[{"HTTPS": 443}]'
             alb.ingress.kubernetes.io/certificate-arn: "{{ acm_certificate_arn }}" # Crucial for HTTPS on ALB
             alb.ingress.kubernetes.io/target-type: ip # Good for EKS, especially Fargate
+            alb.ingress.kubernetes.io/healthcheck-path: "/status"
             alb.ingress.kubernetes.io/backend-protocol: HTTP # ALB terminates SSL, forwards HTTP
             external-dns.alpha.kubernetes.io/ttl: "60"
             external-dns.alpha.kubernetes.io/hostname: "{{ app_name }}.bunnycloud.xyz"
