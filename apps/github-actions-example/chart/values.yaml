@@ -25,8 +25,8 @@ ingress:
   annotations:
     kubernetes.io/ingress.class: "alb"
     alb.ingress.kubernetes.io/scheme: internet-facing
-    alb.ingress.kubernetes.io/listen-ports: '[{"HTTPS": 443}]'
-    alb.ingress.kubernetes.io/certificate-arn: "{{ .Values.acm_certificate_arn }}"
+    alb.ingress.kubernetes.io/listen-ports: '[{"HTTPS":443}]' # No space needed, consistent formatting
+    # alb.ingress.kubernetes.io/certificate-arn: "{{ .Values.acm_certificate_arn }}" # This will be overridden by ArgoCD inline values
     alb.ingress.kubernetes.io/target-type: ip
     alb.ingress.kubernetes.io/backend-protocol: HTTP
     external-dns.alpha.kubernetes.io/hostname: "{{ app_name }}.bunnycloud.xyz"
@@ -58,4 +58,4 @@ aws_region: "ap-southeast-2"
 ecr_repo_name: "github-actions-example"
 image_tag: "" # or set dynamically from CI
 
-acm_certificate_arn: ""  # To be provided via Helm CLI or CI/CD environment
+acm_certificate_arn: ""  # Default, to be overridden by ArgoCD inline values or Helm CLI
