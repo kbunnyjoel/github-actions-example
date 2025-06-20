@@ -86,6 +86,7 @@ resource "aws_iam_policy" "cluster_autoscaler_policy" {
           "autoscaling:DescribeAutoScalingInstances",
           "autoscaling:DescribeLaunchConfigurations",
           "autoscaling:DescribeTags"
+          "autoscaling:DescribeLaunchTemplates" # Added for launch templates
         ],
         Effect   = "Allow",
         Resource = "*" # Describe actions require * resource
@@ -93,7 +94,8 @@ resource "aws_iam_policy" "cluster_autoscaler_policy" {
       {
         Action = [
           "autoscaling:SetDesiredCapacity",
-          "autoscaling:TerminateInstanceInAutoScalingGroup"
+          "autoscaling:TerminateInstanceInAutoScalingGroup",
+          "autoscaling:UpdateAutoScalingGroup" # Crucial for modifying min/max size
         ],
         Effect   = "Allow",
         Resource = "arn:aws:autoscaling:${var.aws_region}:${data.aws_caller_identity.current.account_id}:autoScalingGroup:*:autoScalingGroupName/eks-*"
