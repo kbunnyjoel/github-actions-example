@@ -176,6 +176,10 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ap-southeast-2
 
+      - name: Configure kubectl for Terraform
+        if: ${{ github.event.inputs.destroy != 'true' }}
+        run: aws eks update-kubeconfig --region ap-southeast-2 --name github-actions-eks-example
+
       - name: Install Terraform
         if: ${{ github.event.inputs.destroy != 'true' }}
         uses: hashicorp/setup-terraform@v3
@@ -196,24 +200,16 @@ jobs:
         with:
           name: tfsec-report
           path: terraform/tfsec-report.json
+
       - name: Terraform Init
         if: ${{ github.event.inputs.destroy != 'true' }}
         working-directory: terraform
         run: terraform init
 
-      - name: Remove aws-auth ConfigMap from Terraform state (if present)
-        if: ${{ github.event.inputs.destroy != 'true' }}
-        working-directory: terraform
-        run: |
-          # This step is crucial if you previously used authentication_mode = "API_AND_CONFIG_MAP"
-          # and are now switching to "API". Terraform will try to remove the ConfigMap from the cluster,
-          # which requires the Kubernetes provider. Removing it from state prevents this.
-          terraform state rm 'module.eks.kubernetes_config_map_v1_data.aws_auth[0]' || echo "aws-auth ConfigMap not found in state or already removed."
-          terraform state rm 'module.eks.kubernetes_config_map.aws_auth[0]' || echo "aws-auth ConfigMap (old style) not found in state or already removed."
-
       - name: Terraform Validate
         if: ${{ github.event.inputs.destroy != 'true' }}
         run: terraform validate
+
       - name: Terraform Format
         if: ${{ github.event.inputs.destroy != 'true' }}
         run: terraform fmt -check
@@ -221,6 +217,7 @@ jobs:
       - name: Terraform Unlock
         if: ${{ github.event.inputs.destroy != 'true' }}
         run: terraform force-unlock -force 8877d196-05be-bc90-9ecf-bf2dff3d5b6d || echo "No locks to unlock"
+
       - name: Terraform Plan
         if: ${{ github.event.inputs.destroy != 'true' }}
         run: terraform plan
@@ -230,21 +227,12 @@ jobs:
         working-directory: terraform
         run: terraform apply -auto-approve
 
-      - name: Generate kubeconfig and upload
-        if: ${{ github.event.inputs.destroy != 'true' }}
-        run: |
-          mkdir -p /tmp/kubeconfig
-          aws eks update-kubeconfig --region ap-southeast-2 --name github-actions-eks-example --kubeconfig /tmp/kubeconfig/config
-        env:
-          AWS_REGION: ap-southeast-2
-        shell: bash
-
       - name: Upload kubeconfig as artifact
         if: ${{ github.event.inputs.destroy != 'true' }}
         uses: actions/upload-artifact@v4
         with:
           name: bastion-kubeconfig
-          path: /tmp/kubeconfig/config
+          path: ~/.kube/config
 
       - name: Upload deployment_key.pem as artifact
         if: ${{ github.event.inputs.destroy != 'true' }}
