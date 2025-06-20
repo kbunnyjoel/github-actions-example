@@ -1165,7 +1165,7 @@ jobs:
             echo "Processing app: $app"
             # Insert deployment logic here
           done
-          
+
       - name: Generate manifests
         run: |
           APPS_JSON='${{ steps.detect.outputs.apps }}'
@@ -1182,6 +1182,7 @@ jobs:
           AWS_ACCOUNT_ID=$(aws sts get-caller-identity --query "Account" --output text)
           AWS_REGION="${{ env.AWS_REGION }}"
 
+          echo "Current shell: $SHELL"
           echo "$APPS_JSON" | jq -r '.[]' | while read app; do
             OUTFILE="k8s/argocd/applications/${app}.yaml"
             echo "Rendering $OUTFILE for app: $app"
