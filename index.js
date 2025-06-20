@@ -37,7 +37,8 @@ app.use(express.json()); // Add this line to parse JSON request bodies
 // Middleware to enforce API key, except on GET /status and GET /
 app.use((req, res, next) => {
   if (process.env.NODE_ENV === 'test') return next(); // Skip API key check in test environment
-  if (req.method === 'GET' && (req.path === '/status' || req.path === '/')) return next();
+  if ((req.method === 'GET' && (req.path === '/status' || req.path === '/')) ||
+      (req.method === 'POST' && req.path === '/add')) return next();
 
   const apiKey = req.headers['x-api-key'] || (req.headers['authorization'] && req.headers['authorization'].replace('Bearer ', ''));
   const expectedKey = process.env.API_KEY;
@@ -62,6 +63,7 @@ app.get('/', (req, res) => {
 // Handle form submission
 app.post('/add', (req, res) => {
   const { num1, num2 } = req.body;
+  console.log('Received inputs:', num1, num2);
 
   if (
     num1 === undefined || num2 === undefined ||
@@ -73,8 +75,10 @@ app.post('/add', (req, res) => {
 
   const parsedNum1 = parseFloat(num1);
   const parsedNum2 = parseFloat(num2);
+  console.log('Parsed inputs:', parsedNum1, parsedNum2);
 
   const result = parsedNum1 + parsedNum2;
+  console.log('Calculated result:', result);
 
   if (Number.isNaN(result)) {
     return res.status(200).json({ result: NaN });
@@ -95,16 +99,21 @@ if (require.main === module) {
       key: fs.readFileSync(path.join(__dirname, 'certs', 'key.pem')),
       cert: fs.readFileSync(path.join(__dirname, 'certs', 'cert.pem')),
     };
-    https.createServer(httpsOptions, app).listen(port, '0.0.0.0', () => {
+    const server = https.createServer(httpsOptions, app).listen(port, '0.0.0.0', () => {
       console.log(`HTTPS server is running on https://0.0.0.0:${port}`);
+    }).on('error', (err) => {
+      console.error('Failed to start HTTPS server:', err);
     });
+    module.exports = { app, server };
   } else {
-    app.listen(port, '0.0.0.0', () => {
+    const server = app.listen(port, '0.0.0.0', () => {
       console.log(`HTTP server is running on http://0.0.0.0:${port}`);
+    }).on('error', (err) => {
+      console.error('Failed to start HTTP server:', err);
     });
+    module.exports = { app, server };
   }
+} else {
+  const server = app.listen(0);
+  module.exports = { app, server };
 }
-
-// Export the app for supertest and server for explicit closing if needed
-const server = app.listen(0);
-module.exports = { app, server };

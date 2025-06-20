@@ -29,6 +29,8 @@
         <p><small>Powered by EJS & Express</small></p>
     </footer>
     <script>
+        const API_KEY = '<%= process.env.API_KEY || "test123" %>'; // fallback if not defined
+
         document.getElementById('add-form').addEventListener('submit', async function(e) {
             e.preventDefault();
             const num1Input = document.querySelector('[name="num1"]');
@@ -41,13 +43,15 @@
             try {
                 const res = await fetch('/add', {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'x-api-key': API_KEY
+                    },
                     body: JSON.stringify({ num1, num2 })
                 });
 
                 const data = await res.json();
 
-                // Remove previous result if any
                 const existingResult = document.querySelector('.result-output');
                 if (existingResult) {
                     existingResult.remove();
@@ -64,7 +68,6 @@
 
                 container.appendChild(output);
 
-                // Clear input fields
                 num1Input.value = '';
                 num2Input.value = '';
 
