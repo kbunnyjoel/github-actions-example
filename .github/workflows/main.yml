@@ -1207,6 +1207,12 @@ jobs:
             cat "$OUTFILE"
           done
 
+      - name: Upload generated ArgoCD app manifests as artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: argocd-app-manifests
+          path: k8s/argocd/applications/
+
 
       - name: Commit and push generated ArgoCD Application manifests
         env:
@@ -1265,11 +1271,19 @@ jobs:
       - name: Configure kubeconfig for EKS
         run: aws eks update-kubeconfig --region ap-southeast-2 --name github-actions-eks-example
 
+      - name: Download generated ArgoCD app manifests artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: argocd-app-manifests
+          path: k8s/argocd/applications/
+
       - name: Apply ArgoCD Application manifests
         run: |
           if [ -d "k8s/argocd/applications" ]; then
             for app_manifest in k8s/argocd/applications/*.yaml; do
               if [ -f "$app_manifest" ]; then
+                echo "Applying manifest: $app_manifest"
+                cat "$app_manifest" # Log the manifest content before applying
                 kubectl apply -f "$app_manifest"
               fi
             done
