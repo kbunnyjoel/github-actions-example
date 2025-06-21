@@ -210,7 +210,6 @@ module "eks" {
       iam_role_additional_policies = {
         AmazonEC2ContainerRegistryReadOnly = "arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryReadOnly"
         NodeLoadBalancerPolicy             = aws_iam_policy.node_load_balancer_policy.arn
-        EC2DescribeAvailabilityZones       = aws_iam_policy.node_ec2_describe_zones_policy.arn
       }
 
       # Add trust policy references using local.oidc_provider_url for IRSA
