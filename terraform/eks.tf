@@ -211,6 +211,7 @@ module "eks" {
       iam_role_additional_policies = {
         AmazonEC2ContainerRegistryReadOnly = "arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryReadOnly"
         ClusterAutoscalerPolicy            = aws_iam_policy.cluster_autoscaler_policy.arn
+        NodeLoadBalancerPolicy             = aws_iam_policy.node_load_balancer_policy.arn
       }
       # Add CloudWatch agent
       bootstrap_extra_args = "--kubelet-extra-args '--node-labels=eks.amazonaws.com/nodegroup=spot-nodes,eks.amazonaws.com/nodegroup-image=ami-1234567890abcdef0'"
