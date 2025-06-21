@@ -106,7 +106,12 @@ resource "aws_iam_policy" "alb_controller_policy" {
         "Action" : [
           "ec2:CreateSecurityGroup"
         ],
-        "Resource" : "*"
+        "Resource" : "*",
+        "Condition" : {
+          "StringEquals" : {
+            "aws:RequestTag/elbv2.k8s.aws/cluster" : "eks-mlops"
+          }
+        }
       },
       {
         "Effect" : "Allow",
