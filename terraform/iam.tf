@@ -348,3 +348,42 @@ resource "aws_iam_policy" "node_load_balancer_policy" {
   })
 }
 # This avoids the connection refused error when Terraform tries to connect to Kubernetes.
+
+# ---------------------------------------------------------------------------------------------------------------------
+# EKS INGRESS NGINX CONTROLLER IAM ROLE
+# ---------------------------------------------------------------------------------------------------------------------
+
+resource "aws_iam_role" "ingress_nginx" {
+  name = "eks-ingress-nginx-role"
+
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Action = "sts:AssumeRoleWithWebIdentity"
+        Effect = "Allow"
+        Principal = {
+          Federated = module.eks.oidc_provider_arn
+        }
+        Condition = {
+          StringEquals = {
+            "${module.eks.oidc_provider}:sub" = "system:serviceaccount:ingress-nginx:ingress-nginx"
+            "${module.eks.oidc_provider}:aud" = "sts.amazonaws.com"
+          }
+        }
+      }
+    ]
+  })
+
+  tags = {
+    Name        = "eks-ingress-nginx-role"
+    Environment = "dev"
+    Project     = "github-actions-example"
+  }
+}
+
+resource "aws_iam_policy_attachment" "ingress_nginx_attach" {
+  name       = "ingress-nginx-policy-attach"
+  roles      = [aws_iam_role.ingress_nginx.name]
+  policy_arn = aws_iam_policy.node_load_balancer_policy.arn
+}

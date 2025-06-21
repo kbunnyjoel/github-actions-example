@@ -550,6 +550,30 @@ jobs:
           else
             echo "nginx_exists=false" >> $GITHUB_OUTPUT
           fi
+      - name: Get Ingress NGINX IAM Role ARN from Terraform
+        id: get-ingress-iam-role
+        run: |
+          cd terraform
+          INGRESS_IAM_ROLE_ARN=$(terraform output -raw ingress_nginx_role_arn 2>/dev/null || echo "")
+          if [ -z "$INGRESS_IAM_ROLE_ARN" ]; then
+            echo "Warning: Could not get ingress_nginx_role_arn from Terraform output"
+            AWS_ACCOUNT_ID=$(aws sts get-caller-identity --query "Account" --output text)
+            if [ -z "$AWS_ACCOUNT_ID" ]; then
+              echo "Error: Could not determine AWS Account ID for fallback."
+              exit 1
+            fi
+            FALLBACK_ROLE_NAME="eks-ingress-nginx-role"
+            INGRESS_IAM_ROLE_ARN="arn:aws:iam::${AWS_ACCOUNT_ID}:role/${FALLBACK_ROLE_NAME}"
+            echo "Using fallback ingress-nginx IAM role ARN: $INGRESS_IAM_ROLE_ARN"
+            if ! aws iam get-role --role-name "$FALLBACK_ROLE_NAME" > /dev/null 2>&1; then
+              echo "Error: Fallback role '$FALLBACK_ROLE_NAME' does not exist in AWS."
+              echo "Please check Terraform apply job and ensure the role was created with this name."
+              exit 1
+            fi
+          fi
+          echo "Using ingress-nginx IAM role ARN: $INGRESS_IAM_ROLE_ARN"
+          echo "INGRESS_IAM_ROLE_ARN=$INGRESS_IAM_ROLE_ARN" >> $GITHUB_ENV
+
       - name: Install NGINX Ingress Controller with SSL
         # Helm upgrade --install is idempotent and will update if exists or install if not.
         run: |
@@ -577,6 +601,9 @@ jobs:
               --set controller.service.loadBalancerClass="service.k8s.aws/nlb" \
               --set controller.defaultBackendService="ingress-nginx/default-http-backend" \
               --set controller.terminationGracePeriodSeconds=300 \
+              --set controller.serviceAccount.create=true \
+              --set controller.serviceAccount.name=ingress-nginx \
+              --set controller.serviceAccount.annotations."eks\.amazonaws\.com/role-arn"="${{ env.INGRESS_IAM_ROLE_ARN }}" \
               --version 4.10.1 \
               --timeout 30m \
               && break || {

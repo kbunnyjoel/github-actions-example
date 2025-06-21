@@ -12,3 +12,7 @@ output "acm_certificate_arn" {
   description = "The ARN of the ACM certificate for the domain"
   value       = aws_acm_certificate.wildcard_certificate_ap_southeast_2.arn
 }
+output "ingress_nginx_iam_role_arn" {
+  description = "IAM Role ARN for the Ingress NGINX controller"
+  value       = aws_iam_role.ingress_nginx.arn
+}
