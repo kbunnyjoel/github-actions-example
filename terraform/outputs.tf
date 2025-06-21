@@ -16,3 +16,8 @@ output "ingress_nginx_iam_role_arn" {
   description = "IAM Role ARN for the Ingress NGINX controller"
   value       = aws_iam_role.ingress_nginx.arn
 }
+
+output "externaldns_role_arn" {
+  description = "The ARN of the IAM role used by ExternalDNS"
+  value       = aws_iam_role.external_dns.arn
+}
