@@ -464,7 +464,9 @@ jobs:
 
       - name: Get Cluster Autoscaler IAM Role ARN
         id: tf-output
-        run: echo "CLUSTER_AUTOSCALER_ROLE_ARN=$(terraform output -raw cluster_autoscaler_role_arn)" >> $GITHUB_ENV
+        run: |
+          cd terraform 
+          echo "CLUSTER_AUTOSCALER_ROLE_ARN=$(terraform output -raw cluster_autoscaler_role_arn)" >> $GITHUB_ENV
 
       - name: Install Cluster Autoscaler
         run: |
