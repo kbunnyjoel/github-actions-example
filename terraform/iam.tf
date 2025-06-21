@@ -343,6 +343,7 @@ resource "aws_iam_policy" "node_load_balancer_policy" {
           "ec2:DescribeSecurityGroups",
           "ec2:RevokeSecurityGroupIngress",
           "ec2:DeleteSecurityGroup",
+          "ec2:DescribeRouteTables",
           "elasticloadbalancing:DescribeLoadBalancers",
           "elasticloadbalancing:DescribeTargetGroups",
           "elasticloadbalancing:DescribeListeners",
