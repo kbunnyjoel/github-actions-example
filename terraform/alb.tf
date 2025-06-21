@@ -106,7 +106,7 @@ resource "aws_iam_policy" "alb_controller_policy" {
         "Action" : [
           "ec2:CreateSecurityGroup"
         ],
-        "Resource" : "*",
+        "Resource" : "arn:aws:ec2:*:*:vpc/${module.vpc.vpc_id}",
         "Condition" : {
           "StringEquals" : {
             "aws:RequestTag/elbv2.k8s.aws/cluster" : "eks-mlops"
