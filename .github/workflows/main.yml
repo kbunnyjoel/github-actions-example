@@ -596,6 +596,7 @@ jobs:
               --set controller.replicaCount=1 \
               --set controller.containerPort.http=80 \
               --set controller.containerPort.https=443 \
+              --set controller.service.type=NodePort \
               --version 4.10.1 \
               --timeout 30m \
               && break || {
