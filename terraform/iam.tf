@@ -391,7 +391,6 @@ resource "aws_iam_role" "ingress_nginx" {
 }
 
 resource "aws_iam_role_policy_attachment" "ingress_nginx_attach" {
-  for_each   = toset([aws_iam_role.ingress_nginx.name, aws_iam_role.alb_controller_role.name])
-  role       = each.value
+  role       = aws_iam_role.ingress_nginx.name
   policy_arn = aws_iam_policy.node_load_balancer_policy.arn
 }

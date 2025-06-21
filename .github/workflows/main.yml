@@ -574,166 +574,108 @@ jobs:
       - name: Install NGINX Ingress Controller with SSL and extra manifests
         # Helm upgrade --install is idempotent and will update if exists or install if not.
         run: |
-          echo "Installing NGINX Ingress Controller..."
-          cat > nginx-extra-manifests.yaml <<EOF
-          controller:
-            extraManifests:
-              - |
-                apiVersion: v1
-                kind: Service
-                metadata:
-                  name: echo
-                  namespace: default
-                spec:
-                  selector:
-                    app: echo
-                  ports:
-                    - protocol: TCP
-                      port: 80
-                      targetPort: 8080
-              - |
-                apiVersion: apps/v1
-                kind: Deployment
-                metadata:
-                  name: echo
-                  namespace: default
-                spec:
-                  replicas: 1
-                  selector:
-                    matchLabels:
-                      app: echo
-                  template:
-                    metadata:
-                      labels:
-                        app: echo
-                    spec:
-                      containers:
-                        - name: echo
-                          image: ealen/echo-server
-                          ports:
-                            - containerPort: 8080
-              - |
-                apiVersion: networking.k8s.io/v1
-                kind: Ingress
-                metadata:
-                  name: echo-ingress
-                  namespace: default
-                  annotations:
-                    kubernetes.io/ingress.class: nginx
-                spec:
-                  rules:
-                    - http:
-                        paths:
-                          - path: /
-                            pathType: Prefix
-                            backend:
-                              service:
-                                name: echo
-                                port:
-                                  number: 80
-                EOF
-                for i in {1..5}; do
-                  helm upgrade --install ingress-nginx ingress-nginx/ingress-nginx \
-                    --namespace ingress-nginx --create-namespace \
-                    --set controller.service.annotations."service\.beta\.kubernetes\.io/aws-load-balancer-ssl-cert"="${{ env.ACM_CERTIFICATE_ARN }}" \
-                    --set controller.service.annotations."service\.beta\.kubernetes\.io/aws-load-balancer-ssl-ports"="https" \
-                    --set controller.service.annotations."service\.beta\.kubernetes\.io/aws-load-balancer-backend-protocol"="http" \
-                    --set controller.service.targetPorts.https=http \
-                    --set controller.service.ports.https=443 \
-                    --set controller.service.ports.http=80 \
-                    --set controller.config.use-forwarded-headers="true" \
-                    --set controller.config.ssl-redirect="false" \
-                    --set controller.config.compute-full-forwarded-for="true" \
-                    --set controller.config.use-proxy-protocol="false" \
-                    --set controller.config.enable-real-ip="false" \
-                    --set controller.config.proxy-real-ip-cidr="0.0.0.0/0" \
-                    --set controller.config.server-tokens="false" \
-                    --set controller.replicaCount=1 \
-                    --set controller.containerPort.http=80 \
-                    --set controller.containerPort.https=443 \
-                    --set controller.service.type=LoadBalancer \
-                    --set controller.service.loadBalancerClass="service.k8s.aws/nlb" \
-                    --set controller.defaultBackendService="ingress-nginx/default-http-backend" \
-                    --set controller.terminationGracePeriodSeconds=300 \
-                    --set controller.serviceAccount.create=true \
-                    --set controller.serviceAccount.name=ingress-nginx \
-                    --set serviceAccount.annotations."eks\.amazonaws\.com/role-arn"="${{ env.INGRESS_NGINX_ROLE_ARN }}" \
-                    --version 4.10.1 \
-                    --timeout 30m \
-                    --values nginx-extra-manifests.yaml \
-                    && break || {
-                      echo "Attempt $i failed. Retrying in 10 seconds..."
-                      sleep 10
-                    }
-                done
-                echo "Waiting for ingress-nginx controller pod to be ready..."
-                if ! kubectl rollout status deployment ingress-nginx-controller -n ingress-nginx --timeout=10m; then
-                  echo "NGINX Ingress Controller rollout failed. Dumping debug info..."
-                  kubectl get pods -n ingress-nginx -o wide
-                  kubectl describe deployment ingress-nginx-controller -n ingress-nginx
-                  for podname in $(kubectl get pods -n ingress-nginx -l app.kubernetes.io/name=ingress-nginx,app.kubernetes.io/component=controller -o jsonpath='{.items[*].metadata.name}'); do
-                    echo "--- Logs for $podname ---"
-                    kubectl logs $podname -n ingress-nginx --tail=100 || echo "Failed to get logs for $podname"
-                    echo "--- Describe for $podname ---"
-                    kubectl describe pod $podname -n ingress-nginx || echo "Failed to describe $podname"
-                  done
-                  exit 1
-                fi
+            for i in {1..5}; do
+              helm upgrade --install ingress-nginx ingress-nginx/ingress-nginx \
+                --namespace ingress-nginx --create-namespace \
+                --set controller.service.annotations."service\.beta\.kubernetes\.io/aws-load-balancer-ssl-cert"="${{ env.ACM_CERTIFICATE_ARN }}" \
+                --set controller.service.annotations."service\.beta\.kubernetes\.io/aws-load-balancer-ssl-ports"="https" \
+                --set controller.service.annotations."service\.beta\.kubernetes\.io/aws-load-balancer-backend-protocol"="http" \
+                --set controller.service.targetPorts.https=http \
+                --set controller.service.ports.https=443 \
+                --set controller.service.ports.http=80 \
+                --set controller.config.use-forwarded-headers="true" \
+                --set controller.config.ssl-redirect="false" \
+                --set controller.config.compute-full-forwarded-for="true" \
+                --set controller.config.use-proxy-protocol="false" \
+                --set controller.config.enable-real-ip="false" \
+                --set controller.config.proxy-real-ip-cidr="0.0.0.0/0" \
+                --set controller.config.server-tokens="false" \
+                --set controller.replicaCount=1 \
+                --set controller.containerPort.http=80 \
+                --set controller.containerPort.https=443 \
+                --set controller.service.type=LoadBalancer \
+                --set controller.service.loadBalancerClass="service.k8s.aws/nlb" \
+                --set controller.defaultBackendService="ingress-nginx/default-http-backend" \
+                --set controller.terminationGracePeriodSeconds=300 \
+                --set controller.serviceAccount.create=true \
+                --set controller.serviceAccount.name=ingress-nginx \
+                --set serviceAccount.annotations."eks\.amazonaws\.com/role-arn"="${{ env.INGRESS_NGINX_ROLE_ARN }}" \
+                --version 4.10.1 \
+                --timeout 30m \
+                --values nginx-extra-manifests.yaml \
+                && break || {
+                  echo "Attempt $i failed. Retrying in 10 seconds..."
+                  sleep 10
+                }
+            done
+            echo "Waiting for ingress-nginx controller pod to be ready..."
+            if ! kubectl rollout status deployment ingress-nginx-controller -n ingress-nginx --timeout=10m; then
+              echo "NGINX Ingress Controller rollout failed. Dumping debug info..."
+              kubectl get pods -n ingress-nginx -o wide
+              kubectl describe deployment ingress-nginx-controller -n ingress-nginx
+              for podname in $(kubectl get pods -n ingress-nginx -l app.kubernetes.io/name=ingress-nginx,app.kubernetes.io/component=controller -o jsonpath='{.items[*].metadata.name}'); do
+                echo "--- Logs for $podname ---"
+                kubectl logs $podname -n ingress-nginx --tail=100 || echo "Failed to get logs for $podname"
+                echo "--- Describe for $podname ---"
+                kubectl describe pod $podname -n ingress-nginx || echo "Failed to describe $podname"
+              done
+              exit 1
+            fi
                 
-                echo "Checking NGINX Ingress Controller pods..."
-                kubectl get pods -n ingress-nginx
-                
-                echo "Checking NGINX Ingress Controller services..."
-                kubectl get svc -n ingress-nginx
-                
-                echo "Checking NGINX Ingress Controller events..."
-                kubectl get events -n ingress-nginx --sort-by='.lastTimestamp' | tail -20 || echo "No events found in ingress-nginx namespace or an error occurred."
-                
-                echo "Creating default backend for 404 handling..."
-                cat > default-backend.yaml << 'ENDOFFILE'
-                apiVersion: apps/v1
-                kind: Deployment
+            echo "Checking NGINX Ingress Controller pods..."
+            kubectl get pods -n ingress-nginx
+            
+            echo "Checking NGINX Ingress Controller services..."
+            kubectl get svc -n ingress-nginx
+            
+            echo "Checking NGINX Ingress Controller events..."
+            kubectl get events -n ingress-nginx --sort-by='.lastTimestamp' | tail -20 || echo "No events found in ingress-nginx namespace or an error occurred."
+            
+            echo "Creating default backend for 404 handling..."
+            cat > default-backend.yaml << 'ENDOFFILE'
+            apiVersion: apps/v1
+            kind: Deployment
+            metadata:
+              name: default-http-backend
+              namespace: ingress-nginx
+              labels:
+                app: default-http-backend
+            spec:
+              replicas: 1
+              selector:
+                matchLabels:
+                  app: default-http-backend
+              template:
                 metadata:
-                  name: default-http-backend
-                  namespace: ingress-nginx
                   labels:
                     app: default-http-backend
                 spec:
-                  replicas: 1
-                  selector:
-                    matchLabels:
-                      app: default-http-backend
-                  template:
-                    metadata:
-                      labels:
-                        app: default-http-backend
-                    spec:
-                      containers:
-                      - name: default-http-backend
-                        image: registry.k8s.io/defaultbackend-amd64:1.5
-                        ports:
-                        - containerPort: 8080
-                ---
-                apiVersion: v1
-                kind: Service
-                metadata:
-                  name: default-http-backend
-                  namespace: ingress-nginx
-                spec:
-                  ports:
-                  - port: 80
-                    targetPort: 8080
-                  selector:
-                    app: default-http-backend
-                ENDOFFILE
-                kubectl apply -f default-backend.yaml
+                  containers:
+                  - name: default-http-backend
+                    image: registry.k8s.io/defaultbackend-amd64:1.5
+                    ports:
+                    - containerPort: 8080
+            ---
+            apiVersion: v1
+            kind: Service
+            metadata:
+              name: default-http-backend
+              namespace: ingress-nginx
+            spec:
+              ports:
+              - port: 80
+                targetPort: 8080
+              selector:
+                app: default-http-backend
+            ENDOFFILE
+            kubectl apply -f default-backend.yaml
 
-                echo "Checking if PROXY protocol is enabled in NGINX configuration..."
-                (kubectl exec -n ingress-nginx deploy/ingress-nginx-controller -- cat /etc/nginx/nginx.conf > nginx.conf && \
-                grep -i "proxy_protocol" nginx.conf) || echo "No proxy_protocol found in configuration (this is expected as use-proxy-protocol=false), or failed to get nginx.conf."
-                
-                echo "Verifying NGINX Ingress Controller configuration..."
-                kubectl get configmap -n ingress-nginx ingress-nginx-controller -o yaml
+            echo "Checking if PROXY protocol is enabled in NGINX configuration..."
+            (kubectl exec -n ingress-nginx deploy/ingress-nginx-controller -- cat /etc/nginx/nginx.conf > nginx.conf && \
+            grep -i "proxy_protocol" nginx.conf) || echo "No proxy_protocol found in configuration (this is expected as use-proxy-protocol=false), or failed to get nginx.conf."
+            
+            echo "Verifying NGINX Ingress Controller configuration..."
+            kubectl get configmap -n ingress-nginx ingress-nginx-controller -o yaml
 
       - name: Get NGINX Ingress Controller LB Hostname
         id: get-nginx-hostname
