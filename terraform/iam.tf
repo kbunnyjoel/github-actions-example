@@ -348,7 +348,8 @@ resource "aws_iam_policy" "node_load_balancer_policy" {
           "elasticloadbalancing:DescribeTargetGroups",
           "elasticloadbalancing:DescribeListeners",
           "elasticloadbalancing:CreateTargetGroup",
-          "elasticloadbalancing:RegisterTargets"
+          "elasticloadbalancing:RegisterTargets",
+          "elasticloadbalancing:DescribeListenerAttributes",
         ],
         Resource = "*"
       }
