@@ -603,7 +603,7 @@ jobs:
               --set controller.terminationGracePeriodSeconds=300 \
               --set controller.serviceAccount.create=true \
               --set controller.serviceAccount.name=ingress-nginx \
-              --set controller.serviceAccount.annotations."eks\.amazonaws\.com/role-arn"="${{ env.INGRESS_IAM_ROLE_ARN }}" \
+              --set serviceAccount.annotations."eks\.amazonaws\.com/role-arn"=${{ steps.deploy.outputs.ingress_nginx_iam_role_arn }} \
               --version 4.10.1 \
               --timeout 30m \
               && break || {
