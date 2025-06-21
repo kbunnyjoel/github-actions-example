@@ -334,15 +334,22 @@ resource "aws_iam_policy" "node_load_balancer_policy" {
         ],
         Resource = "*"
       },
-      # Added ec2:CreateSecurityGroup for node's role as per error message
+      # Expanded permissions for AWS Load Balancer Controller
       {
-        "Effect" : "Allow",
-        "Action" : [
-          "ec2:CreateSecurityGroup"
+        Effect = "Allow",
+        Action = [
+          "ec2:CreateSecurityGroup",
+          "ec2:AuthorizeSecurityGroupIngress",
+          "ec2:DescribeSecurityGroups",
+          "ec2:RevokeSecurityGroupIngress",
+          "ec2:DeleteSecurityGroup",
+          "elasticloadbalancing:DescribeLoadBalancers",
+          "elasticloadbalancing:DescribeTargetGroups",
+          "elasticloadbalancing:DescribeListeners",
+          "elasticloadbalancing:CreateTargetGroup",
+          "elasticloadbalancing:RegisterTargets"
         ],
-        "Resource" : "arn:aws:ec2:*:*:vpc/${module.vpc.vpc_id}" # Constrain to the VPC
-        # Temporarily removed condition for diagnosis. Revert after testing.
-        # Original condition: "aws:RequestTag/elbv2.k8s.aws/cluster" : "${var.cluster_name}"
+        Resource = "*"
       }
     ]
   })
