@@ -476,6 +476,7 @@ jobs:
             --set awsRegion=${{ env.AWS_REGION }} \
             --set autoDiscovery.clusterName=${{ env.APP_NAME }} \
             --set serviceAccount.create=false \
+            --set serviceAccount.name=cluster-autoscaler \
             --set rbac.serviceAccount.annotations."eks\.amazonaws\.com/role-arn"=${{ env.CLUSTER_AUTOSCALER_ROLE_ARN }}
 
       - name: Install AWS Load Balancer Controller
