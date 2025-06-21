@@ -575,7 +575,7 @@ jobs:
           echo "Using ingress-nginx IAM role ARN: $INGRESS_NGINX_ROLE_ARN"
           echo "INGRESS_NGINX_ROLE_ARN=${INGRESS_NGINX_ROLE_ARN}" >> $GITHUB_ENV
 
-      - name: Install NGINX Ingress Controller with SSL and extra manifests
+      - name: Install NGINX Ingress Controller with SSL
         # Helm upgrade --install is idempotent and will update if exists or install if not.
         run: |
             for i in {1..5}; do
@@ -592,6 +592,7 @@ jobs:
                 --set controller.config.compute-full-forwarded-for="true" \
                 --set controller.config.use-proxy-protocol="false" \
                 --set controller.config.enable-real-ip="false" \
+                --set controller.service.beta.kubernetes.io/aws-load-balancer-scheme: internet-facing \
                 --set controller.config.proxy-real-ip-cidr="0.0.0.0/0" \
                 --set controller.config.server-tokens="false" \
                 --set controller.replicaCount=1 \
