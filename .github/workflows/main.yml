@@ -631,7 +631,7 @@ jobs:
                                 name: echo
                                 port:
                                   number: 80
-              EOF
+                EOF
                 for i in {1..5}; do
                   helm upgrade --install ingress-nginx ingress-nginx/ingress-nginx \
                     --namespace ingress-nginx --create-namespace \
