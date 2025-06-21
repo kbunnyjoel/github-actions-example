@@ -176,10 +176,6 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ap-southeast-2
 
-      - name: Configure kubectl for Terraform
-        if: ${{ github.event.inputs.destroy != 'true' }}
-        run: aws eks update-kubeconfig --region ap-southeast-2 --name github-actions-eks-example
-
       - name: Install Terraform
         if: ${{ github.event.inputs.destroy != 'true' }}
         uses: hashicorp/setup-terraform@v3
@@ -1368,6 +1364,14 @@ jobs:
           name: argocd-app-manifests
           path: k8s/argocd/applications/
 
+      - name: Create Namespace and API Key Secret
+        run: |
+          # Ensure the namespace exists before creating the secret in it.
+          kubectl create namespace ${{ env.APP_NAME }} --dry-run=client -o yaml | kubectl apply -f -
+          kubectl create secret generic api-key-secret \
+            --from-literal=apiKey=${{ secrets.API_KEY }} \
+            --namespace=${{ env.APP_NAME }} --dry-run=client -o yaml | kubectl apply -f -
+
       - name: Apply ArgoCD Application manifests
         run: |
           if [ -d "k8s/argocd/applications" ]; then
@@ -1426,11 +1430,6 @@ jobs:
             echo "Ingress '$APP_INGRESS_NAME' not yet found or annotation missing in namespace '${{ env.APP_NAME }}', waiting... (Attempt $i/60)"
             sleep 10
           done
-      - name: Create API Key Secret
-        run: |
-          kubectl create secret generic api-key-secret \
-            --from-literal=apiKey=${{ secrets.API_KEY }} \
-            --namespace=github-actions-example --dry-run=client -o yaml | kubectl apply -f -
 
       - name: Test /status endpoint with API key
         run: |
