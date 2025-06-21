@@ -478,6 +478,7 @@ jobs:
             --set fullnameOverride=cluster-autoscaler \
             --set rbac.serviceAccount.annotations."eks\.amazonaws\.com/role-arn"=${{ env.CLUSTER_AUTOSCALER_ROLE_ARN }} \
             --force --recreate-pods
+          kubectl rollout restart deployment -n kube-system
 
       - name: Install AWS Load Balancer Controller
         run: |
@@ -506,6 +507,7 @@ jobs:
                 }
           done
 
+          kubectl rollout restart deployment -n kube-system
           kubectl rollout status deployment aws-load-balancer-controller -n kube-system --timeout=5m
             
       - name: Get ACM certificate ARN from Terraform
@@ -610,6 +612,7 @@ jobs:
                   sleep 10
                 }
             done
+            kubectl rollout restart deployment -n ingress-nginx
             echo "Waiting for ingress-nginx controller pod to be ready..."
             if ! kubectl rollout status deployment ingress-nginx-controller -n ingress-nginx --timeout=10m; then
               echo "NGINX Ingress Controller rollout failed. Dumping debug info..."
@@ -753,6 +756,7 @@ jobs:
             --timeout 10m \
             --wait \
             --force --recreate-pods
+          kubectl rollout restart deployment -n argocd
           # Verify the annotation was set correctly
           kubectl get serviceaccount argocd-server -n argocd -o yaml
           # Print the current argocd-cm ConfigMap after Helm install/upgrade for verification
@@ -1065,7 +1069,7 @@ jobs:
             --timeout 10m \
             --wait \
             --force --recreate-pods
-
+          kubectl rollout restart deployment -n external-dns
           echo "✅ ExternalDNS installation complete."
 
       - name: Retry ExternalDNS install if deployment fails
@@ -1116,8 +1120,6 @@ jobs:
         run: |
           echo "Verifying ExternalDNS service account annotations..."
           kubectl describe sa external-dns -n external-dns
-          echo "Restarting ExternalDNS deployment to ensure IRSA is applied..."
-          kubectl rollout restart deployment external-dns -n external-dns
           kubectl rollout status deployment external-dns -n external-dns --timeout=2m
 
           # Check ExternalDNS logs
