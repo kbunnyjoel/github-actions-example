@@ -495,12 +495,6 @@ jobs:
           helm repo add autoscaler https://kubernetes.github.io/autoscaler
           helm repo update
 
-      - name: Get Cluster Autoscaler IAM Role ARN
-        id: tf-output-autoscaler-role
-        run: |
-          cd terraform
-          echo "CLUSTER_AUTOSCALER_ROLE_ARN=$(terraform output -raw cluster_autoscaler_role_arn)" >> $GITHUB_ENV
-          echo "cluster_autoscaler_role_arn=$(terraform output -raw cluster_autoscaler_role_arn)" >> $GITHUB_OUTPUT
       - name: Install Cluster Autoscaler
         run: |
           helm upgrade -i cluster-autoscaler autoscaler/cluster-autoscaler \
@@ -509,8 +503,7 @@ jobs:
             --set awsRegion=${{ env.AWS_REGION }} \
             --set autoDiscovery.clusterName=${{ env.APP_NAME }} \
             --set serviceAccount.create=true \
-            --set serviceAccount.name=cluster-autoscaler \
-            --set rbac.serviceAccount.annotations."eks\.amazonaws\.com/role-arn"=${{ env.CLUSTER_AUTOSCALER_ROLE_ARN }}
+            --set serviceAccount.name=cluster-autoscaler
 
       - name: Install AWS Load Balancer Controller
         run: |
