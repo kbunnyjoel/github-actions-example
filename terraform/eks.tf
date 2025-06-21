@@ -209,7 +209,7 @@ module "eks" {
       enable_monitoring = true
       iam_role_additional_policies = {
         AmazonEC2ContainerRegistryReadOnly = "arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryReadOnly"
-        ClusterAutoscalerPolicy            = aws_iam_policy.cluster_autoscaler_policy.arn
+        NodeLoadBalancerPolicy             = aws_iam_policy.node_load_balancer_policy.arn
       }
 
       # Add trust policy references using local.oidc_provider_url for IRSA
