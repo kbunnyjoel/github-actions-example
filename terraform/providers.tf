@@ -56,7 +56,6 @@ provider "kubernetes" {
   host                   = data.aws_eks_cluster.github_cluster.endpoint
   cluster_ca_certificate = base64decode(data.aws_eks_cluster.github_cluster.certificate_authority[0].data)
   token                  = data.aws_eks_cluster_auth.github_auth.token
-  config_path            = "~/.kube/config"
 }
 
 provider "helm" {
