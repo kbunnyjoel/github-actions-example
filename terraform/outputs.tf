@@ -21,3 +21,13 @@ output "externaldns_role_arn" {
   description = "The ARN of the IAM role used by ExternalDNS"
   value       = aws_iam_role.external_dns.arn
 }
+
+output "argocd_role_arn" {
+  description = "The ARN of the IAM role for ArgoCD"
+  value       = aws_iam_role.argocd_role.arn
+}
+
+output "external_dns_role_arn" {
+  description = "The ARN of the IAM role for ArgoCD"
+  value       = aws_iam_role.external_dns.arn
+}

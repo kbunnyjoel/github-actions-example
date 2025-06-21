@@ -708,6 +708,10 @@ jobs:
             fi
           done
       
+      - name: Get ArgoCD Role ARN
+        id: tf_output
+        run: echo "ARGOCD_ROLE_ARN=$(terraform output -raw argocd_role_arn)" >> "$GITHUB_ENV"
+
       - name: Prepare ArgoCD Helm values file
         run: |
           cat > argocd-install-values.yaml <<EOF
@@ -771,7 +775,6 @@ jobs:
           # Print the deployed ArgoCD Ingress for verification
           echo "Deployed ArgoCD Ingress (argocd-server) configuration:"
           kubectl -n argocd get ingress argocd-server -o yaml || echo "ArgoCD Ingress 'argocd-server' not found."
-
       - name: Patch ArgoCD resources with Helm ownership
         run: bash k8s/argocd/patch-argocd-helm-ownership.sh
   
