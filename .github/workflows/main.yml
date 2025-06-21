@@ -468,7 +468,7 @@ jobs:
               exit 1
             fi
             # This ROLE_NAME must exactly match the name defined in your Terraform ALB controller setup
-            FALLBACK_ROLE_NAME="eks-aws-load-balancer-controller-role"
+            FALLBACK_ROLE_NAME="eks-alb-controller-role"
             ROLE_ARN="arn:aws:iam::${AWS_ACCOUNT_ID}:role/${FALLBACK_ROLE_NAME}"
             echo "Using fallback ALB Controller role ARN: $ROLE_ARN"
             # Verify the fallback role actually exists
@@ -905,7 +905,7 @@ jobs:
               exit 1
             fi
             # This ROLE_NAME must exactly match the name defined in terraform/external_dns.tf
-            FALLBACK_ROLE_NAME="eks-external-dns-role" 
+            FALLBACK_ROLE_NAME="eks-alb-controller-role" 
             ROLE_ARN="arn:aws:iam::${AWS_ACCOUNT_ID}:role/${FALLBACK_ROLE_NAME}"
             echo "Using fallback ExternalDNS role ARN: $ROLE_ARN"
             # Verify the fallback role actually exists
