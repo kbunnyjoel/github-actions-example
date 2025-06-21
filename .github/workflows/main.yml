@@ -892,15 +892,6 @@ jobs:
           echo "Getting ExternalDNS role ARN from Terraform..."
           cd terraform
 
-          # Initialize Terraform to access the state
-          # The backend configuration in your Terraform files must allow this job to access the state
-          echo "Initializing Terraform..."
-          if ! terraform init -input=false -reconfigure; then
-            echo "Error: Terraform init failed."
-            # Decide if you want to exit or attempt fallback. Exiting is safer.
-            # exit 1 
-          fi
-
           ROLE_ARN_FROM_TF=$(terraform output -raw external_dns_role_arn 2>/dev/null)
 
           if [ ! -z "$ROLE_ARN_FROM_TF" ]; then
