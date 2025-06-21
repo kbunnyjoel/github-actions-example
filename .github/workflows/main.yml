@@ -468,7 +468,7 @@ jobs:
 
       - name: Install Cluster Autoscaler
         run: |
-          helm upgrade -i cluster-autoscaler autoscaler/cluster-autoscaler \
+          helm upgrade --install cluster-autoscaler autoscaler/cluster-autoscaler \
             --namespace kube-system \
             --set cloudProvider=aws \
             --set awsRegion=${{ env.AWS_REGION }} \
@@ -487,7 +487,7 @@ jobs:
 
           for i in {1..3}; do
             echo "Attempt $i: Installing AWS Load Balancer Controller..."
-            helm upgrade -i aws-load-balancer-controller eks/aws-load-balancer-controller \
+            helm upgrade --install aws-load-balancer-controller eks/aws-load-balancer-controller \
               -n kube-system \
               --set clusterName=${{ env.APP_NAME }} \
               --set serviceAccount.create=true \
@@ -578,8 +578,11 @@ jobs:
       - name: Install NGINX Ingress Controller with SSL
         # Helm upgrade --install is idempotent and will update if exists or install if not.
         run: |
+            # Define release and chart variables
+            RELEASE="ingress-nginx"
+            CHART="ingress-nginx/ingress-nginx"
             for i in {1..5}; do
-              helm upgrade --install ingress-nginx ingress-nginx/ingress-nginx \
+              helm upgrade "$RELEASE" "$CHART" --install \
                 --namespace ingress-nginx --create-namespace \
                 --set controller.service.annotations."service\.beta\.kubernetes\.io/aws-load-balancer-ssl-cert"="${{ env.ACM_CERTIFICATE_ARN }}" \
                 --set controller.service.annotations."service\.beta\.kubernetes\.io/aws-load-balancer-ssl-ports"="https" \
@@ -608,10 +611,9 @@ jobs:
                 --version 4.10.1 \
                 --timeout 30m \
                 --force \
-                && break || {
-                  echo "Attempt $i failed. Retrying in 10 seconds..."
-                  sleep 10
-                }
+                && break
+              echo "Attempt $i failed. Retrying in 10 seconds..."
+              sleep 10
             done
             kubectl rollout restart deployment ingress-nginx-controller -n ingress-nginx
             echo "Waiting for ingress-nginx controller pod to be ready..."
@@ -1076,28 +1078,28 @@ jobs:
             sleep 5
             
             helm upgrade --install external-dns external-dns/external-dns \
-            --namespace external-dns \
-            --create-namespace \
-            --set 'sources[0]=service' \
-            --set 'sources[1]=ingress' \
-            --set aws.zoneType=public \
-            --set aws.region=ap-southeast-2 \
-            --set 'domainFilters[0]=bunnycloud.xyz' \
-            --set 'extraArgs[0]=--aws-prefer-cname' \
-            --set 'managedRecordTypes[0]=CNAME' \
-            --set policy=upsert-only \
-            --set serviceAccount.create=true \
-            --set serviceAccount.name=external-dns \
-            --set serviceAccount.annotations."eks\.amazonaws\.com/role-arn"="${{ env.EXTERNAL_DNS_ROLE_ARN }}" \
-            --set txtOwnerId=Z020604219Y32SRYV246B \
-            --set provider=aws \
-            --set txtPrefix=externaldns- \
-            --set aws.batchChangeSize=1000 \
-            --set logLevel=debug \
-            --version 1.14.5 \
-            --timeout 10m \
-            --wait \
-            --force
+              --namespace external-dns \
+              --create-namespace \
+              --set 'sources[0]=service' \
+              --set 'sources[1]=ingress' \
+              --set aws.zoneType=public \
+              --set aws.region=ap-southeast-2 \
+              --set 'domainFilters[0]=bunnycloud.xyz' \
+              --set 'extraArgs[0]=--aws-prefer-cname' \
+              --set 'managedRecordTypes[0]=CNAME' \
+              --set policy=upsert-only \
+              --set serviceAccount.create=true \
+              --set serviceAccount.name=external-dns \
+              --set serviceAccount.annotations."eks\.amazonaws\.com/role-arn"="${{ env.EXTERNAL_DNS_ROLE_ARN }}" \
+              --set txtOwnerId=Z020604219Y32SRYV246B \
+              --set provider=aws \
+              --set txtPrefix=externaldns- \
+              --set aws.batchChangeSize=1000 \
+              --set logLevel=debug \
+              --version 1.14.5 \
+              --timeout 10m \
+              --wait \
+              --force
           else
             echo "ExternalDNS is already deployed and healthy."
           fi
