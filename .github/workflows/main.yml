@@ -604,7 +604,6 @@ jobs:
                 --set serviceAccount.annotations."eks\.amazonaws\.com/role-arn"="${{ env.INGRESS_NGINX_ROLE_ARN }}" \
                 --version 4.10.1 \
                 --timeout 30m \
-                --values nginx-extra-manifests.yaml \
                 --force --recreate-pods \
                 && break || {
                   echo "Attempt $i failed. Retrying in 10 seconds..."
