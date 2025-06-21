@@ -554,9 +554,9 @@ jobs:
         id: get-ingress-iam-role
         run: |
           cd terraform
-          INGRESS_IAM_ROLE_ARN=$(terraform output -raw ingress_nginx_role_arn 2>/dev/null || echo "")
+          INGRESS_IAM_ROLE_ARN=$(terraform output -raw ingress_nginx_iam_role_arn 2>/dev/null || echo "")
           if [ -z "$INGRESS_IAM_ROLE_ARN" ]; then
-            echo "Warning: Could not get ingress_nginx_role_arn from Terraform output"
+            echo "Warning: Could not get ingress_nginx_iam_role_arn from Terraform output"
             AWS_ACCOUNT_ID=$(aws sts get-caller-identity --query "Account" --output text)
             if [ -z "$AWS_ACCOUNT_ID" ]; then
               echo "Error: Could not determine AWS Account ID for fallback."
