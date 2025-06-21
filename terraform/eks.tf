@@ -1,5 +1,4 @@
 # Minimal cost-efficient EKS cluster using Terraform
-
 # tfsec:ignore:aws-ec2-require-vpc-flow-logs-for-all-vpcs
 # tfsec:ignore:aws-ec2-no-public-egress-sgr -- Verified and intentionally allowing public egress for specific EKS node group use cases
 module "vpc" {
@@ -213,6 +212,12 @@ module "eks" {
         ClusterAutoscalerPolicy            = aws_iam_policy.cluster_autoscaler_policy.arn
         NodeLoadBalancerPolicy             = aws_iam_policy.node_load_balancer_policy.arn
       }
+
+      # Add trust policy references using local.oidc_provider_url for IRSA
+      # Example (if trust policy is defined inline or referenced):
+      # "${local.oidc_provider_url}:sub" = "system:serviceaccount:kube-system:aws-load-balancer-controller"
+      # "${local.oidc_provider_url}:aud" = "sts.amazonaws.com"
+
       # Add CloudWatch agent
       bootstrap_extra_args = "--kubelet-extra-args '--node-labels=eks.amazonaws.com/nodegroup=spot-nodes,eks.amazonaws.com/nodegroup-image=ami-1234567890abcdef0'"
 

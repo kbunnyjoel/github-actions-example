@@ -120,3 +120,11 @@ output "aws_load_balancer_controller_role_arn" {
 output "cluster_autoscaler_role_arn" {
   value = aws_iam_role.cluster_autoscaler.arn
 }
+
+output "oidc_provider" {
+  value = module.eks.oidc_provider # should be the OIDC URL (without https://)
+}
+
+output "oidc_provider_arn" {
+  value = module.eks.oidc_provider_arn # should be the full ARN
+}
