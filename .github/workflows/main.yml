@@ -476,7 +476,8 @@ jobs:
             --set serviceAccount.create=true \
             --set serviceAccount.name=cluster-autoscaler \
             --set fullnameOverride=cluster-autoscaler \
-            --set rbac.serviceAccount.annotations."eks\.amazonaws\.com/role-arn"=${{ env.CLUSTER_AUTOSCALER_ROLE_ARN }}
+            --set rbac.serviceAccount.annotations."eks\.amazonaws\.com/role-arn"=${{ env.CLUSTER_AUTOSCALER_ROLE_ARN }} \
+            --force --recreate-pods
 
       - name: Install AWS Load Balancer Controller
         run: |
@@ -603,6 +604,7 @@ jobs:
                 --version 4.10.1 \
                 --timeout 30m \
                 --values nginx-extra-manifests.yaml \
+                --force --recreate-pods \
                 && break || {
                   echo "Attempt $i failed. Retrying in 10 seconds..."
                   sleep 10
@@ -749,7 +751,8 @@ jobs:
             --values argocd-install-values.yaml \
             --version 6.11.1 \
             --timeout 10m \
-            --wait
+            --wait \
+            --force --recreate-pods
           # Verify the annotation was set correctly
           kubectl get serviceaccount argocd-server -n argocd -o yaml
           # Print the current argocd-cm ConfigMap after Helm install/upgrade for verification
@@ -1060,7 +1063,8 @@ jobs:
             --set logLevel=debug \
             --version 1.14.5 \
             --timeout 10m \
-            --wait
+            --wait \
+            --force --recreate-pods
 
           echo "✅ ExternalDNS installation complete."
 
@@ -1097,7 +1101,8 @@ jobs:
             --set logLevel=debug \
             --version 1.14.5 \
             --timeout 10m \
-            --wait
+            --wait \
+            --force --recreate-pods
           else
             echo "ExternalDNS is already deployed and healthy."
           fi
