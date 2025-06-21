@@ -332,6 +332,19 @@ resource "aws_iam_policy" "node_load_balancer_policy" {
           "elasticloadbalancing:RemoveTags"
         ],
         Resource = "*"
+      },
+      # Added ec2:CreateSecurityGroup for node's role as per error message
+      {
+        "Effect" : "Allow",
+        "Action" : [
+          "ec2:CreateSecurityGroup"
+        ],
+        "Resource" : "arn:aws:ec2:*:*:vpc/${module.vpc.vpc_id}", # Constrain to the VPC
+        "Condition" : {
+          "StringEquals" : {
+            "aws:RequestTag/elbv2.k8s.aws/cluster" : "${var.cluster_name}" # Use var.cluster_name for consistency
+          }
+        }
       }
     ]
   })
