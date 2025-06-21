@@ -336,3 +336,32 @@ resource "aws_iam_policy" "node_load_balancer_policy" {
     ]
   })
 }
+
+resource "aws_iam_policy" "node_ec2_describe_zones_policy" {
+  name        = "eks-node-describe-zones-policy"
+  description = "Allows EKS nodes to describe availability zones"
+
+  policy = jsonencode({
+    Version = "2012-10-17",
+    Statement = [
+      {
+        Effect = "Allow",
+        Action = [
+          "ec2:DescribeAvailabilityZones"
+        ],
+        Resource = "*"
+      }
+    ]
+  })
+
+  tags = {
+    Name        = "eks-node-describe-zones-policy"
+    Environment = "dev"
+    Project     = "github-actions-example"
+  }
+}
+
+resource "aws_iam_role_policy_attachment" "node_describe_zones" {
+  policy_arn = aws_iam_policy.node_ec2_describe_zones_policy.arn
+  role       = module.eks.eks_managed_node_groups["spot-nodes"].iam_role_name
+}
