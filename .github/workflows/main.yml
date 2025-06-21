@@ -380,12 +380,6 @@ jobs:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ap-southeast-2
-
-      - name: Export AWS Account ID
-        id: aws-account
-        run: |
-          ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
-          echo "AWS_ACCOUNT_ID=$ACCOUNT_ID" >> $GITHUB_ENV
       - name: Install Terraform
         uses: hashicorp/setup-terraform@v3
         with:
@@ -427,11 +421,11 @@ jobs:
           echo "Getting AWS Load Balancer Controller role ARN from Terraform..."
           cd terraform
 
-          ROLE_ARN_FROM_TF=$(terraform output -raw aws_load_balancer_controller_role_arn 2>/dev/null)
+          ALB_ROLE_ARN=$(terraform output -raw aws_load_balancer_controller_role_arn 2>/dev/null)
 
-          if [ ! -z "$ROLE_ARN_FROM_TF" ]; then
-            echo "Successfully retrieved ALB Controller role ARN from Terraform output: $ROLE_ARN_FROM_TF"
-            ROLE_ARN="$ROLE_ARN_FROM_TF"
+          if [ ! -z "$ALB_ROLE_ARN" ]; then
+            echo "Successfully retrieved ALB Controller role ARN from Terraform output: $ALB_ROLE_ARN"
+            ROLE_ARN="$ALB_ROLE_ARN"
           else
             echo "Warning: Could not get ALB Controller role ARN from Terraform output. Attempting fallback."
             if [ -z "${AWS_ACCOUNT_ID}" ]; then
@@ -496,7 +490,7 @@ jobs:
               --set clusterName=${{ env.APP_NAME }} \
               --set serviceAccount.create=true \
               --set serviceAccount.name=aws-load-balancer-controller \
-              --set serviceAccount.annotations."eks\.amazonaws\.com/role-arn"="arn:aws:iam::${{ env.AWS_ACCOUNT_ID }}:role/${{ env.ALB_CONTROLLER_ROLE_ARN }}" \
+              --set serviceAccount.annotations."eks\.amazonaws\.com/role-arn"="${{ env.ALB_CONTROLLER_ROLE_ARN }}" \
               --set region=${{ env.AWS_REGION }} \
               --set vpcId=${{ env.VPC_ID }} \
               --timeout 20m \
@@ -637,7 +631,7 @@ jobs:
                                 name: echo
                                 port:
                                   number: 80
-                EOF
+              EOF
                 for i in {1..5}; do
                   helm upgrade --install ingress-nginx ingress-nginx/ingress-nginx \
                     --namespace ingress-nginx --create-namespace \
