@@ -365,3 +365,8 @@ resource "aws_iam_role_policy_attachment" "node_describe_zones" {
   policy_arn = aws_iam_policy.node_ec2_describe_zones_policy.arn
   role       = module.eks.eks_managed_node_groups["spot-nodes"].iam_role_name
 }
+
+resource "aws_iam_role_policy_attachment" "node_load_balancer" {
+  policy_arn = aws_iam_policy.node_load_balancer_policy.arn
+  role       = module.eks.eks_managed_node_groups["spot-nodes"].iam_role_name
+}
