@@ -374,6 +374,11 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+      - name: Export AWS Account ID
+        id: aws-account
+        run: |
+          ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
+          echo "AWS_ACCOUNT_ID=$ACCOUNT_ID" >> $GITHUB_ENV
       
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v3
@@ -429,9 +434,8 @@ jobs:
             ROLE_ARN="$ROLE_ARN_FROM_TF"
           else
             echo "Warning: Could not get ALB Controller role ARN from Terraform output. Attempting fallback."
-            AWS_ACCOUNT_ID=$(aws sts get-caller-identity --query "Account" --output text)
-            if [ -z "$AWS_ACCOUNT_ID" ]; then
-              echo "Error: Could not determine AWS Account ID for fallback."
+            if [ -z "${AWS_ACCOUNT_ID}" ]; then
+              echo "Error: AWS_ACCOUNT_ID not found in environment."
               exit 1
             fi
             # This ROLE_NAME must exactly match the name defined in your Terraform ALB controller setup
@@ -482,7 +486,6 @@ jobs:
 
       - name: Install AWS Load Balancer Controller
         run: |
-          AWS_ACCOUNT_ID=$(aws sts get-caller-identity --query "Account" --output text)
           helm repo add eks https://aws.github.io/eks-charts
           helm repo update
 
@@ -493,7 +496,7 @@ jobs:
               --set clusterName=${{ env.APP_NAME }} \
               --set serviceAccount.create=true \
               --set serviceAccount.name=aws-load-balancer-controller \
-              --set serviceAccount.annotations."eks\.amazonaws\.com/role-arn"="arn:aws:iam::806210429052:role/eks-aws-load-balancer-controller-role" \
+              --set serviceAccount.annotations."eks\.amazonaws\.com/role-arn"="arn:aws:iam::${{ env.AWS_ACCOUNT_ID }}:role/${{ env.ALB_CONTROLLER_ROLE_ARN }}" \
               --set region=${{ env.AWS_REGION }} \
               --set vpcId=${{ env.VPC_ID }} \
               --timeout 20m \
@@ -556,9 +559,8 @@ jobs:
           INGRESS_NGINX_ROLE_ARN=$(terraform output -raw ingress_nginx_iam_role_arn 2>/dev/null || echo "")
           if [ -z "$INGRESS_NGINX_ROLE_ARN" ]; then
             echo "Warning: Could not get ingress_nginx_iam_role_arn from Terraform output"
-            AWS_ACCOUNT_ID=$(aws sts get-caller-identity --query "Account" --output text)
-            if [ -z "$AWS_ACCOUNT_ID" ]; then
-              echo "Error: Could not determine AWS Account ID for fallback."
+            if [ -z "${AWS_ACCOUNT_ID}" ]; then
+              echo "Error: AWS_ACCOUNT_ID not found in environment."
               exit 1
             fi
             FALLBACK_ROLE_NAME="eks-ingress-nginx-role"
@@ -963,9 +965,8 @@ jobs:
             ROLE_ARN="$ROLE_ARN_FROM_TF"
           else
             echo "Warning: Could not get ExternalDNS role ARN from Terraform output. Attempting fallback."
-            AWS_ACCOUNT_ID=$(aws sts get-caller-identity --query "Account" --output text)
-            if [ -z "$AWS_ACCOUNT_ID" ]; then
-              echo "Error: Could not determine AWS Account ID for fallback."
+            if [ -z "${AWS_ACCOUNT_ID}" ]; then
+              echo "Error: AWS_ACCOUNT_ID not found in environment."
               exit 1
             fi
             # This ROLE_NAME must exactly match the name defined in terraform/external_dns.tf
