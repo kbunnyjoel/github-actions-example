@@ -551,11 +551,10 @@ jobs:
             echo "nginx_exists=false" >> $GITHUB_OUTPUT
           fi
       - name: Get Ingress NGINX IAM Role ARN from Terraform
-        id: get-ingress-iam-role
         run: |
           cd terraform
-          INGRESS_IAM_ROLE_ARN=$(terraform output -raw ingress_nginx_iam_role_arn 2>/dev/null || echo "")
-          if [ -z "$INGRESS_IAM_ROLE_ARN" ]; then
+          INGRESS_NGINX_ROLE_ARN=$(terraform output -raw ingress_nginx_iam_role_arn 2>/dev/null || echo "")
+          if [ -z "$INGRESS_NGINX_ROLE_ARN" ]; then
             echo "Warning: Could not get ingress_nginx_iam_role_arn from Terraform output"
             AWS_ACCOUNT_ID=$(aws sts get-caller-identity --query "Account" --output text)
             if [ -z "$AWS_ACCOUNT_ID" ]; then
@@ -563,16 +562,17 @@ jobs:
               exit 1
             fi
             FALLBACK_ROLE_NAME="eks-ingress-nginx-role"
-            INGRESS_IAM_ROLE_ARN="arn:aws:iam::${AWS_ACCOUNT_ID}:role/${FALLBACK_ROLE_NAME}"
-            echo "Using fallback ingress-nginx IAM role ARN: $INGRESS_IAM_ROLE_ARN"
-            if ! aws iam get-role --role-name "$FALLBACK_ROLE_NAME" > /dev/null 2>&1; then
+            # Use aws iam get-role to ensure ARN is correct and extract it
+            INGRESS_NGINX_ROLE_ARN=$(aws iam get-role --role-name "$FALLBACK_ROLE_NAME" --query 'Role.Arn' --output text 2>/dev/null || echo "")
+            if [ -z "$INGRESS_NGINX_ROLE_ARN" ]; then
               echo "Error: Fallback role '$FALLBACK_ROLE_NAME' does not exist in AWS."
               echo "Please check Terraform apply job and ensure the role was created with this name."
               exit 1
             fi
+            echo "Using fallback ingress-nginx IAM role ARN: $INGRESS_NGINX_ROLE_ARN"
           fi
-          echo "Using ingress-nginx IAM role ARN: $INGRESS_IAM_ROLE_ARN"
-          echo "INGRESS_IAM_ROLE_ARN=$INGRESS_IAM_ROLE_ARN" >> $GITHUB_ENV
+          echo "Using ingress-nginx IAM role ARN: $INGRESS_NGINX_ROLE_ARN"
+          echo "INGRESS_NGINX_ROLE_ARN=${INGRESS_NGINX_ROLE_ARN}" >> $GITHUB_ENV
 
       - name: Install NGINX Ingress Controller with SSL
         # Helm upgrade --install is idempotent and will update if exists or install if not.
@@ -603,7 +603,7 @@ jobs:
               --set controller.terminationGracePeriodSeconds=300 \
               --set controller.serviceAccount.create=true \
               --set controller.serviceAccount.name=ingress-nginx \
-              --set serviceAccount.annotations."eks\.amazonaws\.com/role-arn"=${{ steps.deploy.outputs.ingress_nginx_iam_role_arn }} \
+              --set serviceAccount.annotations."eks\.amazonaws\.com/role-arn"="${{ env.INGRESS_NGINX_ROLE_ARN }}" \
               --version 4.10.1 \
               --timeout 30m \
               && break || {
