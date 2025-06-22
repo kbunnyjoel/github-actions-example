@@ -124,21 +124,17 @@ jobs:
           platforms: linux/arm64
 
       
-      # Run Trivy Vulnerability Scan (ARM64, HIGH/CRITICAL only)
-      - name: Run Trivy Vulnerability Scan
-        env:
-          TRIVY_USERNAME: ${{ secrets.DOCKER_USERNAME }}
-          TRIVY_PASSWORD: ${{ secrets.DOCKER_PASSWORD }}
+      # Install Trivy
+      - name: Install Trivy
         run: |
-          trivy image \
-            --scanners vuln \
-            --format table \
-            --exit-code 1 \
-            --severity HIGH,CRITICAL \
-            --platform linux/arm64 \
-            --username $TRIVY_USERNAME \
-            --password $TRIVY_PASSWORD \
-            docker.io/${{ secrets.DOCKER_USERNAME }}/github-actions-example:e21a3933aab037792b680b38f6069eff4c6af906
+          wget -qO trivy.tar.gz https://github.com/aquasecurity/trivy/releases/latest/download/trivy_0.51.1_Linux-64bit.tar.gz
+          tar zxvf trivy.tar.gz
+          sudo mv trivy /usr/local/bin/
+
+      # Run Trivy vulnerability scanner (remote image scan)
+      - name: Run Trivy vulnerability scanner
+        run: |
+          trivy image --scanners vuln --exit-code 1 --severity CRITICAL,HIGH docker.io/${{ secrets.DOCKER_USERNAME }}/${{ env.APP_NAME }}:${{ github.sha }}
 
       - name: Run Docker container in background
         run: docker run -d -p 3000:3000 --name live-app ${{ secrets.DOCKER_USERNAME }}/${{ env.APP_NAME }}:${{ github.sha }}
