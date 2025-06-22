@@ -1356,7 +1356,7 @@ jobs:
               -D image_repository="$IMAGE_REPOSITORY" \
               -D image_tag="$IMAGE_TAG" \
               -D deployment_namespace="$DEPLOYMENT_NAMESPACE" \
-              -D acm_certificate_arn="${{ env.ACM_CERTIFICATE_ARN }},${{ env.ALB_CERT_ARN" }}\
+              -D acm_certificate_arn="${{ env.ACM_CERT_ARN }},${{ env.ALB_CERT_ARN" }}\
               -D aws_account_id="$AWS_ACCOUNT_ID" \
               -D aws_region="$AWS_REGION" \
               > "$OUTFILE"
