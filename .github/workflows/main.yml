@@ -338,7 +338,7 @@ jobs:
         run: |
           cd terraform
           terraform init
-          terraform force-unlock -force b159fdc2-cfb6-217b-fb11-f809a438d93d || echo "No locks to unlock"
+          terraform force-unlock -force 637f1591-4e24-fd14-a1e5-2ac72e45c873 || echo "No locks to unlock"
           terraform destroy -auto-approve
 
       - name: Clean up orphaned ELBs and their subnets (manual cleanup)

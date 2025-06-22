@@ -76,10 +76,46 @@ for sg in $(aws ec2 describe-security-groups --filters "Name=vpc-id,Values=$VPC_
   aws ec2 delete-security-group --group-id $sg || true
 done
 
-# Delete Route Tables (excluding main)
-for rt in $(aws ec2 describe-route-tables --filters "Name=vpc-id,Values=$VPC_ID" --query "RouteTables[?Associations[?Main!=true]].RouteTableId" --output text); do
+# Delete Route Tables (disassociate non-main, skip main)
+for rt in $(aws ec2 describe-route-tables --filters "Name=vpc-id,Values=$VPC_ID" --query "RouteTables[].RouteTableId" --output text); do
+  echo "🔍 Checking Route Table: $rt"
+
+  # Disassociate non-main route table associations
+  for assoc_id in $(aws ec2 describe-route-tables --route-table-ids $rt --query "RouteTables[0].Associations[?Main==\`false\`].RouteTableAssociationId" --output text); do
+    echo "🔌 Disassociating Route Table: $assoc_id"
+    aws ec2 disassociate-route-table --association-id $assoc_id || true
+  done
+
+  # Check if this is the main route table
+  is_main=$(aws ec2 describe-route-tables --route-table-ids $rt --query "RouteTables[0].Associations[?Main==\`true\`]" --output text)
+
+  if [[ -z "$is_main" ]]; then
+    echo "🧹 Deleting Route Table: $rt"
+    aws ec2 delete-route-table --route-table-id $rt || true
+  else
+    echo "⚠️ Skipping main route table: $rt"
+  fi
+done
+
+# Try replacing main route table association to allow deletion
+main_assoc_id=$(aws ec2 describe-route-tables --filters "Name=vpc-id,Values=$VPC_ID" --query "RouteTables[].Associations[?Main==\`true\`].RouteTableAssociationId" --output text)
+alt_rt=$(aws ec2 describe-route-tables --filters "Name=vpc-id,Values=$VPC_ID" --query "RouteTables[?Associations[?Main!=\`true\`]].RouteTableId" --output text | awk '{print $1}')
+
+if [[ -n "$main_assoc_id" && -n "$alt_rt" ]]; then
+  echo "🔄 Replacing main route table with: $alt_rt"
+  aws ec2 replace-route-table-association --association-id $main_assoc_id --route-table-id $alt_rt || true
+fi
+
+# Final route table cleanup (now no main should remain)
+for rt in $(aws ec2 describe-route-tables --filters "Name=vpc-id,Values=$VPC_ID" --query "RouteTables[].RouteTableId" --output text); do
   echo "🧹 Deleting Route Table: $rt"
   aws ec2 delete-route-table --route-table-id $rt || true
+done
+
+# Delete Network ACLs (excluding default)
+for acl in $(aws ec2 describe-network-acls --filters "Name=vpc-id,Values=$VPC_ID" --query "NetworkAcls[?IsDefault==\`false\`].NetworkAclId" --output text); do
+  echo "🧹 Deleting Network ACL: $acl"
+  aws ec2 delete-network-acl --network-acl-id $acl || true
 done
 
 # Delete Subnets
