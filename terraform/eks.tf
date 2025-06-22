@@ -273,11 +273,11 @@ resource "aws_eks_addon" "vpc_cni" {
   addon_name               = "vpc-cni"
   service_account_role_arn = aws_iam_role.vpc_cni.arn
 
-  # Enable IP preallocation: pre-allocate 5 IPs and 1 ENI per node
+  # Enable prefix delegation for improved IP management
   configuration_values = jsonencode({
     env = {
-      WARM_ENI_TARGET = "1"
-      WARM_IP_TARGET  = "5"
+      ENABLE_PREFIX_DELEGATION = "true"
+      WARM_PREFIX_TARGET       = "1"
     }
   })
 
