@@ -16,12 +16,12 @@ resource "aws_route53_zone" "main" {
 # If bunnycloud.xyz should point to a specific service (e.g., a load balancer or S3 website),
 # replace "192.0.2.1" with the appropriate IP or use an ALIAS record.
 resource "aws_route53_record" "apex_a_record" {
-  zone_id = aws_route53_zone.main.zone_id
-  name    = aws_route53_zone.main.name # This will resolve to "bunnycloud.xyz"
-  type    = "A"
-  ttl     = 300
-  records = ["192.0.2.1"] # Placeholder IP from TEST-NET-1 (RFC 5737)
-  depends_on = [ aws_route53_zone.main ] # Ensure the zone is created before this record
+  zone_id    = aws_route53_zone.main.zone_id
+  name       = aws_route53_zone.main.name # This will resolve to "bunnycloud.xyz"
+  type       = "A"
+  ttl        = 300
+  records    = ["192.0.2.1"]           # Placeholder IP from TEST-NET-1 (RFC 5737)
+  depends_on = [aws_route53_zone.main] # Ensure the zone is created before this record
   lifecycle {
     prevent_destroy = true
   }
