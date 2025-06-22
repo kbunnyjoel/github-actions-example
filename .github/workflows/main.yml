@@ -1457,12 +1457,21 @@ jobs:
 
       - name: Test /status endpoint with API key
         run: |
-          response=$(curl -ks -H "x-api-key: ${{ secrets.API_KEY }}" https://${{ env.APP_NAME }}.bunnycloud.xyz/status)
-          echo "Response: $response"
-          if [[ "$response" != *'"status":"ok"'* ]]; then
-            echo "Unexpected response: $response"
-            exit 1
-          fi
+          for i in {1..10}; do
+            echo "Checking app status... Attempt $i"
+            response=$(curl -ks -H "x-api-key: ${{ secrets.API_KEY }}" https://${{ env.APP_NAME }}.bunnycloud.xyz/status)
+
+            if [[ "$response" == *'"status":"ok"'* ]]; then
+              echo "✅ App is healthy."
+              exit 0
+            fi
+
+            echo "❌ Unexpected response or DNS not resolved yet: $response"
+            sleep 10
+          done
+
+          echo "❌ App did not respond with status=ok after retries."
+          exit 1
 
       - name: Ensure application is deployed
         run: |
