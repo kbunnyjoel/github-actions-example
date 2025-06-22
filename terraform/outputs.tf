@@ -31,3 +31,8 @@ output "external_dns_role_arn" {
   description = "The ARN of the IAM role for ArgoCD"
   value       = aws_iam_role.external_dns.arn
 }
+
+output "route53_zone_id"  {
+  description = "The ID of the Route 53 hosted zone"
+  value       = aws_route53_zone.main.zone_id
+}
