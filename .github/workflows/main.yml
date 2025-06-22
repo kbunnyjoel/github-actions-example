@@ -121,7 +121,7 @@ jobs:
           tags: |
             ${{ secrets.DOCKER_USERNAME }}/${{ env.APP_NAME }}:${{ github.sha }}
             ghcr.io/${{ github.repository_owner }}/${{ env.APP_NAME }}:${{ github.sha }}
-          platforms: linux/arm64
+          platforms: linux/amd64,linux/arm64
 
 
       # Install Trivy (dynamically using defined version and architecture detection)
