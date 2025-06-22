@@ -41,7 +41,7 @@ app.use((req, res, next) => {
       (req.method === 'POST' && req.path === '/add')) return next();
 
   const apiKey = req.headers['x-api-key'] || (req.headers['authorization'] && req.headers['authorization'].replace('Bearer ', ''));
-  const expectedKey = process.env.API_KEY;
+  const expectedKey = process.env.EXPECTED_API_KEY;
 
   if (!apiKey || apiKey !== expectedKey) {
     return res.status(401).send('Api Key was not provided.');
