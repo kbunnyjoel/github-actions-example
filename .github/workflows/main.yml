@@ -125,14 +125,21 @@ jobs:
 
       
       # Install Trivy
-      - name: Install Trivy
+      - name: Download Trivy
         run: |
           uname_arch=$(uname -m)
-          if [ "$uname_arch" = "aarch64" ]; then
-            wget -qO trivy.tar.gz https://github.com/aquasecurity/trivy/releases/latest/download/trivy_0.51.1_Linux-ARM64.tar.gz
+
+          # Map uname output to Trivy's expected archive names
+          if [ "$uname_arch" = "x86_64" ]; then
+            trivy_arch="64bit"
+          elif [ "$uname_arch" = "aarch64" ] || [ "$uname_arch" = "arm64" ]; then
+            trivy_arch="ARM64"
           else
-            wget -qO trivy.tar.gz https://github.com/aquasecurity/trivy/releases/latest/download/trivy_0.51.1_Linux-64bit.tar.gz
+            echo "Unsupported architecture: $uname_arch"
+            exit 1
           fi
+
+          wget -qO trivy.tar.gz "https://github.com/aquasecurity/trivy/releases/latest/download/trivy_0.51.1_Linux-${trivy_arch}.tar.gz"
           tar -xzf trivy.tar.gz
           sudo mv trivy /usr/local/bin/
           trivy --version
