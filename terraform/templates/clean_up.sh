@@ -2,14 +2,15 @@
 
 set -euo pipefail
 
-VPC_ID="$1"
+VPC_IDS=$(aws ec2 describe-vpcs --query "Vpcs[].VpcId" --output text)
 
-if [[ -z "$VPC_ID" ]]; then
-  echo "❌ Please provide a VPC ID as the first argument."
+if [[ -z "$VPC_IDS" ]]; then
+  echo "❌ Failed to automatically retrieve VPC IDs."
   exit 1
 fi
 
-echo "🔍 Starting cleanup for VPC: $VPC_ID"
+for VPC_ID in $VPC_IDS; do
+  echo "🔍 Starting cleanup for VPC: $VPC_ID"
 
 # Delete Elastic Network Interfaces (detach if attached before deleting)
 for eni in $(aws ec2 describe-network-interfaces --filters "Name=vpc-id,Values=$VPC_ID" --query "NetworkInterfaces[].NetworkInterfaceId" --output text); do
@@ -91,4 +92,5 @@ done
 echo "🧨 Attempting final VPC delete: $VPC_ID"
 aws ec2 delete-vpc --vpc-id $VPC_ID
 
-echo "✅ VPC $VPC_ID cleanup complete."
+  echo "✅ VPC $VPC_ID cleanup complete."
+done
