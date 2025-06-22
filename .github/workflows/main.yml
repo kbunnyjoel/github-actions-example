@@ -1323,8 +1323,8 @@ jobs:
           cd terraform
           ACM_CERT_ARN=$(terraform output -raw github_actions_example_certificate_arn)
           ALB_CERT_ARN=$(terraform output -raw acm_certificate_arn)
-          echo "ACM_CERT_ARN=$ACM_CERT_ARN" >> $GITHUB_ENV
-          echo "ALB_CERT_ARN=$ALB_CERT_ARN" >> $GITHUB_ENV
+          echo "ACM_CERT_ARN_ENV=$ACM_CERT_ARN" >> $GITHUB_ENV
+          echo "ALB_CERT_ARN_ENV=$ALB_CERT_ARN" >> $GITHUB_ENV
 
       - name: Generate manifests
         run: |
@@ -1356,7 +1356,7 @@ jobs:
               -D image_repository="$IMAGE_REPOSITORY" \
               -D image_tag="$IMAGE_TAG" \
               -D deployment_namespace="$DEPLOYMENT_NAMESPACE" \
-              -D acm_certificate_arn="${{ env.ACM_CERT_ARN }},${{ env.ALB_CERT_ARN" }}\
+              -D acm_certificate_arn="${{ env.ACM_CERT_ARN_ENV }},${{ env.ALB_CERT_ARN_ENV" }}\
               -D aws_account_id="$AWS_ACCOUNT_ID" \
               -D aws_region="$AWS_REGION" \
               > "$OUTFILE"
