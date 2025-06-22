@@ -578,9 +578,12 @@ jobs:
       - name: Install NGINX Ingress Controller with SSL
         # Helm upgrade --install is idempotent and will update if exists or install if not.
         run: |
-          # Set release and chart names, using environment or fallback values if needed
-          RELEASE_NAME="${RELEASE_NAME:-ingress-nginx}"
-          CHART_NAME="${CHART_NAME:-ingress-nginx/ingress-nginx}"
+          # Set release and chart names explicitly
+          RELEASE_NAME="ingress-nginx"
+          CHART_NAME="ingress-nginx/ingress-nginx"
+
+          echo "Helm release: $RELEASE_NAME"
+          echo "Helm chart: $CHART_NAME"
 
           for i in {1..5}; do
             echo "Attempt $i: helm upgrade $RELEASE_NAME $CHART_NAME"
