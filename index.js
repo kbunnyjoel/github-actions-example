@@ -3,6 +3,7 @@ const https = require('https');
 const express = require('express');
 const path = require('path');
 const app = express();
+console.log('Running in NODE_ENV:', process.env.NODE_ENV);
 const port = process.env.PORT || 3000;
 
 // --- Live Reload Setup (for development) ---
@@ -42,6 +43,10 @@ app.use((req, res, next) => {
 
   const apiKey = req.headers['x-api-key'] || (req.headers['authorization'] && req.headers['authorization'].replace('Bearer ', ''));
   const expectedKey = process.env.EXPECTED_API_KEY;
+
+  console.log('Incoming request path:', req.path);
+  console.log('Received API Key:', apiKey);
+  console.log('Expected API Key:', expectedKey);
 
   if (!apiKey || apiKey !== expectedKey) {
     return res.status(401).send('Api Key was not provided.');
