@@ -125,24 +125,18 @@ jobs:
 
       
       # Install Trivy
-      - name: Download Trivy
+      - name: Set Trivy architecture and download
         run: |
           uname_arch=$(uname -m)
+          echo "Architecture: $uname_arch"
 
-          # Map uname output to Trivy's expected archive names
-          if [ "$uname_arch" = "x86_64" ]; then
-            trivy_arch="64bit"
-          elif [ "$uname_arch" = "aarch64" ] || [ "$uname_arch" = "arm64" ]; then
-            trivy_arch="ARM64"
+          if [ "$uname_arch" = "aarch64" ]; then
+            wget -qO trivy.tar.gz https://github.com/aquasecurity/trivy/releases/latest/download/trivy_0.51.1_Linux-ARM64.tar.gz
           else
-            echo "Unsupported architecture: $uname_arch"
-            exit 1
+            wget -qO trivy.tar.gz https://github.com/aquasecurity/trivy/releases/latest/download/trivy_0.51.1_Linux-64bit.tar.gz
           fi
-
-          wget -qO trivy.tar.gz "https://github.com/aquasecurity/trivy/releases/latest/download/trivy_0.51.1_Linux-${trivy_arch}.tar.gz"
           tar -xzf trivy.tar.gz
           sudo mv trivy /usr/local/bin/
-          trivy --version
 
       # Run Trivy vulnerability scanner (remote image scan)
       - name: Run Trivy vulnerability scanner
