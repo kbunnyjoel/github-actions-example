@@ -114,8 +114,8 @@ resource "aws_route53_record" "bastion_dns" {
   ttl     = 60
   records = [aws_eip.bastion_eip.public_ip]
 
+  depends_on = [aws_route53_zone.main]
   lifecycle {
-    ignore_changes  = [records]
-    create_before_destroy = true
+    prevent_destroy = true
   }
 }
