@@ -123,6 +123,7 @@ jobs:
             ghcr.io/${{ github.repository_owner }}/${{ env.APP_NAME }}:${{ github.sha }}
           platforms: linux/arm64
 
+
       # Install Trivy (architecture detection, x86_64 and ARM64 support)
       - name: Install Trivy
         run: |
@@ -135,7 +136,6 @@ jobs:
             echo "Unsupported architecture: $arch"
             exit 1
           fi
-
           tar zxvf trivy.tar.gz
           sudo mv trivy /usr/local/bin/
 
@@ -143,6 +143,21 @@ jobs:
       - name: Run Trivy scan on Docker image
         run: |
           trivy image ${{ secrets.DOCKER_USERNAME }}/${{ env.APP_NAME }}:${{ github.sha }}
+
+      # Trivy Remote Scan
+      - name: Trivy Remote Scan
+        run: |
+          echo "Running Trivy scan on remote Docker image"
+          ARCH=$(uname -m)
+          if [ "$ARCH" = "aarch64" ] || [ "$ARCH" = "arm64" ]; then
+            wget -qO trivy.tar.gz https://github.com/aquasecurity/trivy/releases/latest/download/trivy_0.51.1_Linux-ARM64.tar.gz
+          else
+            wget -qO trivy.tar.gz https://github.com/aquasecurity/trivy/releases/latest/download/trivy_0.51.1_Linux-64bit.tar.gz
+          fi
+          tar zxvf trivy.tar.gz
+          sudo mv trivy /usr/local/bin/
+          IMAGE_NAME=ghcr.io/${{ github.repository }}:${{ github.sha }}
+          trivy image --exit-code 1 --severity CRITICAL,HIGH "$IMAGE_NAME"
 
       - name: Run Docker container in background
         run: docker run -d -p 3000:3000 --name live-app ${{ secrets.DOCKER_USERNAME }}/${{ env.APP_NAME }}:${{ github.sha }}
