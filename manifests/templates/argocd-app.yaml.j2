@@ -48,7 +48,7 @@ spec:
           annotations:
             kubernetes.io/ingress.class: "alb" # Ensures ALB controller picks it up
             alb.ingress.kubernetes.io/scheme: internet-facing
-            alb.ingress.kubernetes.io/listen-ports: '[{"HTTPS": 443}]'
+            alb.ingress.kubernetes.io/listen-ports: '[{"HTTP": 80}, {"HTTPS": 443}]'
             alb.ingress.kubernetes.io/certificate-arn: "{{ acm_certificate_arn }}" # Crucial for HTTPS on ALB
             alb.ingress.kubernetes.io/target-type: ip # Good for EKS, especially Fargate
             alb.ingress.kubernetes.io/healthcheck-path: "/status"

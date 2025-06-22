@@ -144,8 +144,8 @@ jobs:
         run: |
           trivy image --cache-dir .trivycache ${{ secrets.DOCKER_USERNAME }}/${{ env.APP_NAME }}:${{ github.sha }}
 
-            - name: Run Docker container in background
-              run: docker run -d -p 3000:3000 --name live-app ${{ secrets.DOCKER_USERNAME }}/${{ env.APP_NAME }}:${{ github.sha }}
+      - name: Run Docker container in background
+        run: docker run -d -p 3000:3000 --name live-app ${{ secrets.DOCKER_USERNAME }}/${{ env.APP_NAME }}:${{ github.sha }}
 
       - name: Wait for app to be ready
         run: |
