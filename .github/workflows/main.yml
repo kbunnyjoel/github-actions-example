@@ -1324,7 +1324,7 @@ jobs:
           ACM_CERT_ARN=$(terraform output -raw github_actions_example_certificate_arn)
           ALB_CERT_ARN=$(terraform output -raw acm_certificate_arn)
           echo "ACM_CERT_ARN=$ACM_CERT_ARN" >> $GITHUB_ENV
-          echo "ALB_CERT_ARN=$ALB_CERT_ARN" >> $GITHUB
+          echo "ALB_CERT_ARN=$ALB_CERT_ARN" >> $GITHUB_ENV
 
       - name: Generate manifests
         run: |
