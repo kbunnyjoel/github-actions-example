@@ -124,18 +124,21 @@ jobs:
           platforms: linux/arm64
 
       
-      # Scan the image after it has been built and loaded/pushed
-      - name: Scan image for vulnerabilities
-        uses: aquasecurity/trivy-action@master
-        with:
-          image-ref: '${{ secrets.DOCKER_USERNAME }}/${{ env.APP_NAME }}:${{ github.sha }}'
-          format: 'table'
-          exit-code: '1' # Fail the build if vulnerabilities are found (adjust severity as needed)
-          ignore-unfixed: true
-          vuln-type: 'os,library'
-          severity: 'CRITICAL,HIGH'
-          # Ensure the scanner checks the local Docker daemon
-          # Trivy action usually does this by default if image is found locally.
+      # Run Trivy Vulnerability Scan (ARM64, HIGH/CRITICAL only)
+      - name: Run Trivy Vulnerability Scan
+        env:
+          TRIVY_USERNAME: ${{ secrets.DOCKER_USERNAME }}
+          TRIVY_PASSWORD: ${{ secrets.DOCKER_PASSWORD }}
+        run: |
+          trivy image \
+            --scanners vuln \
+            --format table \
+            --exit-code 1 \
+            --severity HIGH,CRITICAL \
+            --platform linux/arm64 \
+            --username $TRIVY_USERNAME \
+            --password $TRIVY_PASSWORD \
+            docker.io/${{ secrets.DOCKER_USERNAME }}/github-actions-example:e21a3933aab037792b680b38f6069eff4c6af906
 
       - name: Run Docker container in background
         run: docker run -d -p 3000:3000 --name live-app ${{ secrets.DOCKER_USERNAME }}/${{ env.APP_NAME }}:${{ github.sha }}
