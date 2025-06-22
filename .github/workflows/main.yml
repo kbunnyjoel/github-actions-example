@@ -626,11 +626,19 @@ jobs:
                 break
               }
             echo "Attempt $i failed. Retrying in 10 seconds..."
+            echo "🔍 Inspecting ingress-nginx pods and events..."
+            kubectl get pods -n ingress-nginx || true
+            kubectl get events -n ingress-nginx --sort-by=.lastTimestamp | tail -n 20 || true
+            kubectl get jobs -n ingress-nginx || true
             sleep 10
           done
 
           if [[ $i -eq 5 ]]; then
             echo "❌ Helm install failed after 5 attempts."
+            echo "🚨 Helm upgrade failed after 5 attempts. Dumping debug info..."
+            kubectl describe pods -n ingress-nginx || true
+            kubectl get events -n ingress-nginx --sort-by=.lastTimestamp | tail -n 50 || true
+            kubectl get jobs -n ingress-nginx -o wide || true
             exit 1
           fi
 
