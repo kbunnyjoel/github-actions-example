@@ -603,7 +603,7 @@ jobs:
               --set controller.config.compute-full-forwarded-for="true" \
               --set controller.config.use-proxy-protocol="false" \
               --set controller.config.enable-real-ip="false" \
-              --set controller.service.beta.kubernetes.io/aws-load-balancer-scheme: internet-facing \
+              --set controller.service.annotations."service\.beta\.kubernetes\.io/aws-load-balancer-scheme"=internet-facing \
               --set controller.config.proxy-real-ip-cidr="0.0.0.0/0" \
               --set controller.config.server-tokens="false" \
               --set controller.replicaCount=1 \
@@ -619,7 +619,6 @@ jobs:
               --version 4.10.1 \
               --timeout 30m \
               --force \
-              --values values.yaml \
               && {
                 echo "✅ Helm upgrade succeeded. Inspecting release..."
                 helm get all "$RELEASE_NAME" -n ingress-nginx || echo "Helm release not found"
