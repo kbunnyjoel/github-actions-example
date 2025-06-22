@@ -627,7 +627,7 @@ jobs:
               --set serviceAccount.annotations."eks\.amazonaws\.com/role-arn"="${{ env.INGRESS_NGINX_ROLE_ARN }}" \
               --version 4.10.1 \
               --timeout 10m \
-              # --wait \
+              --wait \
               && {
                 echo "✅ Helm upgrade succeeded. Inspecting release..."
                 helm get all "$RELEASE_NAME" -n ingress-nginx || echo "Helm release not found"
