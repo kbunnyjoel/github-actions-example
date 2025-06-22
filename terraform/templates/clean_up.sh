@@ -11,6 +11,37 @@ fi
 
 echo "🔍 Starting cleanup for VPC: $VPC_ID"
 
+# Delete Elastic Network Interfaces (detach if attached before deleting)
+for eni in $(aws ec2 describe-network-interfaces --filters "Name=vpc-id,Values=$VPC_ID" --query "NetworkInterfaces[].NetworkInterfaceId" --output text); do
+  echo "🧹 Processing ENI: $eni"
+  
+  attachment_id=$(aws ec2 describe-network-interfaces --network-interface-ids $eni --query "NetworkInterfaces[0].Attachment.AttachmentId" --output text)
+
+  if [[ "$attachment_id" != "None" ]]; then
+    echo "🔌 Detaching ENI: $eni (Attachment ID: $attachment_id)"
+    aws ec2 detach-network-interface --attachment-id $attachment_id || true
+    sleep 3
+  fi
+
+  echo "🧹 Deleting ENI: $eni"
+  aws ec2 delete-network-interface --network-interface-id $eni || true
+done
+
+# Delete Load Balancers
+for lb in $(aws elbv2 describe-load-balancers --query "LoadBalancers[?VpcId=='$VPC_ID'].LoadBalancerArn" --output text); do
+  echo "🧹 Deleting Load Balancer: $lb"
+  aws elbv2 delete-load-balancer --load-balancer-arn $lb || true
+done
+
+# Wait for deletion (optional safety delay)
+sleep 10
+
+# Delete Target Groups
+for tg in $(aws elbv2 describe-target-groups --query "TargetGroups[?VpcId=='$VPC_ID'].TargetGroupArn" --output text); do
+  echo "🧹 Deleting Target Group: $tg"
+  aws elbv2 delete-target-group --target-group-arn $tg || true
+done
+
 # Delete NAT Gateways
 for nat in $(aws ec2 describe-nat-gateways --filter "Name=vpc-id,Values=$VPC_ID" --query "NatGateways[].NatGatewayId" --output text); do
   echo "🧹 Deleting NAT Gateway: $nat"
