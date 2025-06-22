@@ -578,6 +578,9 @@ jobs:
       - name: Install NGINX Ingress Controller with SSL
         # Helm upgrade --install is idempotent and will update if exists or install if not.
         run: |
+          # Ensure namespace exists before Helm tries to use it
+          kubectl get namespace ingress-nginx || kubectl create namespace ingress-nginx
+
           # Set release and chart names explicitly
           RELEASE_NAME="ingress-nginx"
           CHART_NAME="ingress-nginx/ingress-nginx"
@@ -621,6 +624,10 @@ jobs:
             echo "Attempt $i failed. Retrying in 10 seconds..."
             sleep 10
           done
+
+          echo "Waiting for ingress-nginx controller rollout to complete..."
+          kubectl rollout status deployment ingress-nginx-controller -n ingress-nginx --timeout=5m
+
           kubectl rollout restart deployment ingress-nginx-controller -n ingress-nginx
           echo "Waiting for ingress-nginx controller pod to be ready..."
           if ! kubectl rollout status deployment ingress-nginx-controller -n ingress-nginx --timeout=10m; then
