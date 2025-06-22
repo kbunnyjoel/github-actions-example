@@ -1317,18 +1317,24 @@ jobs:
             echo "Processing app: $app"
             # Insert deployment logic here
           done
+      
+      - name: Set environment variables
+        run: |
+          cd terraform
+          ACM_CERT_ARN=$(terraform output -raw github_actions_example_certificate_arn)
+          ALB_CERT_ARN=$(terraform output -raw acm_certificate_arn)
+          echo "ACM_CERT_ARN=$ACM_CERT_ARN" >> $GITHUB_ENV
+          echo "ALB_CERT_ARN=$ALB_CERT_ARN" >> $GITHUB
 
       - name: Generate manifests
         run: |
-          cd terraform
           APPS_JSON='${{ steps.detect.outputs.apps }}'
 
           # Use repository variables or defaults
           DOCKER_USERNAME="${{ secrets.DOCKER_USERNAME }}"
           DEPLOYMENT_NAMESPACE="${{ env.APP_NAME }}"
           IMAGE_NAME="${{ env.APP_NAME }}"
-          ACM_CERT_ARN=$(terraform output -raw github_actions_example_certificate_arn)
-          ALB_CERT_ARN=$(terraform output -raw acm_certificate_arn)
+        
           echo "ACM CERT ARN: $ACM_CERT_ARN"
           # Get AWS Account ID and Region for ECR image repository
           AWS_ACCOUNT_ID=$(aws sts get-caller-identity --query "Account" --output text)
@@ -1350,7 +1356,7 @@ jobs:
               -D image_repository="$IMAGE_REPOSITORY" \
               -D image_tag="$IMAGE_TAG" \
               -D deployment_namespace="$DEPLOYMENT_NAMESPACE" \
-              -D acm_certificate_arn="$ACM_CERT_ARN,$ALB_CERT_ARN" \
+              -D acm_certificate_arn="${{ env.ACM_CERTIFICATE_ARN }},${{ env.ALB_CERT_ARN" }}\
               -D aws_account_id="$AWS_ACCOUNT_ID" \
               -D aws_region="$AWS_REGION" \
               > "$OUTFILE"
