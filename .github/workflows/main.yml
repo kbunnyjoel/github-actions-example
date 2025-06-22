@@ -127,7 +127,12 @@ jobs:
       # Install Trivy
       - name: Install Trivy
         run: |
-          wget -qO trivy.tar.gz https://github.com/aquasecurity/trivy/releases/latest/download/trivy_0.51.1_Linux-ARM64.tar.gz
+          uname_arch=$(uname -m)
+          if [ "$uname_arch" = "aarch64" ]; then
+            wget -qO trivy.tar.gz https://github.com/aquasecurity/trivy/releases/latest/download/trivy_0.51.1_Linux-ARM64.tar.gz
+          else
+            wget -qO trivy.tar.gz https://github.com/aquasecurity/trivy/releases/latest/download/trivy_0.51.1_Linux-64bit.tar.gz
+          fi
           tar -xzf trivy.tar.gz
           sudo mv trivy /usr/local/bin/
           trivy --version
