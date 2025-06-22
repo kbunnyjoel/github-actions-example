@@ -125,23 +125,25 @@ jobs:
 
 
       # Install Trivy (architecture detection, x86_64 and ARM64 support)
-      - name: Detect architecture
-        id: arch
+      - name: Set architecture and install Trivy
         run: |
-          echo "ARCH=$(uname -m)" >> $GITHUB_ENV
+          ARCH=$(uname -m)
+          echo "Detected architecture: $ARCH"
 
-      - name: Install Trivy
-        run: |
-          if [ "${{ env.ARCH }}" == "x86_64" ]; then
-            wget -qO trivy.tar.gz https://github.com/aquasecurity/trivy/releases/latest/download/trivy_0.51.1_Linux-64bit.tar.gz
-          elif [ "${{ env.ARCH }}" == "aarch64" ] || [ "${{ env.ARCH }}" == "arm64" ]; then
-            wget -qO trivy.tar.gz https://github.com/aquasecurity/trivy/releases/latest/download/trivy_0.51.1_Linux-ARM64.tar.gz
+          if [ "$ARCH" = "x86_64" ]; then
+            TRIVY_URL="https://github.com/aquasecurity/trivy/releases/latest/download/trivy_0.51.1_Linux-64bit.tar.gz"
+          elif [ "$ARCH" = "aarch64" ] || [ "$ARCH" = "arm64" ]; then
+            TRIVY_URL="https://github.com/aquasecurity/trivy/releases/latest/download/trivy_0.51.1_Linux-ARM64.tar.gz"
           else
-            echo "Unsupported architecture: ${{ env.ARCH }}"
+            echo "Unsupported architecture: $ARCH"
             exit 1
           fi
-          tar zxvf trivy.tar.gz
+
+          echo "Downloading Trivy from: $TRIVY_URL"
+          wget -O trivy.tar.gz "$TRIVY_URL"
+          tar zxvf trivy.tar.gz trivy
           sudo mv trivy /usr/local/bin/
+          trivy --version
 
       # Run Trivy scan on Docker image
       - name: Run Trivy scan on Docker image
@@ -152,13 +154,6 @@ jobs:
       - name: Trivy Remote Scan
         run: |
           echo "Running Trivy scan on remote Docker image"
-          if [ "${{ env.ARCH }}" = "aarch64" ] || [ "${{ env.ARCH }}" = "arm64" ]; then
-            wget -qO trivy.tar.gz https://github.com/aquasecurity/trivy/releases/latest/download/trivy_0.51.1_Linux-ARM64.tar.gz
-          else
-            wget -qO trivy.tar.gz https://github.com/aquasecurity/trivy/releases/latest/download/trivy_0.51.1_Linux-64bit.tar.gz
-          fi
-          tar zxvf trivy.tar.gz
-          sudo mv trivy /usr/local/bin/
           IMAGE_NAME=ghcr.io/${{ github.repository }}:${{ github.sha }}
           trivy image --exit-code 1 --severity CRITICAL,HIGH "$IMAGE_NAME"
 
