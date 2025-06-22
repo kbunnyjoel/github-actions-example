@@ -203,8 +203,8 @@ module "eks" {
       desired_size      = 1
       min_size          = 1
       max_size          = 3
-      instance_types    = ["t3a.large", "c6a.large"]
-      ami_type          = "AL2_x86_64"
+      instance_types    = ["t4g.large", "c6g.large"]
+      ami_type          = "AL2_ARM_64"
       capacity_type     = "SPOT"
       key_name          = aws_key_pair.deployment_key.key_name
       enable_monitoring = true
@@ -242,7 +242,7 @@ module "eks" {
       # Add tags specific to this node group
       tags = {
         "k8s.io/cluster-autoscaler/enabled"             = "true"
-        "k8s.io/cluster-autoscaler/${var.cluster_name}" = "true"
+        "k8s.io/cluster-autoscaler/${var.cluster_name}" = "owned"
         "NodeGroup"                                     = "spot-nodes"
       }
     }

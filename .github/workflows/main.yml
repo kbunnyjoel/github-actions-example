@@ -1513,22 +1513,40 @@ jobs:
       - name: Verify DNS record for application
         run: |
           APP_TARGET_HOSTNAME="github-actions-example.bunnycloud.xyz"
-          NGINX_LB_HOSTNAME=$(kubectl get svc -n ingress-nginx ingress-nginx-controller -o jsonpath='{.status.loadBalancer.ingress[0].hostname}' 2>/dev/null)
-          
-          if [ -z "$NGINX_LB_HOSTNAME" ]; then
-            echo "Error: Could not find NGINX Ingress Controller LoadBalancer hostname."
-            kubectl get svc -n ingress-nginx
+
+          # Get the hostname of the ALB created for the application's Ingress
+          APP_ALB_HOSTNAME=""
+          MAX_RETRIES=30
+          SLEEP_BETWEEN=10
+          for i in $(seq 1 $MAX_RETRIES); do
+            APP_ALB_HOSTNAME=$(kubectl get ingress github-actions-example -n github-actions-example -o jsonpath='{.status.loadBalancer.ingress[0].hostname}' 2>/dev/null)
+            if [ -n "$APP_ALB_HOSTNAME" ]; then
+              echo "✅ Application ALB hostname found: $APP_ALB_HOSTNAME"
+              break
+            fi
+            echo "⏳ Attempt $i/$MAX_RETRIES: Waiting for Application ALB hostname..."
+            sleep $SLEEP_BETWEEN
+            if [ $i -eq $MAX_RETRIES ]; then
+              echo "❌ Error: Application ALB hostname not found after waiting."
+              kubectl get ingress github-actions-example -n github-actions-example -o yaml || true
+              exit 1
+            fi
+          done
+
+          if [ -z "$APP_ALB_HOSTNAME" ]; then
+            echo "Error: Could not find Application ALB hostname."
+            kubectl get ingress github-actions-example -n github-actions-example
             exit 1
           fi
           
-          echo "NGINX LoadBalancer hostname: $NGINX_LB_HOSTNAME"
+          echo "Application ALB hostname: $APP_ALB_HOSTNAME"
           echo "Checking DNS CNAME record for $APP_TARGET_HOSTNAME..."
           
           echo "Waiting for DNS CNAME record propagation (ExternalDNS should create this)..."
 
           for i in {1..12}; do
             RESOLVED_CNAME=$(dig +short -t CNAME $APP_TARGET_HOSTNAME @8.8.8.8 | sed 's/\.$//')
-            EXPECTED_CNAME=$(echo $NGINX_LB_HOSTNAME | sed 's/\.$//')
+            EXPECTED_CNAME=$(echo $APP_ALB_HOSTNAME | sed 's/\.$//')
 
             if [ -n "$RESOLVED_CNAME" ] && [ "$RESOLVED_CNAME" = "$EXPECTED_CNAME" ]; then
               echo "✅ DNS CNAME record for $APP_TARGET_HOSTNAME propagated and correctly points to $EXPECTED_CNAME."
@@ -1538,14 +1556,14 @@ jobs:
             fi
             echo "Waiting for DNS CNAME propagation for $APP_TARGET_HOSTNAME... Attempt $i/12."
             echo "   App resolved CNAME: '$RESOLVED_CNAME'"
-            echo "   ELB expected CNAME: '$EXPECTED_CNAME'"
+            echo "   ALB expected CNAME: '$EXPECTED_CNAME'"
             
             if [ $i -eq 12 ]; then
               echo "Warning: DNS CNAME propagation for $APP_TARGET_HOSTNAME timed out or CNAME mismatch."
               echo "Final DNS CNAME record resolution check for $APP_TARGET_HOSTNAME (using 8.8.8.8):"
               dig -t CNAME $APP_TARGET_HOSTNAME @8.8.8.8
-              echo "Final DNS CNAME record resolution check for ELB $NGINX_LB_HOSTNAME (using 8.8.8.8):"
-              dig -t CNAME $NGINX_LB_HOSTNAME @8.8.8.8
+              echo "Final DNS CNAME record resolution check for ALB $APP_ALB_HOSTNAME (using 8.8.8.8):"
+              dig -t CNAME $APP_ALB_HOSTNAME @8.8.8.8
               echo "Hint: Check ExternalDNS logs: kubectl logs -n external-dns -l app.kubernetes.io/name=external-dns --tail=200"
               echo "Hint: Check Ingress annotations: kubectl get ingress github-actions-example -n github-actions-example -o yaml"
             fi
@@ -1559,13 +1577,19 @@ jobs:
       - name: Verify application accessibility
         run: |
           APP_HOSTNAME="github-actions-example.bunnycloud.xyz"
-          NGINX_LB_HOSTNAME=$(kubectl get svc -n ingress-nginx ingress-nginx-controller -o jsonpath='{.status.loadBalancer.ingress[0].hostname}' 2>/dev/null)
-          
+          # Use the application's ALB hostname for direct testing
+          APP_ALB_HOSTNAME=$(kubectl get ingress github-actions-example -n github-actions-example -o jsonpath='{.status.loadBalancer.ingress[0].hostname}' 2>/dev/null)
+
+          if [ -z "$APP_ALB_HOSTNAME" ]; then
+            echo "Error: Could not find Application ALB hostname for direct connection test."
+            exit 1
+          fi
+
           echo "Testing DNS resolution for $APP_HOSTNAME..."
-          nslookup $APP_HOSTNAME || echo "DNS resolution failed"
+          nslookup $APP_HOSTNAME || { echo "DNS resolution failed for $APP_HOSTNAME"; exit 1; }
           
-          echo "Testing direct connection to load balancer..."
-          curl -v --connect-timeout 10 -k "http://$NGINX_LB_HOSTNAME" || echo "Connection to load balancer failed"
+          echo "Testing direct connection to application ALB: $APP_ALB_HOSTNAME..."
+          curl -v --connect-timeout 10 -k "http://$APP_ALB_HOSTNAME" || { echo "Connection to application ALB failed"; exit 1; }
           
           # Wait longer for DNS and ingress to be fully configured
           echo "Waiting for DNS and ingress to be fully configured..."

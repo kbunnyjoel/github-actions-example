@@ -85,6 +85,7 @@ resource "aws_iam_policy" "cluster_autoscaler_policy" {
           "autoscaling:DescribeAutoScalingGroups",
           "autoscaling:DescribeAutoScalingInstances",
           "autoscaling:DescribeLaunchConfigurations",
+          "autoscaling:DescribeLaunchTemplateVersions",
           "autoscaling:DescribeTags",
           "autoscaling:DescribeLaunchTemplates" # Added for launch templates
         ],
