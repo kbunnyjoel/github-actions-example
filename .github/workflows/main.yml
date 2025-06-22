@@ -126,31 +126,18 @@ jobs:
       # Install Trivy (architecture detection, x86_64 and ARM64 support)
       - name: Install Trivy
         run: |
-          ARCH=$(uname -m)
-
-          if [ "$ARCH" = "aarch64" ]; then
-            ARCH_TYPE="ARM64"
-          elif [ "$ARCH" = "x86_64" ]; then
-            ARCH_TYPE="64bit"
+          arch=$(uname -m)
+          if [ "$arch" == "x86_64" ]; then
+            wget -qO trivy.tar.gz https://github.com/aquasecurity/trivy/releases/latest/download/trivy_0.51.1_Linux-64bit.tar.gz
+          elif [ "$arch" == "aarch64" ] || [ "$arch" == "arm64" ]; then
+            wget -qO trivy.tar.gz https://github.com/aquasecurity/trivy/releases/latest/download/trivy_0.51.1_Linux-ARM64.tar.gz
           else
-            echo "Unsupported architecture: $ARCH"
+            echo "Unsupported architecture: $arch"
             exit 1
           fi
 
-          echo "Installing Trivy for architecture: $ARCH_TYPE"
-
-          TRIVY_VERSION="0.51.1"
-          TRIVY_TAR="trivy_${TRIVY_VERSION}_Linux-${ARCH_TYPE}.tar.gz"
-          TRIVY_URL="https://github.com/aquasecurity/trivy/releases/download/v${TRIVY_VERSION}/${TRIVY_TAR}"
-
-          wget -O trivy.tar.gz "$TRIVY_URL" || {
-            echo "❌ Failed to download Trivy binary from $TRIVY_URL"
-            exit 1
-          }
-
-          tar zxvf trivy.tar.gz trivy
+          tar zxvf trivy.tar.gz
           sudo mv trivy /usr/local/bin/
-          trivy --version
 
       # Run Trivy scan on Docker image
       - name: Run Trivy scan on Docker image
