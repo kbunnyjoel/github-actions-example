@@ -477,7 +477,7 @@ jobs:
             --set serviceAccount.name=cluster-autoscaler \
             --set fullnameOverride=cluster-autoscaler \
             --set rbac.serviceAccount.annotations."eks\.amazonaws\.com/role-arn"=${{ env.CLUSTER_AUTOSCALER_ROLE_ARN }} \
-            --set extraArgs.expander=most-pods \        
+            --set extraArgs.expander=most-pods    
           kubectl rollout restart deployment cluster-autoscaler -n kube-system
 
       - name: Install AWS Load Balancer Controller
