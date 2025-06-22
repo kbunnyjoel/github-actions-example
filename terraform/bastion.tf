@@ -116,6 +116,6 @@ resource "aws_route53_record" "bastion_dns" {
 
   lifecycle {
     ignore_changes  = [records]
-    prevent_destroy = true
+    create_before_destroy = true
   }
 }
