@@ -501,7 +501,7 @@ jobs:
             helm upgrade --install aws-load-balancer-controller eks/aws-load-balancer-controller \
               -n kube-system \
               --set clusterName=${{ env.APP_NAME }} \
-              --set serviceAccount.create=true \
+              --set serviceAccount.how create=true \
               --set serviceAccount.name=aws-load-balancer-controller \
               --set serviceAccount.annotations."eks\.amazonaws\.com/role-arn"="${{ env.ALB_CONTROLLER_ROLE_ARN }}" \
               --set region=${{ env.AWS_REGION }} \
@@ -1274,6 +1274,22 @@ jobs:
       pull-requests: write
     steps:
       - uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v3
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ap-southeast-2
+          
+      - name: Install Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "1.11.0" # Example: Use a more recent stable version
+
+      - name: Init Terraform
+        working-directory: terraform
+        run: terraform init
       # This job needs ACM_CERT_ARN and NGINX_LB_HOSTNAME from deploy-argocd job
       - name: Set up Python and install Jinja2
         run: |
@@ -1304,17 +1320,16 @@ jobs:
 
       - name: Generate manifests
         run: |
+          cd terraform
           APPS_JSON='${{ steps.detect.outputs.apps }}'
 
           # Use repository variables or defaults
           DOCKER_USERNAME="${{ secrets.DOCKER_USERNAME }}"
           DEPLOYMENT_NAMESPACE="${{ env.APP_NAME }}"
           IMAGE_NAME="${{ env.APP_NAME }}"
-          ACM_CERT_ARN="${{ needs.deploy-argocd.outputs.acm-cert-arn }}"
-          NGINX_LB_HOSTNAME="${{ needs.deploy-argocd.outputs.nginx-lb-hostname }}"
-          echo "NGINX LB Hostname: ${{ needs.deploy-argocd.outputs.nginx-lb-hostname }}"
+          ACM_CERT_ARN=$(terraform output -raw github_actions_example_certificate_arn)
+          ALB_CERT_ARN=$(terraform output -raw acm_certificate_arn)
           echo "ACM CERT ARN: $ACM_CERT_ARN"
-          echo "NGINX LB Hostname: $NGINX_LB_HOSTNAME"
           # Get AWS Account ID and Region for ECR image repository
           AWS_ACCOUNT_ID=$(aws sts get-caller-identity --query "Account" --output text)
           AWS_REGION="${{ env.AWS_REGION }}"
@@ -1335,7 +1350,7 @@ jobs:
               -D image_repository="$IMAGE_REPOSITORY" \
               -D image_tag="$IMAGE_TAG" \
               -D deployment_namespace="$DEPLOYMENT_NAMESPACE" \
-              -D acm_certificate_arn="$ACM_CERT_ARN" \
+              -D acm_certificate_arn="$ACM_CERT_ARN,$ALB_CERT_ARN" \
               -D aws_account_id="$AWS_ACCOUNT_ID" \
               -D aws_region="$AWS_REGION" \
               > "$OUTFILE"

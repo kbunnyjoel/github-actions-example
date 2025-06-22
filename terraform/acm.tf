@@ -50,6 +50,21 @@ resource "aws_acm_certificate" "wildcard_certificate_ap_southeast_2" {
   }
 }
 
+resource "aws_acm_certificate" "github_actions_example_certificate_ap_southeast_2" {
+  domain_name       = "github-actions-example.bunnycloud.xyz"
+  validation_method = "DNS"
+
+  tags = {
+    Environment = "dev"
+    Purpose     = "EKS ALB for GitHub Actions Example"
+    Region      = var.aws_region
+  }
+
+  lifecycle {
+    create_before_destroy = true
+  }
+}
+
 # DNS validation record for the ap-southeast-2 certificate
 resource "aws_route53_record" "cert_validation_ap_southeast_2" {
   count           = var.create_dns_records ? 1 : 0
@@ -62,6 +77,17 @@ resource "aws_route53_record" "cert_validation_ap_southeast_2" {
   ttl     = 60
 }
 
+resource "aws_route53_record" "cert_validation_github_actions_example_ap_southeast_2" {
+  count           = var.create_dns_records ? 1 : 0
+  allow_overwrite = true
+
+  zone_id = aws_route53_zone.main.zone_id
+  name    = element(aws_acm_certificate.github_actions_example_certificate_ap_southeast_2.domain_validation_options.*.resource_record_name, 0)
+  type    = element(aws_acm_certificate.github_actions_example_certificate_ap_southeast_2.domain_validation_options.*.resource_record_type, 0)
+  records = [element(aws_acm_certificate.github_actions_example_certificate_ap_southeast_2.domain_validation_options.*.resource_record_value, 0)]
+  ttl     = 60
+}
+
 # Waits for the ap-southeast-2 ACM certificate to be validated.
 resource "aws_acm_certificate_validation" "acm_cert_validation_ap_southeast_2" {
   count = var.create_dns_records ? 1 : 0
@@ -69,4 +95,11 @@ resource "aws_acm_certificate_validation" "acm_cert_validation_ap_southeast_2" {
 
   certificate_arn         = aws_acm_certificate.wildcard_certificate_ap_southeast_2.arn
   validation_record_fqdns = [for record in aws_route53_record.cert_validation_ap_southeast_2 : record.fqdn]
+}
+
+resource "aws_acm_certificate_validation" "acm_cert_validation_github_actions_example_ap_southeast_2" {
+  count = var.create_dns_records ? 1 : 0
+
+  certificate_arn         = aws_acm_certificate.github_actions_example_certificate_ap_southeast_2.arn
+  validation_record_fqdns = [for record in aws_route53_record.cert_validation_github_actions_example_ap_southeast_2 : record.fqdn]
 }
