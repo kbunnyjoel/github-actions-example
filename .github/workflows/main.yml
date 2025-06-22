@@ -588,6 +588,16 @@ jobs:
           echo "Helm release: $RELEASE_NAME"
           echo "Helm chart: $CHART_NAME"
 
+          # --- Insert stuck release check/rollback logic BEFORE the retry loop ---
+          echo "🔍 Checking Helm release status before upgrade..."
+          helm_status=$(helm status ingress-nginx -n ingress-nginx --output json || echo "")
+
+          if echo "$helm_status" | grep -q '"status":"pending'; then
+            echo "⚠️ Helm release is stuck in a pending state. Attempting rollback..."
+            helm rollback ingress-nginx 0 -n ingress-nginx || echo "⚠️ Rollback failed or no revisions exist"
+          fi
+          # --- End stuck release check ---
+
           for i in {1..5}; do
             echo "Attempt $i: helm upgrade $RELEASE_NAME $CHART_NAME"
             helm upgrade ingress-nginx ingress-nginx/ingress-nginx --install \
