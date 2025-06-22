@@ -115,7 +115,7 @@ resource "aws_route53_record" "bastion_dns" {
   records = [aws_eip.bastion_eip.public_ip]
 
   lifecycle {
-    ignore_changes = [records]
+    ignore_changes  = [records]
     prevent_destroy = true
   }
 }
