@@ -125,15 +125,19 @@ jobs:
 
 
       # Install Trivy (architecture detection, x86_64 and ARM64 support)
+      - name: Detect architecture
+        id: arch
+        run: |
+          echo "ARCH=$(uname -m)" >> $GITHUB_ENV
+
       - name: Install Trivy
         run: |
-          arch=$(uname -m)
-          if [ "$arch" == "x86_64" ]; then
+          if [ "${{ env.ARCH }}" == "x86_64" ]; then
             wget -qO trivy.tar.gz https://github.com/aquasecurity/trivy/releases/latest/download/trivy_0.51.1_Linux-64bit.tar.gz
-          elif [ "$arch" == "aarch64" ] || [ "$arch" == "arm64" ]; then
+          elif [ "${{ env.ARCH }}" == "aarch64" ] || [ "${{ env.ARCH }}" == "arm64" ]; then
             wget -qO trivy.tar.gz https://github.com/aquasecurity/trivy/releases/latest/download/trivy_0.51.1_Linux-ARM64.tar.gz
           else
-            echo "Unsupported architecture: $arch"
+            echo "Unsupported architecture: ${{ env.ARCH }}"
             exit 1
           fi
           tar zxvf trivy.tar.gz
@@ -148,8 +152,7 @@ jobs:
       - name: Trivy Remote Scan
         run: |
           echo "Running Trivy scan on remote Docker image"
-          ARCH=$(uname -m)
-          if [ "$ARCH" = "aarch64" ] || [ "$ARCH" = "arm64" ]; then
+          if [ "${{ env.ARCH }}" = "aarch64" ] || [ "${{ env.ARCH }}" = "arm64" ]; then
             wget -qO trivy.tar.gz https://github.com/aquasecurity/trivy/releases/latest/download/trivy_0.51.1_Linux-ARM64.tar.gz
           else
             wget -qO trivy.tar.gz https://github.com/aquasecurity/trivy/releases/latest/download/trivy_0.51.1_Linux-64bit.tar.gz
