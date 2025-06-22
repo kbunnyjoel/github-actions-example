@@ -52,3 +52,27 @@ else
     --change-batch file://delete-batch.json
   echo "✅ Deletion request submitted."
 fi
+
+echo "🔍 Deleting Load Balancers..."
+for lb in $(aws elbv2 describe-load-balancers --query 'LoadBalancers[*].LoadBalancerArn' --output text); do
+  echo "🗑️ Deleting Load Balancer: $lb"
+  aws elbv2 delete-load-balancer --load-balancer-arn "$lb"
+done
+
+echo "🔍 Deleting NAT Gateways..."
+for nat in $(aws ec2 describe-nat-gateways --query 'NatGateways[*].NatGatewayId' --output text); do
+  echo "🗑️ Deleting NAT Gateway: $nat"
+  aws ec2 delete-nat-gateway --nat-gateway-id "$nat"
+done
+
+echo "🔍 Releasing Elastic IPs..."
+for alloc_id in $(aws ec2 describe-addresses --query 'Addresses[*].AllocationId' --output text); do
+  echo "🗑️ Releasing Elastic IP: $alloc_id"
+  aws ec2 release-address --allocation-id "$alloc_id"
+done
+
+echo "🔍 Deleting Network Interfaces..."
+for eni in $(aws ec2 describe-network-interfaces --query 'NetworkInterfaces[*].NetworkInterfaceId' --output text); do
+  echo "🗑️ Deleting Network Interface: $eni"
+  aws ec2 delete-network-interface --network-interface-id "$eni"
+done
