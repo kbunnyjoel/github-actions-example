@@ -477,8 +477,7 @@ jobs:
             --set serviceAccount.name=cluster-autoscaler \
             --set fullnameOverride=cluster-autoscaler \
             --set rbac.serviceAccount.annotations."eks\.amazonaws\.com/role-arn"=${{ env.CLUSTER_AUTOSCALER_ROLE_ARN }} \
-            --set extraArgs.expander=most-pods \
-            --force
+            --set extraArgs.expander=most-pods \        
           kubectl rollout restart deployment cluster-autoscaler -n kube-system
 
       - name: Install AWS Load Balancer Controller
@@ -497,8 +496,7 @@ jobs:
               --set region=${{ env.AWS_REGION }} \
               --set vpcId=${{ env.VPC_ID }} \
               --timeout 20m \
-              --wait \
-              --force
+              --wait          
             kubectl rollout status deployment aws-load-balancer-controller -n kube-system --timeout=5m # Explicitly check rollout status
             echo "Giving AWS Load Balancer Controller webhook a moment to fully initialize..."
             sleep 15 # Wait for webhook to be ready before other resources are applied
@@ -630,7 +628,6 @@ jobs:
               --version 4.10.1 \
               --timeout 10m \
               # --wait \
-              --force \
               && {
                 echo "✅ Helm upgrade succeeded. Inspecting release..."
                 helm get all "$RELEASE_NAME" -n ingress-nginx || echo "Helm release not found"
@@ -805,8 +802,7 @@ jobs:
             --values argocd-install-values.yaml \
             --version 6.11.1 \
             --timeout 10m \
-            --wait \
-            --force
+            --wait
           # Verify the annotation was set correctly
           kubectl get serviceaccount argocd-server -n argocd -o yaml
           # Print the current argocd-cm ConfigMap after Helm install/upgrade for verification
@@ -1107,8 +1103,7 @@ jobs:
             --set logLevel=debug \
             --version 1.14.5 \
             --timeout 10m \
-            --wait \
-            --force
+            --wait 
           kubectl rollout restart deployment external-dns -n external-dns
           echo "✅ ExternalDNS installation complete."
 
@@ -1145,8 +1140,7 @@ jobs:
               --set logLevel=debug \
               --version 1.14.5 \
               --timeout 10m \
-              --wait \
-              --force
+              --wait
           else
             echo "ExternalDNS is already deployed and healthy."
           fi
