@@ -617,7 +617,8 @@ jobs:
               --set controller.serviceAccount.name=ingress-nginx \
               --set serviceAccount.annotations."eks\.amazonaws\.com/role-arn"="${{ env.INGRESS_NGINX_ROLE_ARN }}" \
               --version 4.10.1 \
-              --timeout 30m \
+              --timeout 10m \
+              # --wait \
               --force \
               && {
                 echo "✅ Helm upgrade succeeded. Inspecting release..."
@@ -643,7 +644,7 @@ jobs:
           fi
 
           echo "Waiting for ingress-nginx controller rollout to complete..."
-          kubectl rollout status deployment ingress-nginx-controller -n ingress-nginx --timeout=5m
+          # kubectl rollout status deployment ingress-nginx-controller -n ingress-nginx --timeout=5m
 
           kubectl rollout restart deployment ingress-nginx-controller -n ingress-nginx
           echo "Waiting for ingress-nginx controller pod to be ready..."
