@@ -732,7 +732,9 @@ jobs:
       
       - name: Get ArgoCD Role ARN
         id: tf_output
-        run: echo "ARGOCD_ROLE_ARN=$(terraform output -raw argocd_role_arn)" >> "$GITHUB_ENV"
+        run: |
+          cd terraform
+          echo "ARGOCD_ROLE_ARN=$(terraform output -raw argocd_role_arn)" >> "$GITHUB_ENV"
 
       - name: Prepare ArgoCD Helm values file
         run: |
