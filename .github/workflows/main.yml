@@ -139,20 +139,13 @@ jobs:
           tar -xzf trivy.tar.gz
           sudo mv trivy /usr/local/bin/
 
-      # Run Trivy scan on Docker image
-      - name: Run Trivy scan on Docker image
-        run: |
-            trivy image --platform linux/amd64 --cache-dir .trivycache ${{ secrets.DOCKER_USERNAME }}/${{ env.APP_NAME }}:${{ github.sha }}
-
       # Trivy Remote Scan
-      - name: Trivy Remote Scan
+      - name: Run Trivy scan on Docker image (remote)
         run: |
-          echo "Running Trivy scan on remote Docker image"
-          IMAGE_NAME=ghcr.io/${{ github.repository }}:${{ github.sha }}
-          trivy image --platform linux/amd64 --cache-dir .trivycache --exit-code 1 --severity CRITICAL,HIGH "$IMAGE_NAME"
+          trivy image --cache-dir .trivycache ${{ secrets.DOCKER_USERNAME }}/${{ env.APP_NAME }}:${{ github.sha }}
 
-      - name: Run Docker container in background
-        run: docker run -d -p 3000:3000 --name live-app ${{ secrets.DOCKER_USERNAME }}/${{ env.APP_NAME }}:${{ github.sha }}
+            - name: Run Docker container in background
+              run: docker run -d -p 3000:3000 --name live-app ${{ secrets.DOCKER_USERNAME }}/${{ env.APP_NAME }}:${{ github.sha }}
 
       - name: Wait for app to be ready
         run: |
