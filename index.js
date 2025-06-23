@@ -54,7 +54,7 @@ app.use((req, res, next) => {
   console.log('Received API Key:', apiKey);
   console.log('Expected API Key:', expectedKey);
 
-  const isExempt = exemptPaths.some(p => req.path.startsWith(p));
+  const isExempt = exemptPaths.some(p => req.path === p);
   if (isExempt) {
     return next();
   }
