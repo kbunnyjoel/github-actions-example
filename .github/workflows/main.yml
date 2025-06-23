@@ -589,6 +589,8 @@ jobs:
         run: |
           helm uninstall argocd -n argocd || true
           helm uninstall ingress-nginx -n ingress-nginx || true
+          echo "Waiting for NGINX Ingress Controller resources to be removed..."
+          kubectl wait --for=delete pod -l app.kubernetes.io/name=ingress-nginx -n ingress-nginx --timeout=90s || true
 
       - name: Install ingress-nginx Ingress Controller with SSL
         run: |
@@ -599,6 +601,20 @@ jobs:
             --set controller.service.annotations."service\.beta\.kubernetes\.io/aws-load-balancer-ssl-cert"=arn:aws:acm:ap-southeast-2:806210429052:certificate/5492a6f1-c2fb-4903-b2a8-c593f1d8823e \
             --set controller.service.annotations."service\.beta\.kubernetes\.io/aws-load-balancer-ssl-ports"="https" \
             --set controller.service.targetPorts.https=http
+          echo "Waiting for NGINX Ingress Controller ELB hostname..."
+          for i in {1..20}; do
+            HOSTNAME=$(kubectl get svc -n ingress-nginx ingress-nginx-controller -o jsonpath='{.status.loadBalancer.ingress[0].hostname}' 2>/dev/null)
+            if [[ -n "$HOSTNAME" ]]; then
+              echo "ELB Hostname: $HOSTNAME"
+              break
+            fi
+            echo "Waiting for ELB hostname to be assigned... ($i)"
+            sleep 15
+          done
+          if [[ -z "$HOSTNAME" ]]; then
+            echo "Error: ELB hostname was not assigned in time."
+            exit 1
+          fi
 
       - name: Reinstall ArgoCD
         run: |
