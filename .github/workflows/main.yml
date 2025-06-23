@@ -642,6 +642,9 @@ jobs:
               --set controller.serviceAccount.create=true \
               --set controller.serviceAccount.name=ingress-nginx \
               --set serviceAccount.annotations."eks\.amazonaws\.com/role-arn"="${{ env.INGRESS_NGINX_ROLE_ARN }}" \
+               --set defaultBackend.enabled=true \
+              --set defaultBackend.image.repository=k8s.gcr.io/defaultbackend-amd64 \
+              --set defaultBackend.image.tag=1.5 \
               --version 4.10.1 \
               --timeout 10m \
               --wait \
