@@ -616,17 +616,6 @@ jobs:
             exit 1
           fi
 
-      - name: Reinstall ArgoCD
-        run: |
-          helm upgrade --install argocd argo/argo-cd \
-            --namespace argocd --create-namespace \
-            --set server.ingress.enabled=true \
-            --set server.ingress.hostname=argocd.bunnycloud.xyz \
-            --set server.ingress.ingressClassName=nginx \
-            --set server.ingress.annotations."kubernetes\.io/ingress\.class"=nginx \
-            --set server.ingress.annotations."nginx\.ingress\.kubernetes\.io/backend-protocol"=HTTPS \
-            --set server.ingress.annotations."nginx\.ingress\.kubernetes\.io/ssl-redirect"=false
-
       - name: Get NGINX Ingress Controller LB Hostname
         id: get-nginx-hostname
         run: |

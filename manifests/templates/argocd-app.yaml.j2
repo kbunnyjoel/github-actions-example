@@ -53,6 +53,7 @@ spec:
             alb.ingress.kubernetes.io/certificate-arn: "{{ acm_certificate_arn }}" # Crucial for HTTPS on ALB
             alb.ingress.kubernetes.io/target-type: ip # Good for EKS, especially Fargate
             alb.ingress.kubernetes.io/healthcheck-path: "/status"
+            alb.ingress.kubernetes.io/ssl-redirect: '443'
             alb.ingress.kubernetes.io/healthcheck-headers: '[{"name":"x-api-key","value":"test123"}]'
             alb.ingress.kubernetes.io/backend-protocol: HTTP # ALB terminates SSL, forwards HTTP
             alb.ingress.kubernetes.io/group.name: "{{ app_name }}"
