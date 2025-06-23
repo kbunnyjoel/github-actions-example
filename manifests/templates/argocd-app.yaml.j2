@@ -55,6 +55,7 @@ spec:
             alb.ingress.kubernetes.io/healthcheck-path: "/status"
             alb.ingress.kubernetes.io/healthcheck-headers: '[{"name":"x-api-key","value":"test123"}]'
             alb.ingress.kubernetes.io/backend-protocol: HTTP # ALB terminates SSL, forwards HTTP
+            alb.ingress.kubernetes.io/group.name: "{{ app_name }}"
             external-dns.alpha.kubernetes.io/ttl: "60"
             external-dns.alpha.kubernetes.io/hostname: "{{ app_name }}.bunnycloud.xyz."
 
