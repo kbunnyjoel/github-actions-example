@@ -828,6 +828,42 @@ jobs:
           kubectl -n argocd get ingress argocd-server -o yaml || echo "ArgoCD Ingress 'argocd-server' not found."
       - name: Patch ArgoCD resources with Helm ownership
         run: bash k8s/argocd/patch-argocd-helm-ownership.sh
+
+      # Verify Ingress and CNAME match (after deployment, before TLS/domain-dependent checks)
+      - name: Verify Ingress and CNAME match
+        run: |
+          NAMESPACE="argocd"
+          INGRESS_NAME="argocd-server"
+          EXPECTED_DOMAIN=$(kubectl get ingress -n argocd argocd-server -o jsonpath="{.spec.rules[0].host}")
+
+          INGRESS_LB=$(kubectl -n "$NAMESPACE" get ingress "$INGRESS_NAME" -o jsonpath='{.status.loadBalancer.ingress[0].hostname}')
+
+          if [[ -z "$INGRESS_LB" ]]; then
+            echo "❌ Could not fetch LoadBalancer hostname from Ingress '$INGRESS_NAME' in namespace '$NAMESPACE'."
+            exit 1
+          fi
+
+          CNAME_RECORD=$(dig +short "$EXPECTED_DOMAIN" CNAME)
+
+          if [[ -z "$CNAME_RECORD" ]]; then
+            echo "❌ No CNAME record found for $EXPECTED_DOMAIN"
+            exit 2
+          fi
+
+          # Normalize trailing dots
+          INGRESS_LB=$(echo "$INGRESS_LB" | sed 's/\.$//')
+          CNAME_RECORD=$(echo "$CNAME_RECORD" | sed 's/\.$//')
+
+          if [[ "$CNAME_RECORD" == "$INGRESS_LB" ]]; then
+            echo "✅ Ingress and DNS CNAME match:"
+            echo "    Ingress: $INGRESS_LB"
+            echo "    DNS:     $CNAME_RECORD"
+          else
+            echo "❌ MISMATCH DETECTED!"
+            echo "    Ingress: $INGRESS_LB"
+            echo "    DNS:     $CNAME_RECORD"
+            exit 3
+          fi
   
       - name: Validate ArgoCD IAM role integration
         run: |
