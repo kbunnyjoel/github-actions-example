@@ -30,6 +30,8 @@ spec:
             secretKeyRef:
               name: api-key-secret
               key: apiKey
+        - name: NODE_ENV
+          value: production
         {{- with .Values.readinessProbe }}
         readinessProbe:
           {{- toYaml . | nindent 10 }}
