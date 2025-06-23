@@ -1241,37 +1241,7 @@ jobs:
             echo "Processing app: $app"
             # Insert deployment logic here
           done
-
-      - name: Patch github-actions-example ingress for ALB group and correct host
-        run: |
-          INGRESS_NAME="argocd-server"
-          NAMESPACE="argocd"
-          GROUP_ANNOTATION_KEY="alb.ingress.kubernetes.io/group.name"
-          GROUP_ANNOTATION_VALUE="github-actions-example"
-          HOST_NAME="github-actions-example.bunnycloud.xyz"
-
-          # Wait for the ingress to exist
-          for i in {1..30}; do
-            if kubectl get ingress "$INGRESS_NAME" -n "$NAMESPACE" > /dev/null 2>&1; then
-              echo "Ingress $INGRESS_NAME found in namespace $NAMESPACE"
-              break
-            fi
-            if [ $i -eq 30 ]; then
-              echo "Error: Ingress $INGRESS_NAME not found in namespace $NAMESPACE after waiting."
-              exit 1
-            fi
-            echo "Waiting for Ingress $INGRESS_NAME in $NAMESPACE... ($i/30)"
-            sleep 5
-          done
-
-          # Patch the ALB group annotation (add or update)
-          kubectl annotate ingress "$INGRESS_NAME" -n "$NAMESPACE" \
-            "$GROUP_ANNOTATION_KEY"="$GROUP_ANNOTATION_VALUE" --overwrite
-
-          # Patch the host field in spec.rules
-          kubectl patch ingress "$INGRESS_NAME" -n "$NAMESPACE" --type='json' \
-            -p="[{'op': 'replace', 'path': '/spec/rules/0/host', 'value':'$HOST_NAME'}]"
-      
+          
       - name: Set environment variables
         run: |
           cd terraform
