@@ -609,7 +609,7 @@ jobs:
             --set server.ingress.ingressClassName=nginx \
             --set server.ingress.annotations."kubernetes\.io/ingress\.class"=nginx \
             --set server.ingress.annotations."nginx\.ingress\.kubernetes\.io/backend-protocol"=HTTPS \
-            --set server.ingress.annotations."nginx\.ingress\.kubernetes\.io/ssl-redirect"=true
+            --set server.ingress.annotations."nginx\.ingress\.kubernetes\.io/ssl-redirect"=false
 
       - name: Get NGINX Ingress Controller LB Hostname
         id: get-nginx-hostname
