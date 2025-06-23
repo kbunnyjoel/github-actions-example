@@ -35,18 +35,28 @@ app.use(express.static(path.join(__dirname, 'public')));
 app.use(express.urlencoded({ extended: true }));
 app.use(express.json()); // Add this line to parse JSON request bodies
 
-// Middleware to enforce API key, except on GET /status and GET /
+// Middleware to enforce API key, except on whitelisted paths
 app.use((req, res, next) => {
   if (process.env.NODE_ENV === 'test') return next(); // Skip API key check in test environment
-  if ((req.method === 'GET' && (req.path === '/status' || req.path === '/')) ||
-      (req.method === 'POST' && req.path === '/add')) return next();
 
+  const exemptPaths = [
+    '/',
+    '/status',
+    '/favicon.ico',
+    '/robots.txt',
+    '/.well-known/appspecific/com.chrome.devtools.json'
+  ];
+
+  console.log('Incoming request path:', req.path);
   const apiKey = req.headers['x-api-key'] || (req.headers['authorization'] && req.headers['authorization'].replace('Bearer ', ''));
   const expectedKey = process.env.EXPECTED_API_KEY;
 
-  console.log('Incoming request path:', req.path);
   console.log('Received API Key:', apiKey);
   console.log('Expected API Key:', expectedKey);
+
+  if (exemptPaths.includes(req.path)) {
+    return next();
+  }
 
   if (!apiKey || apiKey !== expectedKey) {
     return res.status(401).send('Api Key was not provided.');
