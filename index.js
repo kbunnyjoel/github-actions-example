@@ -49,13 +49,15 @@ app.use((req, res, next) => {
 
   console.log('Incoming request path:', req.path);
   console.log('Full original URL:', req.originalUrl);
+  console.log('Request headers:', req.headers);
   const apiKey = req.headers['x-api-key'] || (req.headers['authorization'] && req.headers['authorization'].replace('Bearer ', ''));
   const expectedKey = process.env.EXPECTED_API_KEY;
 
   console.log('Received API Key:', apiKey);
   console.log('Expected API Key:', expectedKey);
 
-  const isExempt = exemptPaths.some(p => req.path === p || req.path.startsWith(p + '/'));
+  const url = req.originalUrl.split('?')[0];
+  const isExempt = exemptPaths.some(p => url === p || url.startsWith(p + '/'));
   if (isExempt) {
     return next();
   }
