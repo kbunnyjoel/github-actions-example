@@ -22,7 +22,5 @@ resource "aws_route53_record" "apex_a_record" {
   ttl        = 300
   records    = ["192.0.2.1"]           # Placeholder IP from TEST-NET-1 (RFC 5737)
   depends_on = [aws_route53_zone.main] # Ensure the zone is created before this record
-  lifecycle {
-    prevent_destroy = true
-  }
+
 }
