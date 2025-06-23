@@ -781,13 +781,15 @@ jobs:
             ingress:
               name: argocd-ingress
               enabled: true
-              ingressClassName: nginx
+              ingressClassName: alb
               hostname: argocd.bunnycloud.xyz
               annotations:
-                "nginx.ingress.kubernetes.io/ssl-redirect": "false" # Disable SSL redirect at Ingress level
-                "nginx.ingress.kubernetes.io/force-ssl-redirect": "false" # Disable force SSL redirect
-                nginx.ingress.kubernetes.io/backend-protocol: "HTTPS"
-                external-dns.alpha.kubernetes.io/hostname: "argocd.bunnycloud.xyz."
+                kubernetes.io/ingress.class: alb
+                alb.ingress.kubernetes.io/scheme: internet-facing
+                alb.ingress.kubernetes.io/target-type: ip
+                alb.ingress.kubernetes.io/listen-ports: '[{"HTTP": 80}, {"HTTPS": 443}]'
+                alb.ingress.kubernetes.io/certificate-arn: arn:aws:acm:ap-southeast-2:806210429052:certificate/5ed90bfd-a03d-4bda-800d-f3927d9bdc1a
+                external-dns.alpha.kubernetes.io/hostname: argocd.bunnycloud.xyz.
           configs:
             cm:
               url: "https://argocd.bunnycloud.xyz" # Set the correct URL for ArgoCD
