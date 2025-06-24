@@ -637,13 +637,12 @@ jobs:
               --set controller.containerPort.https=443 \
               --set controller.service.type=LoadBalancer \
               --set controller.service.loadBalancerClass="service.k8s.aws/nlb" \
-              --set controller.defaultBackendService="ingress-nginx/default-http-backend" \
               --set controller.terminationGracePeriodSeconds=300 \
               --set controller.serviceAccount.create=true \
               --set controller.serviceAccount.name=ingress-nginx \
               --set serviceAccount.annotations."eks\.amazonaws\.com/role-arn"="${{ env.INGRESS_NGINX_ROLE_ARN }}" \
                --set defaultBackend.enabled=true \
-              --set defaultBackend.image.repository=k8s.gcr.io/defaultbackend-amd64 \
+              --set defaultBackend.image.repository=registry.k8s.io/defaultbackend-arm64 \
               --set defaultBackend.image.tag=1.5 \
               --version 4.10.1 \
               --timeout 10m \
@@ -695,48 +694,6 @@ jobs:
           echo "Checking NGINX Ingress Controller services..."
           kubectl get svc -n ingress-nginx
           
-          echo "Checking NGINX Ingress Controller events..."
-          kubectl get events -n ingress-nginx --sort-by='.lastTimestamp' | tail -20 || echo "No events found in ingress-nginx namespace or an error occurred."
-          
-          echo "Creating default backend for 404 handling..."
-          cat > default-backend.yaml << 'ENDOFFILE'
-          apiVersion: apps/v1
-          kind: Deployment
-          metadata:
-            name: default-http-backend
-            namespace: ingress-nginx
-            labels:
-              app: default-http-backend
-          spec:
-            replicas: 1
-            selector:
-              matchLabels:
-                app: default-http-backend
-            template:
-              metadata:
-                labels:
-                  app: default-http-backend
-              spec:
-                containers:
-                - name: default-http-backend
-                  image: registry.k8s.io/defaultbackend-amd64:1.5
-                  ports:
-                  - containerPort: 8080
-          ---
-          apiVersion: v1
-          kind: Service
-          metadata:
-            name: default-http-backend
-            namespace: ingress-nginx
-          spec:
-            ports:
-            - port: 80
-              targetPort: 8080
-            selector:
-              app: default-http-backend
-          ENDOFFILE
-          kubectl apply -f default-backend.yaml
-
           echo "Checking if PROXY protocol is enabled in NGINX configuration..."
           (kubectl exec -n ingress-nginx deploy/ingress-nginx-controller -- cat /etc/nginx/nginx.conf > nginx.conf && \
           grep -i "proxy_protocol" nginx.conf) || echo "No proxy_protocol found in configuration (this is expected as use-proxy-protocol=false), or failed to get nginx.conf."
