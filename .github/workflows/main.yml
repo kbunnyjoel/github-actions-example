@@ -746,7 +746,7 @@ jobs:
             ingress:
               name: argocd-ingress
               enabled: true
-              ingressClassName: nginx
+              ingressClassName: alb
               hostname: argocd.bunnycloud.xyz
               annotations:
                 kubernetes.io/ingress.class: alb
