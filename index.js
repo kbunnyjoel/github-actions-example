@@ -42,12 +42,20 @@ app.use((req, res, next) => {
 
   if (isHealthCheck || isTestEnv) return next();
 
-  const exemptPaths = [
-    '/',
-    '/favicon.ico',
-    '/robots.txt',
-    '/.well-known/appspecific/com.chrome.devtools.json'
-  ];
+ const exemptPaths = [
+  '',
+  '/',
+  '/index.html',
+  '/index',
+  '/home',
+  '/favicon.ico',
+  '/robots.txt',
+  '/.well-known/appspecific/com.chrome.devtools.json',
+  '/css',
+  '/js',
+  '/images'
+];
+
 
   const apiKey = req.headers['x-api-key'] || (req.headers['authorization'] && req.headers['authorization'].replace('Bearer ', ''));
   const expectedKey = process.env.EXPECTED_API_KEY;
