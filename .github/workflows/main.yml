@@ -1536,6 +1536,9 @@ jobs:
             sleep 10
           done
 
+      - name: Setup ArgoCD CLI
+        uses: imranismail/setup-argocd@v1
+
       - name: Wait for ArgoCD application to be healthy
         run: |
           for i in {1..5}; do
