@@ -124,9 +124,33 @@ for subnet in $(aws ec2 describe-subnets --filters "Name=vpc-id,Values=$VPC_ID" 
   aws ec2 delete-subnet --subnet-id $subnet || true
 done
 
+
 # Final VPC Deletion
 echo "🧨 Attempting final VPC delete: $VPC_ID"
 aws ec2 delete-vpc --vpc-id $VPC_ID
 
   echo "✅ VPC $VPC_ID cleanup complete."
+done
+
+# Delete Route53 records (except NS and SOA) in associated hosted zones
+if ! command -v jq &> /dev/null; then
+  echo "❌ jq is required for this script. Please install jq and rerun the script."
+  exit 1
+fi
+
+for zone_id in $(aws route53 list-hosted-zones --query "HostedZones[].Id" --output text | cut -d'/' -f3); do
+  echo "🧹 Cleaning Route53 records in hosted zone: $zone_id"
+  
+  records=$(aws route53 list-resource-record-sets --hosted-zone-id $zone_id \
+    --query "ResourceRecordSets[?Type!='NS' && Type!='SOA']" --output json)
+
+  if [[ $records != "[]" ]]; then
+    changes=$(echo $records | jq -c '[.[] | {Action: "DELETE", ResourceRecordSet: .}]')
+    
+    if [[ $changes != "[]" ]]; then
+      change_batch="{\"Changes\": $changes}"
+      echo "$change_batch" > /tmp/rrset-delete.json
+      aws route53 change-resource-record-sets --hosted-zone-id $zone_id --change-batch file:///tmp/rrset-delete.json || true
+    fi
+  fi
 done
