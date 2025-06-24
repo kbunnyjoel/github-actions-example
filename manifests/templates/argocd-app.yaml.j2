@@ -60,6 +60,7 @@ spec:
             external-dns.alpha.kubernetes.io/ttl: "60"
             external-dns.alpha.kubernetes.io/hostname: "{{ app_name }}.bunnycloud.xyz."
             alb.ingress.kubernetes.io/load-balancer-attributes: deletion_protection.enabled=false
+            alb.ingress.kubernetes.io/force-update: "$(date +%s)"
 
         # Define resource requests and limits for your application pods
         resources: {} # Leave empty to use Helm chart defaults or override as needed
