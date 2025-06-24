@@ -50,7 +50,7 @@ spec:
             alb.ingress.kubernetes.io/scheme: internet-facing
             alb.ingress.kubernetes.io/redirect-http-to-https: "true" # Redirect HTTP to HTTPS
             alb.ingress.kubernetes.io/listen-ports: '[{"HTTP": 80}, {"HTTPS": 443}]'
-            alb.ingress.kubernetes.io/certificate-arn: "{{ acm_certificate_arn | replace(',', ';') }}" # Crucial for HTTPS on ALB
+            alb.ingress.kubernetes.io/certificate-arn: "{{ acm_certificate_arn }}" # Crucial for HTTPS on ALB
             alb.ingress.kubernetes.io/target-type: ip # Good for EKS, especially Fargate
             alb.ingress.kubernetes.io/healthcheck-path: "/status"
             alb.ingress.kubernetes.io/ssl-redirect: '443'
@@ -59,6 +59,7 @@ spec:
             alb.ingress.kubernetes.io/group.name: {{ app_name }}
             external-dns.alpha.kubernetes.io/ttl: "60"
             external-dns.alpha.kubernetes.io/hostname: "{{ app_name }}.bunnycloud.xyz."
+            alb.ingress.kubernetes.io/load-balancer-attributes: deletion_protection.enabled=false
 
         # Define resource requests and limits for your application pods
         resources: {} # Leave empty to use Helm chart defaults or override as needed
