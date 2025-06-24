@@ -799,30 +799,31 @@ jobs:
       - name: Get LoadBalancer Hostname
         id: get_lb
         run: |
-          HOSTNAME=$(kubectl -n argocd get ingress argocd-server -o jsonpath='{.status.loadBalancer.ingress[0].hostname}')
+          sleep 30 # Wait for the LoadBalancer to be provisioned
+          HOSTNAME=$(kubectl get svc -n ingress-nginx ingress-nginx-controller -o jsonpath='{.status.loadBalancer.ingress[0].hostname}')
           echo "lb_hostname=$HOSTNAME" >> $GITHUB_OUTPUT
 
       # Patch ArgoCD Ingress and CNAME Record if mismatched
       - name: Patch ArgoCD Ingress and CNAME Record
         run: |
-          cd terraform
-          HOSTED_ZONE_ID="$( terraform output -raw route53_zone_id )"
+          # cd terraform
+          # HOSTED_ZONE_ID="$( terraform output -raw route53_zone_id )"
           EXPECTED_HOSTNAME="${{ steps.get_lb.outputs.lb_hostname }}"
-          echo "Expected LB Hostname: $EXPECTED_HOSTNAME"
+          # echo "Expected LB Hostname: $EXPECTED_HOSTNAME"
 
-          CURRENT_HOST=$(kubectl -n argocd get ingress argocd-server -o jsonpath='{.spec.rules[0].host}')
-          if [[ "$CURRENT_HOST" != "argocd.bunnycloud.xyz" ]]; then
-            echo "Patching ingress host..."
-            kubectl -n argocd patch ingress argocd-server --type='json' \
-              -p="[{'op': 'replace', 'path': '/spec/rules/0/host', 'value': 'argocd.bunnycloud.xyz'}]"
-          fi
+          # CURRENT_HOST=$(kubectl -n argocd get ingress argocd-server -o jsonpath='{.spec.loadBalancer.ingress[0].hostname}')
+          # if [[ "$CURRENT_HOST" != $EXPECTED_HOSTNAME ]]; then
+          #   echo "Patching ingress host..."
+          #   kubectl -n argocd patch ingress argocd-server --type='json' \
+          #     -p="[{'op': 'replace', 'path': '/spec/rules/0/host', 'value': 'argocd.bunnycloud.xyz'}]"
+          # fi
 
-          # Check for empty EXPECTED_HOSTNAME before DNS update
-          if [ -z "$EXPECTED_HOSTNAME" ]; then
-            echo "❌ ERROR: NGINX Load Balancer hostname is empty. Skipping DNS update."
-            exit 1
-          fi
-          echo "Updating Route53 with CNAME pointing to: $EXPECTED_HOSTNAME"
+          # # Check for empty EXPECTED_HOSTNAME before DNS update
+          # if [ -z "$EXPECTED_HOSTNAME" ]; then
+          #   echo "❌ ERROR: NGINX Load Balancer hostname is empty. Skipping DNS update."
+          #   exit 1
+          # fi
+          # echo "Updating Route53 with CNAME pointing to: $EXPECTED_HOSTNAME"
 
           echo "Updating Route53 CNAME if needed..."
           cat > change-batch.json <<EOF
