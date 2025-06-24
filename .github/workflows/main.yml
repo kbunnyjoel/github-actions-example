@@ -750,12 +750,12 @@ jobs:
               hostname: argocd.bunnycloud.xyz
               annotations:
                 kubernetes.io/ingress.class: alb
-                  alb.ingress.kubernetes.io/scheme: internet-facing
-                  alb.ingress.kubernetes.io/target-type: ip
-                  alb.ingress.kubernetes.io/listen-ports: '[{"HTTP": 80}]'
-                  alb.ingress.kubernetes.io/ssl-redirect: 'false'
-                  alb.ingress.kubernetes.io/backend-protocol: HTTPS
-                  external-dns.alpha.kubernetes.io/hostname: "argocd.bunnycloud.xyz."
+                alb.ingress.kubernetes.io/scheme: internet-facing
+                alb.ingress.kubernetes.io/target-type: ip
+                alb.ingress.kubernetes.io/listen-ports: '[{"HTTP": 80}]'
+                alb.ingress.kubernetes.io/ssl-redirect: 'false'
+                alb.ingress.kubernetes.io/backend-protocol: HTTPS
+                external-dns.alpha.kubernetes.io/hostname: "argocd.bunnycloud.xyz."
           configs:
             cm:
               url: "https://argocd.bunnycloud.xyz" # Set the correct URL for ArgoCD
