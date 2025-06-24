@@ -749,10 +749,13 @@ jobs:
               ingressClassName: nginx
               hostname: argocd.bunnycloud.xyz
               annotations:
-                "nginx.ingress.kubernetes.io/ssl-redirect": "false" # Disable SSL redirect at Ingress level
-                "nginx.ingress.kubernetes.io/force-ssl-redirect": "false" # Disable force SSL redirect
-                "nginx.ingress.kubernetes.io/backend-protocol": "HTTPS"
-                external-dns.alpha.kubernetes.io/hostname: "argocd.bunnycloud.xyz."
+                kubernetes.io/ingress.class: alb
+                  alb.ingress.kubernetes.io/scheme: internet-facing
+                  alb.ingress.kubernetes.io/target-type: ip
+                  alb.ingress.kubernetes.io/listen-ports: '[{"HTTP": 80}]'
+                  alb.ingress.kubernetes.io/ssl-redirect: 'false'
+                  alb.ingress.kubernetes.io/backend-protocol: HTTPS
+                  external-dns.alpha.kubernetes.io/hostname: "argocd.bunnycloud.xyz."
           configs:
             cm:
               url: "https://argocd.bunnycloud.xyz" # Set the correct URL for ArgoCD
@@ -1355,7 +1358,7 @@ jobs:
       - name: Set environment variables
         run: |
           cd terraform
-          ACM_CERT_ARN=$(terraform output -raw github_actions_example_certificate_arn)
+          ACM_CERT_ARN=$(terraform output -raw shared_certificate_ap_southeast_2)
           ALB_CERT_ARN=$(terraform output -raw acm_certificate_arn)
           echo "ACM_CERT_ARN_ENV=$ACM_CERT_ARN" >> $GITHUB_ENV
           echo "ALB_CERT_ARN_ENV=$ALB_CERT_ARN" >> $GITHUB_ENV
@@ -1535,33 +1538,22 @@ jobs:
             sleep 10
           done
 
-      - name: Health check on /status endpoint
+      - name: Test /status endpoint with API key
         run: |
-          DOMAIN="${{ env.APP_NAME }}.bunnycloud.xyz"
-          URL="https://${DOMAIN}/status"
-          MAX_ATTEMPTS=10
+          for i in {1..10}; do
+            echo "Checking app status... Attempt $i"
+            response=$(curl -ks -H "x-api-key: ${{ secrets.API_KEY }}" https://${{ env.APP_NAME }}.bunnycloud.xyz/status)
 
-          for i in $(seq 1 $MAX_ATTEMPTS); do
-            echo "🔎 Attempt $i: Resolving $DOMAIN"
-            dig +short $DOMAIN || true
-
-            echo "🌐 Sending request to $URL with x-api-key..."
-            response=$(curl -ks -w "\nHTTP %{http_code}\n" -H "x-api-key: ${{ secrets.API_KEY }}" "$URL")
-
-            echo "📝 Response:"
-            echo "$response"
-
-            if echo "$response" | grep -q '"status":"ok"'; then
+            if [[ "$response" == *'"status":"ok"'* ]]; then
               echo "✅ App is healthy."
               exit 0
             fi
 
-            sleep_time=$((2 ** i))
-            echo "⏳ Not healthy yet. Retrying in $sleep_time seconds..."
-            sleep $sleep_time
+            echo "❌ Unexpected response or DNS not resolved yet: $response"
+            sleep 10
           done
 
-          echo "🚨 App did not become healthy after $MAX_ATTEMPTS attempts."
+          echo "❌ App did not respond with status=ok after retries."
           exit 1
 
       - name: Ensure application is deployed
