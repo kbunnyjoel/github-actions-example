@@ -1356,7 +1356,7 @@ jobs:
       - name: Set environment variables
         run: |
           cd terraform
-          ACM_CERT_ARN=$(terraform output -raw github_actions_example_certificate_arn)
+          ACM_CERT_ARN=$(terraform output -raw shared_certificate_ap_southeast_2)
           ALB_CERT_ARN=$(terraform output -raw acm_certificate_arn)
           echo "ACM_CERT_ARN_ENV=$ACM_CERT_ARN" >> $GITHUB_ENV
           echo "ALB_CERT_ARN_ENV=$ALB_CERT_ARN" >> $GITHUB_ENV

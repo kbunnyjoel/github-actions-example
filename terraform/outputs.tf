@@ -37,7 +37,7 @@ output "route53_zone_id" {
   value       = aws_route53_zone.main.zone_id
 }
 
-output "github_actions_example_certificate_arn" {
+output "shared_certificate_ap_southeast_2" {
   description = "ARN of the ACM certificate for github-actions-example.bunnycloud.xyz"
-  value       = aws_acm_certificate.github_actions_example_certificate_ap_southeast_2.arn
+  value       = aws_acm_certificate.shared_certificate_ap_southeast_2.arn
 }
