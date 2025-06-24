@@ -71,13 +71,13 @@ resource "aws_acm_certificate" "shared_certificate_ap_southeast_2" {
 
 # DNS validation record for the shared certificate (both domain names)
 resource "aws_route53_record" "cert_validation_shared_ap_southeast_2" {
-  count           = var.create_dns_records ? length(aws_acm_certificate.shared_certificate_ap_southeast_2.domain_validation_options) : 0
+  for_each        = { for dvo in aws_acm_certificate.shared_certificate_ap_southeast_2.domain_validation_options : dvo.domain_name => dvo }
   allow_overwrite = true
 
   zone_id = aws_route53_zone.main.zone_id
-  name    = aws_acm_certificate.shared_certificate_ap_southeast_2.domain_validation_options[count.index].resource_record_name
-  type    = aws_acm_certificate.shared_certificate_ap_southeast_2.domain_validation_options[count.index].resource_record_type
-  records = [aws_acm_certificate.shared_certificate_ap_southeast_2.domain_validation_options[count.index].resource_record_value]
+  name    = each.value.resource_record_name
+  type    = each.value.resource_record_type
+  records = [each.value.resource_record_value]
   ttl     = 60
 }
 
