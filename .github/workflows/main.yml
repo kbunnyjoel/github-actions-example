@@ -1522,7 +1522,7 @@ jobs:
               ANNOTATION_VALUE=$(kubectl get ingress -n "${{ env.APP_NAME }}" "$APP_INGRESS_NAME" -o jsonpath='{.metadata.annotations.external-dns\.alpha\.kubernetes\.io/hostname}' 2>/dev/null)
               if [ -n "$ANNOTATION_VALUE" ]; then
                 echo "ExternalDNS hostname annotation found: $ANNOTATION_VALUE"
-                exit 0 # Success, Ingress and annotation found
+                break # Success, Ingress and annotation found
               else
                 echo "Warning: ExternalDNS hostname annotation not found on Ingress '$APP_INGRESS_NAME'. Will retry... (Attempt $i/60)"
               fi
@@ -1534,6 +1534,22 @@ jobs:
             fi
             echo "Ingress '$APP_INGRESS_NAME' not yet found or annotation missing in namespace '${{ env.APP_NAME }}', waiting... (Attempt $i/60)"
             sleep 10
+          done
+
+      - name: Wait for ArgoCD application to be healthy
+        run: |
+          for i in {1..5}; do
+            echo "Checking app status... Attempt $i"
+            if argocd app wait argocd --health --timeout 60; then
+              echo "✅ ArgoCD app is healthy"
+              break
+            elif [ "$i" -eq 5 ]; then
+              echo "❌ ArgoCD app failed to become healthy after 5 attempts"
+              exit 1
+            else
+              echo "⏳ Retrying in 10 seconds..."
+              sleep 10
+            fi
           done
 
       - name: Test /status endpoint with API key
