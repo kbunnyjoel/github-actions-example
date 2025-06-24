@@ -819,7 +819,7 @@ jobs:
       # Patch ArgoCD Ingress and CNAME Record if mismatched
       - name: Patch ArgoCD Ingress and CNAME Record
         run: |
-          # cd terraform
+          cd terraform
           HOSTED_ZONE_ID="$( terraform output -raw route53_zone_id )"
           EXPECTED_HOSTNAME="${{ steps.get_lb.outputs.lb_hostname }}"
           echo "Expected LB Hostname: $EXPECTED_HOSTNAME"
