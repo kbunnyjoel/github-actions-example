@@ -1535,22 +1535,33 @@ jobs:
             sleep 10
           done
 
-      - name: Test /status endpoint with API key
+      - name: Health check on /status endpoint
         run: |
-          for i in {1..10}; do
-            echo "Checking app status... Attempt $i"
-            response=$(curl -ks -H "x-api-key: ${{ secrets.API_KEY }}" https://${{ env.APP_NAME }}.bunnycloud.xyz/status)
+          DOMAIN="${{ env.APP_NAME }}.bunnycloud.xyz"
+          URL="https://${DOMAIN}/status"
+          MAX_ATTEMPTS=10
 
-            if [[ "$response" == *'"status":"ok"'* ]]; then
+          for i in $(seq 1 $MAX_ATTEMPTS); do
+            echo "🔎 Attempt $i: Resolving $DOMAIN"
+            dig +short $DOMAIN || true
+
+            echo "🌐 Sending request to $URL with x-api-key..."
+            response=$(curl -ks -w "\nHTTP %{http_code}\n" -H "x-api-key: ${{ secrets.API_KEY }}" "$URL")
+
+            echo "📝 Response:"
+            echo "$response"
+
+            if echo "$response" | grep -q '"status":"ok"'; then
               echo "✅ App is healthy."
               exit 0
             fi
 
-            echo "❌ Unexpected response or DNS not resolved yet: $response"
-            sleep 10
+            sleep_time=$((2 ** i))
+            echo "⏳ Not healthy yet. Retrying in $sleep_time seconds..."
+            sleep $sleep_time
           done
 
-          echo "❌ App did not respond with status=ok after retries."
+          echo "🚨 App did not become healthy after $MAX_ATTEMPTS attempts."
           exit 1
 
       - name: Ensure application is deployed
