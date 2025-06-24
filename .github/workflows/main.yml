@@ -817,6 +817,13 @@ jobs:
               -p="[{'op': 'replace', 'path': '/spec/rules/0/host', 'value': 'argocd.bunnycloud.xyz'}]"
           fi
 
+          # Check for empty EXPECTED_HOSTNAME before DNS update
+          if [ -z "$EXPECTED_HOSTNAME" ]; then
+            echo "❌ ERROR: NGINX Load Balancer hostname is empty. Skipping DNS update."
+            exit 1
+          fi
+          echo "Updating Route53 with CNAME pointing to: $EXPECTED_HOSTNAME"
+
           echo "Updating Route53 CNAME if needed..."
           cat > change-batch.json <<EOF
           {
