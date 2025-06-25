@@ -1131,7 +1131,8 @@ jobs:
             --set logLevel=debug \
             --version 1.14.5 \
             --timeout 10m \
-            --wait 
+            --wait \
+            --set policy=upsert-only
           kubectl rollout restart deployment external-dns -n external-dns
           echo "✅ ExternalDNS installation complete."
 
@@ -1168,7 +1169,8 @@ jobs:
               --set logLevel=debug \
               --version 1.14.5 \
               --timeout 10m \
-              --wait
+              --wait \
+              --set policy=upsert-only
           else
             echo "ExternalDNS is already deployed and healthy."
           fi
