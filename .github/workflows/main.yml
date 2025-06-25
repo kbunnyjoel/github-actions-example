@@ -1172,10 +1172,10 @@ jobs:
             echo "ExternalDNS is already deployed and healthy."
           fi
     
-      - name: Ensure ArgoCD DNS A record is up-to-date
-        run: |
-          chmod +x k8s/argocd/check-argocd-dns.sh
-          k8s/argocd/check-argocd-dns.sh
+      # - name: Ensure ArgoCD DNS A record is up-to-date
+      #   run: |
+      #     chmod +x k8s/argocd/check-argocd-dns.sh
+      #     k8s/argocd/check-argocd-dns.sh
           
       - name: Verify ExternalDNS Service Account and Restart Pods
         run: |
