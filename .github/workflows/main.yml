@@ -1124,7 +1124,6 @@ jobs:
             --set serviceAccount.create=true \
             --set serviceAccount.name=external-dns \
             --set serviceAccount.annotations."eks\.amazonaws\.com/role-arn"="${{ env.EXTERNAL_DNS_ROLE_ARN }}" \
-            --set txtOwnerId=Z020604219Y32SRYV246B \
             --set provider=aws \
             --set txtPrefix=externaldns- \
             --set aws.batchChangeSize=1000 \
