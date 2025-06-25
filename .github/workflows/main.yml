@@ -351,28 +351,7 @@ jobs:
           terraform init
           terraform force-unlock -force 637f1591-4e24-fd14-a1e5-2ac72e45c873 || echo "No locks to unlock"
           terraform destroy -auto-approve
-
-      - name: Clean up orphaned ELBs and their subnets (manual cleanup)
-        if: github.event.inputs.destroy == 'true'
-        run: |
-          echo "🧹 Cleaning up leftover Load Balancers and subnets..."
-          
-          # Delete classic ELBs
-          for elb in $(aws elb describe-load-balancers --query 'LoadBalancerDescriptions[].LoadBalancerName' --output text); do
-            aws elb delete-load-balancer --load-balancer-name "$elb" || echo "Failed to delete ELB: $elb"
-          done
-
-          # Delete NLBs and ALBs
-          for elbv2 in $(aws elbv2 describe-load-balancers --query 'LoadBalancers[].LoadBalancerArn' --output text); do
-            aws elbv2 delete-load-balancer --load-balancer-arn "$elbv2" || echo "Failed to delete ELBv2: $elbv2"
-          done
-
-          # Delete unused subnets
-          for subnet in $(aws ec2 describe-subnets --query 'Subnets[].SubnetId' --output text); do
-            aws ec2 delete-subnet --subnet-id "$subnet" || echo "Skipping in-use subnet: $subnet"
-          done
-
-      
+    
   deploy-argocd:
     outputs:
       acm-cert-arn: ${{ steps.get-cert-arn.outputs.ACM_CERTIFICATE_ARN }}
@@ -753,6 +732,7 @@ jobs:
                 alb.ingress.kubernetes.io/target-type: ip
                 alb.ingress.kubernetes.io/listen-ports: '[{"HTTP": 80}]'
                 alb.ingress.kubernetes.io/ssl-redirect: 'false'
+                alb.ingress.kubernetes.io/certificate-arn: ${{ env.ACM_CERTIFICATE_ARN }}
                 alb.ingress.kubernetes.io/backend-protocol: HTTPS
                 external-dns.alpha.kubernetes.io/hostname: "argocd.bunnycloud.xyz."
           configs:
