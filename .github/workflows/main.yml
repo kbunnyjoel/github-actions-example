@@ -1131,8 +1131,7 @@ jobs:
             --set logLevel=debug \
             --version 1.14.5 \
             --timeout 10m \
-            --wait \
-            --set policy=upsert-only
+            --wait 
           kubectl rollout restart deployment external-dns -n external-dns
           echo "✅ ExternalDNS installation complete."
 
@@ -1523,19 +1522,20 @@ jobs:
       - name: Test /status endpoint with API key
         run: |
           for i in {1..10}; do
-            echo "Checking app status... Attempt $i"
-            response=$(curl -ks -H "x-api-key: ${{ secrets.API_KEY }}" https://${{ env.APP_NAME }}.bunnycloud.xyz/status)
+            echo "🔎 Checking app status... Attempt $i"
+            response=$(curl -ks -H "x-api-key: ${{ secrets.API_KEY }}" https://gha.bunnycloud.xyz/status)
+            echo "📝 Response: $response"
 
             if [[ "$response" == *'"status":"ok"'* ]]; then
               echo "✅ App is healthy."
               exit 0
             fi
 
-            echo "❌ Unexpected response or DNS not resolved yet: $response"
+            echo "❌ Unexpected response. Retrying..."
             sleep 10
           done
 
-          echo "❌ App did not respond with status=ok after retries."
+          echo "🚨 App did not respond with status=ok after retries."
           exit 1
 
       - name: Ensure application is deployed
