@@ -23,6 +23,7 @@ env:
   APP_NAME: ${{ github.event.repository.name }}
   REGISTRY: docker.io/${{ secrets.DOCKER_USERNAME }}
   AWS_REGION: 'ap-southeast-2'
+  DNS_ACM: "gha"
 
 jobs:
 
@@ -1365,7 +1366,7 @@ jobs:
             IMAGE_TAG="${{ github.sha }}"
 
             jinja2 manifests/templates/argocd-app.yaml.j2 \
-              -D app_name="${{ env.APP_NAME }}" \
+              -D app_name="${{ env.DNS_ACM }}" \
               -D chart_path="apps/$app/chart" \
               -D github_repository_url="${{ github.server_url }}/${{ github.repository }}" \
               -D target_revision="${{ github.ref_name }}" \
