@@ -1037,7 +1037,7 @@ jobs:
           
           # Define all base hostnames that ExternalDNS will manage
           BASE_HOSTNAMES=(
-            "github-actions-example.bunnycloud.xyz"
+            "gha.bunnycloud.xyz"
             "argocd.bunnycloud.xyz"
           )
 
@@ -1216,7 +1216,7 @@ jobs:
         run: |
           HOSTED_ZONE_ID="${{ env.HOSTED_ZONE_ID }}"
           ARGO_RECORD_NAME="argocd.bunnycloud.xyz."
-          APP_RECORD_NAME="github-actions-example.bunnycloud.xyz."
+          APP_RECORD_NAME="gha.bunnycloud.xyz."
           
           echo "Verifying DNS records for $ARGO_RECORD_NAME (managed by ExternalDNS/manual step)..."
           aws route53 list-resource-record-sets --hosted-zone-id "$HOSTED_ZONE_ID" \
@@ -1348,7 +1348,7 @@ jobs:
 
       - name: Process apps safely
         run: |
-          APPS_JSON='["github-actions-example"]'
+          APPS_JSON='["gha"]'
           for app in $(echo "$APPS_JSON" | jq -r '.[]'); do
             echo "Processing app: $app"
             # Insert deployment logic here
@@ -1495,7 +1495,7 @@ jobs:
       - name: Check Application Ingress Resource
         run: |
 
-          APP_INGRESS_NAME="github-actions-example" # Assuming Ingress name matches app name
+          APP_INGRESS_NAME="gha" # Assuming Ingress name matches app name
 
           echo "Waiting for namespace '${{ env.APP_NAME }}' to be created by ArgoCD..."
           for i in {1..30}; do # Wait up to 5 minutes (30 * 10s)
@@ -1567,12 +1567,12 @@ jobs:
         run: |
           # Get hosted zone ID
           HOSTED_ZONE_ID=$(aws route53 list-hosted-zones --query "HostedZones[?Name=='bunnycloud.xyz.'].Id" --output text | sed 's/\/hostedzone\///')
-          APP_DOMAIN="github-actions-example.bunnycloud.xyz."
+          APP_DOMAIN="gha.bunnycloud.xyz."
           
           echo "Listing ExternalDNS TXT records..."
           
           # List ExternalDNS TXT records
-          for txt_record in "externaldns-cname-github-actions-example.bunnycloud.xyz." "externaldns-github-actions-example.bunnycloud.xyz."; do
+          for txt_record in "externaldns-cname-gha.bunnycloud.xyz." "externaldns-gha.bunnycloud.xyz."; do
             echo "Checking for TXT record: $txt_record"
             aws route53 list-resource-record-sets --hosted-zone-id "$HOSTED_ZONE_ID" \
               --query "ResourceRecordSets[?Name=='$txt_record' && Type=='TXT']"
@@ -1580,14 +1580,14 @@ jobs:
           
       - name: Verify DNS record for application
         run: |
-          APP_TARGET_HOSTNAME="github-actions-example.bunnycloud.xyz"
+          APP_TARGET_HOSTNAME="gha.bunnycloud.xyz"
 
           # Get the hostname of the ALB created for the application's Ingress
           APP_ALB_HOSTNAME=""
           MAX_RETRIES=30
           SLEEP_BETWEEN=10
           for i in $(seq 1 $MAX_RETRIES); do
-            APP_ALB_HOSTNAME=$(kubectl get ingress github-actions-example -n github-actions-example -o jsonpath='{.status.loadBalancer.ingress[0].hostname}' 2>/dev/null)
+            APP_ALB_HOSTNAME=$(kubectl get ingress gha -n gha -o jsonpath='{.status.loadBalancer.ingress[0].hostname}' 2>/dev/null)
             if [ -n "$APP_ALB_HOSTNAME" ]; then
               echo "✅ Application ALB hostname found: $APP_ALB_HOSTNAME"
               break
@@ -1596,14 +1596,14 @@ jobs:
             sleep $SLEEP_BETWEEN
             if [ $i -eq $MAX_RETRIES ]; then
               echo "❌ Error: Application ALB hostname not found after waiting."
-              kubectl get ingress github-actions-example -n github-actions-example -o yaml || true
+              kubectl get ingress gha -n gha -o yaml || true
               exit 1
             fi
           done
 
           if [ -z "$APP_ALB_HOSTNAME" ]; then
             echo "Error: Could not find Application ALB hostname."
-            kubectl get ingress github-actions-example -n github-actions-example
+            kubectl get ingress gha -n gha
             exit 1
           fi
           
@@ -1633,7 +1633,7 @@ jobs:
               echo "Final DNS CNAME record resolution check for ALB $APP_ALB_HOSTNAME (using 8.8.8.8):"
               dig -t CNAME $APP_ALB_HOSTNAME @8.8.8.8
               echo "Hint: Check ExternalDNS logs: kubectl logs -n external-dns -l app.kubernetes.io/name=external-dns --tail=200"
-              echo "Hint: Check Ingress annotations: kubectl get ingress github-actions-example -n github-actions-example -o yaml"
+              echo "Hint: Check Ingress annotations: kubectl get ingress gha -n gha -o yaml"
             fi
             sleep 10
           done
@@ -1644,9 +1644,9 @@ jobs:
 
       - name: Verify application accessibility
         run: |
-          APP_HOSTNAME="github-actions-example.bunnycloud.xyz"
+          APP_HOSTNAME="gha.bunnycloud.xyz"
           # Use the application's ALB hostname for direct testing
-          APP_ALB_HOSTNAME=$(kubectl get ingress github-actions-example -n github-actions-example -o jsonpath='{.status.loadBalancer.ingress[0].hostname}' 2>/dev/null)
+          APP_ALB_HOSTNAME=$(kubectl get ingress gha -n gha -o jsonpath='{.status.loadBalancer.ingress[0].hostname}' 2>/dev/null)
 
           if [ -z "$APP_ALB_HOSTNAME" ]; then
             echo "Error: Could not find Application ALB hostname for direct connection test."
@@ -1663,7 +1663,7 @@ jobs:
           echo "Waiting for DNS and ingress to be fully configured..."
           for i in {1..12}; do
             echo "Attempt $i/12: Testing connection to https://$APP_HOSTNAME..."
-            if curl -s --connect-timeout 10 -k "https://$APP_HOSTNAME" | grep -q "github-actions-example"; then
+            if curl -s --connect-timeout 10 -k "https://$APP_HOSTNAME" | grep -q "gha"; then
               echo "✅ Application is accessible!"
               break
             fi

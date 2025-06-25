@@ -1,5 +1,5 @@
 {{- if .Values.ingress.enabled -}}
-{{- $fullName := include "github-actions-example.fullname" . -}}
+{{- $fullName := include "gha.fullname" . -}}
 {{- $svcPortName := "" }}
 {{- /* Attempt to find a port named 'http', otherwise use the first port defined */}}
 {{- range .Values.service.ports }}
@@ -24,9 +24,9 @@ apiVersion: extensions/v1beta1
 {{- end }}
 kind: Ingress
 metadata:
-  name: {{ include "github-actions-example.fullname" . }}
+  name: {{ include "gha.fullname" . }}
   labels:
-    {{- include "github-actions-example.labels" . | nindent 4 }}
+    {{- include "gha.labels" . | nindent 4 }}
   annotations:
     {{- toYaml .Values.ingress.annotations | nindent 4 }}
 spec:
@@ -39,7 +39,7 @@ spec:
             pathType: {{ .Values.ingress.pathType | default "ImplementationSpecific" }}
             backend:
               service:
-                name: {{ include "github-actions-example.fullname" . }}
+                name: {{ include "gha.fullname" . }}
                 port:
                   {{- if $svcPortName }}
                   name: {{ $svcPortName }}

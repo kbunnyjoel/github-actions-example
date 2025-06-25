@@ -45,6 +45,7 @@ spec:
           hostname: "{{ app_name }}.bunnycloud.xyz" # Your application's actual hostname
           path: "/"
           pathType: "Prefix"
+          port: 3000 # Ensure this matches the containerPort
           annotations:
             kubernetes.io/ingress.class: "alb" # Ensures ALB controller picks it up
             alb.ingress.kubernetes.io/scheme: internet-facing

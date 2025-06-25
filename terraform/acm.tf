@@ -51,7 +51,7 @@ resource "aws_acm_certificate" "wildcard_certificate_ap_southeast_2" {
 }
 
 resource "aws_acm_certificate" "github_actions_example_certificate_ap_southeast_2" {
-  domain_name       = "github-actions-example.bunnycloud.xyz"
+  domain_name       = "gha.bunnycloud.xyz"
   validation_method = "DNS"
 
   tags = {

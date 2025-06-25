@@ -17,7 +17,7 @@ spec:
   source:
     repoURL: https://github.com/kbunnyjoel/github-actions-example # URL of the Git repository where your Helm chart is located
     targetRevision: feature/improvements # Git branch/tag/commit to sync from
-    path: apps/github-actions-example/chart # Path to the Helm chart within the repository (e.g., apps/nodejs/chart)
+    path: apps/gha/chart # Path to the Helm chart within the repository (e.g., apps/nodejs/chart)
     helm:
       values: |
         replicaCount: 1 # Default replica count, can be overridden
@@ -41,7 +41,7 @@ spec:
         ingress:
           enabled: true
           className: "alb"
-          hostname: "github-actions-example.bunnycloud.xyz"
+          hostname: "gha.bunnycloud.xyz"
           path: "/"
           pathType: "Prefix"
           annotations:
@@ -52,8 +52,7 @@ spec:
             alb.ingress.kubernetes.io/target-type: ip
             alb.ingress.kubernetes.io/backend-protocol: HTTP
             external-dns.alpha.kubernetes.io/ttl: "60"
-            external-dns.alpha.kubernetes.io/hostname: "github-actions-example.bunnycloud.xyz."
-
+            external-dns.alpha.kubernetes.io/hostname: "gha.bunnycloud.xyz"
         # Define resource requests and limits for your application pods
         resources: {} # Leave empty to use Helm chart defaults or override as needed
         #  limits:

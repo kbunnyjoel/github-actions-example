@@ -1,9 +1,9 @@
 apiVersion: v1
 kind: Service
 metadata:
-  name: {{ include "github-actions-example.fullname" . }}
+  name: {{ include "gha.fullname" . }}
   labels:
-    {{- include "github-actions-example.labels" . | nindent 4 }}
+    {{- include "gha.labels" . | nindent 4 }}
   {{- with .Values.service.annotations }}
   annotations:
     {{- toYaml . | nindent 4 }}
@@ -13,4 +13,4 @@ spec:
   ports:
     {{- toYaml .Values.service.ports | nindent 4 }}
   selector:
-    {{- include "github-actions-example.selectorLabels" . | nindent 4 }}
+    {{- include "gha.selectorLabels" . | nindent 4 }}
