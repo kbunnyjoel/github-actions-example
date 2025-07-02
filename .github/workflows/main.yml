@@ -1418,10 +1418,19 @@ jobs:
           git add k8s/argocd/applications/
           git commit -m "chore: update ArgoCD app manifests" || echo "No changes to commit."
 
-          # Always rebase onto the latest remote changes before pushing
-          git pull --rebase origin ${GITHUB_REF_NAME} || echo "Nothing to rebase"
+          # Determine the correct branch to push to depending on event type
+          if [[ "${GITHUB_EVENT_NAME}" == "pull_request" ]]; then
+            TARGET_BRANCH=$(jq -r .pull_request.head.ref "$GITHUB_EVENT_PATH")
+          else
+            TARGET_BRANCH="${GITHUB_REF_NAME}"
+          fi
 
-          git push origin HEAD:${GITHUB_REF_NAME}
+          echo "Pushing changes to branch: $TARGET_BRANCH"
+
+          # Always rebase onto the latest remote changes before pushing
+          git pull --rebase origin ${TARGET_BRANCH} || echo "Nothing to rebase"
+
+          git push origin HEAD:refs/heads/${TARGET_BRANCH}
 
   lint-and-deploy-helm:
     if: ${{ github.event.inputs.destroy_infra != 'true' }}
