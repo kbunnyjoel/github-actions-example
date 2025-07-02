@@ -87,7 +87,8 @@ resource "aws_iam_policy" "cluster_autoscaler_policy" {
           "autoscaling:DescribeLaunchConfigurations",
           "autoscaling:DescribeLaunchTemplateVersions",
           "autoscaling:DescribeTags",
-          "autoscaling:DescribeLaunchTemplates" # Added for launch templates
+          "autoscaling:DescribeLaunchTemplates", # Added for launch templates
+          "eks:DescribeNodegroup"
         ],
         Effect   = "Allow",
         Resource = "*" # Describe actions require * resource

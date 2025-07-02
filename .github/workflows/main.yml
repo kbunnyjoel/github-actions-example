@@ -376,6 +376,7 @@ jobs:
       - name: Configure kubectl for EKS
         run: |
           aws eks update-kubeconfig --region ap-southeast-2 --name github-actions-eks-example
+     
       - name: Wait for EKS API and nodes to be ready
         run: |
           echo "Waiting for Kubernetes API..."
@@ -440,9 +441,22 @@ jobs:
           helm repo add ingress-nginx https://kubernetes.github.io/ingress-nginx
           helm repo add argo https://argoproj.github.io/argo-helm
           helm repo add external-dns https://kubernetes-sigs.github.io/external-dns/
+          helm repo add metrics-server https://kubernetes-sigs.github.io/metrics-server/
           helm repo add eks https://aws.github.io/eks-charts
           helm repo add autoscaler https://kubernetes.github.io/autoscaler
           helm repo update
+
+      - name: Install Metrics Server
+        run: |
+          echo "Installing Kubernetes Metrics Server..."
+
+          helm upgrade --install metrics-server metrics-server/metrics-server \
+            --namespace kube-system \
+            --set 'args[0]=--kubelet-insecure-tls' \
+            --version 3.11.0 \
+            --wait
+
+          echo "Metrics Server installed and ready."
 
       - name: Get Cluster Autoscaler IAM Role ARN
         id: tf-output
@@ -525,46 +539,46 @@ jobs:
         run: |
           echo "The ACM_CERTIFICATE_ARN that will be used by Helm is: ${{ env.ACM_CERTIFICATE_ARN }}"
 
-      - name: Check NGINX Ingress Controller
-        id: check-nginx
-        run: |
-          if kubectl get namespace ingress-nginx &>/dev/null; then
-            if kubectl get deployment -n ingress-nginx ingress-nginx-controller &>/dev/null; then
-              echo "NGINX Ingress Controller deployment exists"
-              kubectl get pods -n ingress-nginx
-              kubectl get svc -n ingress-nginx
-              echo "nginx_exists=true" >> $GITHUB_OUTPUT
-            else
-              echo "nginx_exists=false" >> $GITHUB_OUTPUT
-            fi
-          else
-            echo "nginx_exists=false" >> $GITHUB_OUTPUT
-          fi
+      # - name: Check NGINX Ingress Controller
+      #   id: check-nginx
+      #   run: |
+      #     if kubectl get namespace ingress-nginx &>/dev/null; then
+      #       if kubectl get deployment -n ingress-nginx ingress-nginx-controller &>/dev/null; then
+      #         echo "NGINX Ingress Controller deployment exists"
+      #         kubectl get pods -n ingress-nginx
+      #         kubectl get svc -n ingress-nginx
+      #         echo "nginx_exists=true" >> $GITHUB_OUTPUT
+      #       else
+      #         echo "nginx_exists=false" >> $GITHUB_OUTPUT
+      #       fi
+      #     else
+      #       echo "nginx_exists=false" >> $GITHUB_OUTPUT
+      #     fi
           
-      - name: Get Ingress NGINX IAM Role ARN from Terraform
-        run: |
-          cd terraform
-          INGRESS_NGINX_ROLE_ARN=$(terraform output -raw ingress_nginx_iam_role_arn 2>/dev/null || echo "")
-          if [ -z "$INGRESS_NGINX_ROLE_ARN" ]; then
-            echo "Warning: Could not get ingress_nginx_iam_role_arn from Terraform output"
-            if [ -z "${AWS_ACCOUNT_ID}" ]; then
-              echo "Error: AWS_ACCOUNT_ID not found in environment."
-              exit 1
-            fi
-            FALLBACK_ROLE_NAME="eks-ingress-nginx-role"
-            # Use aws iam get-role to ensure ARN is correct and extract it
-            INGRESS_NGINX_ROLE_ARN=$(aws iam get-role --role-name "$FALLBACK_ROLE_NAME" --query 'Role.Arn' --output text 2>/dev/null || echo "")
-            if [ -z "$INGRESS_NGINX_ROLE_ARN" ]; then
-              echo "Error: Fallback role '$FALLBACK_ROLE_NAME' does not exist in AWS."
-              echo "Please check Terraform apply job and ensure the role was created with this name."
-              exit 1
-            fi
-            echo "Using fallback ingress-nginx IAM role ARN: $INGRESS_NGINX_ROLE_ARN"
-          fi
-          echo "Using ingress-nginx IAM role ARN: $INGRESS_NGINX_ROLE_ARN"
-          echo "INGRESS_NGINX_ROLE_ARN=${INGRESS_NGINX_ROLE_ARN}" >> $GITHUB_ENV
+      # - name: Get Ingress NGINX IAM Role ARN from Terraform
+      #   run: |
+      #     cd terraform
+      #     INGRESS_NGINX_ROLE_ARN=$(terraform output -raw ingress_nginx_iam_role_arn 2>/dev/null || echo "")
+      #     if [ -z "$INGRESS_NGINX_ROLE_ARN" ]; then
+      #       echo "Warning: Could not get ingress_nginx_iam_role_arn from Terraform output"
+      #       if [ -z "${AWS_ACCOUNT_ID}" ]; then
+      #         echo "Error: AWS_ACCOUNT_ID not found in environment."
+      #         exit 1
+      #       fi
+      #       FALLBACK_ROLE_NAME="eks-ingress-nginx-role"
+      #       # Use aws iam get-role to ensure ARN is correct and extract it
+      #       INGRESS_NGINX_ROLE_ARN=$(aws iam get-role --role-name "$FALLBACK_ROLE_NAME" --query 'Role.Arn' --output text 2>/dev/null || echo "")
+      #       if [ -z "$INGRESS_NGINX_ROLE_ARN" ]; then
+      #         echo "Error: Fallback role '$FALLBACK_ROLE_NAME' does not exist in AWS."
+      #         echo "Please check Terraform apply job and ensure the role was created with this name."
+      #         exit 1
+      #       fi
+      #       echo "Using fallback ingress-nginx IAM role ARN: $INGRESS_NGINX_ROLE_ARN"
+      #     fi
+      #     echo "Using ingress-nginx IAM role ARN: $INGRESS_NGINX_ROLE_ARN"
+      #     echo "INGRESS_NGINX_ROLE_ARN=${INGRESS_NGINX_ROLE_ARN}" >> $GITHUB_ENV
 
-      - name: Uninstall existing ArgoCD and ingress-nginx Helm releases
+      - name: Uninstall existing ArgoCD Helm release
         run: |
           helm uninstall argocd -n argocd || true
           # helm uninstall ingress-nginx -n ingress-nginx || true
