@@ -1,6 +1,9 @@
+const fs = require('fs');
+const https = require('https');
 const express = require('express');
 const path = require('path');
 const app = express();
+console.log('Running in NODE_ENV:', process.env.NODE_ENV);
 const port = process.env.PORT || 3000;
 
 // --- Live Reload Setup (for development) ---
@@ -32,6 +35,48 @@ app.use(express.static(path.join(__dirname, 'public')));
 app.use(express.urlencoded({ extended: true }));
 app.use(express.json()); // Add this line to parse JSON request bodies
 
+// Middleware to enforce API key, except on whitelisted paths
+app.use((req, res, next) => {
+  const isHealthCheck = req.path === '/status';
+  const isTestEnv = process.env.NODE_ENV === 'test';
+
+  if (isHealthCheck || isTestEnv) return next();
+
+ const exemptPaths = [
+  '',
+  '/',
+  '/index.html',
+  '/index',
+  '/home',
+  '/favicon.ico',
+  '/robots.txt',
+  '/.well-known/appspecific/com.chrome.devtools.json',
+  '/css',
+  '/js',
+  '/images'
+];
+
+
+  const apiKey = req.headers['x-api-key'] || (req.headers['authorization'] && req.headers['authorization'].replace('Bearer ', ''));
+  const expectedKey = process.env.EXPECTED_API_KEY;
+
+  const url = req.originalUrl.split('?')[0];
+  const isExempt = exemptPaths.some(p => url === p || url.startsWith(p + '/'));
+  if (isExempt) return next();
+
+  console.log('Incoming request path:', req.path);
+  console.log('Full original URL:', req.originalUrl);
+  console.log('Request headers:', req.headers);
+  console.log('Received API Key:', apiKey);
+  console.log('Expected API Key:', expectedKey);
+
+  if (!apiKey || apiKey !== expectedKey) {
+    return res.status(401).send('Api Key was not provided.');
+  }
+
+  next();
+});
+
 // Health check endpoint
 app.get('/status', (req, res) => {
   res.status(200).json({ status: 'ok' });
@@ -45,6 +90,7 @@ app.get('/', (req, res) => {
 // Handle form submission
 app.post('/add', (req, res) => {
   const { num1, num2 } = req.body;
+  console.log('Received inputs:', num1, num2);
 
   if (
     num1 === undefined || num2 === undefined ||
@@ -56,8 +102,10 @@ app.post('/add', (req, res) => {
 
   const parsedNum1 = parseFloat(num1);
   const parsedNum2 = parseFloat(num2);
+  console.log('Parsed inputs:', parsedNum1, parsedNum2);
 
   const result = parsedNum1 + parsedNum2;
+  console.log('Calculated result:', result);
 
   if (Number.isNaN(result)) {
     return res.status(200).json({ result: NaN });
@@ -71,9 +119,28 @@ app.post('/add', (req, res) => {
   return res.status(200).json({ result: roundedResult });
 });
 
-const server = app.listen(port, '0.0.0.0', () => {
-  console.log(`Server is running on http://0.0.0.0:${port}`);
-});
-
-// Export the app for supertest and server for explicit closing if needed
-module.exports = { app, server };
+if (require.main === module) {
+  if (fs.existsSync(path.join(__dirname, 'certs', 'key.pem')) &&
+      fs.existsSync(path.join(__dirname, 'certs', 'cert.pem'))) {
+    const httpsOptions = {
+      key: fs.readFileSync(path.join(__dirname, 'certs', 'key.pem')),
+      cert: fs.readFileSync(path.join(__dirname, 'certs', 'cert.pem')),
+    };
+    const server = https.createServer(httpsOptions, app).listen(port, '0.0.0.0', () => {
+      console.log(`HTTPS server is running on https://0.0.0.0:${port}`);
+    }).on('error', (err) => {
+      console.error('Failed to start HTTPS server:', err);
+    });
+    module.exports = { app, server };
+  } else {
+    const server = app.listen(port, '0.0.0.0', () => {
+      console.log(`HTTP server is running on http://0.0.0.0:${port}`);
+    }).on('error', (err) => {
+      console.error('Failed to start HTTP server:', err);
+    });
+    module.exports = { app, server };
+  }
+} else {
+  const server = app.listen(0);
+  module.exports = { app, server };
+}

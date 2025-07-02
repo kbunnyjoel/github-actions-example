@@ -1,5 +1,5 @@
 apiVersion: v2
-name: nodejs-app
+name: gha
 description: A Helm chart for deploying a Node.js application
 # This chart is used in the GitHub Actions example repository to demonstrate CI/CD with ArgoCD.
 # It deploys a simple Node.js application and is configured to work with ArgoCD.

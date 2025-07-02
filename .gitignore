@@ -158,7 +158,6 @@ dist
 *.test
 *~
 /pkg/
-aws/testdata/service/cloudformation/examplecompany-exampleservice-exampleresource/bin/handler
 bin/
 changelog.tmp
 dist/
@@ -166,8 +165,6 @@ example.tf
 log.txt
 markdown-link-check*.txt
 modules-dev/
-package-lock.json
-package.json
 skaff/skaff
 sweeper-bin
 terraform-provider-aws
@@ -194,4 +191,4 @@ awssdk.patch
 
 
 deployment_key.pem
-terraform/keys/*
+terraform/keys/

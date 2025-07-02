@@ -1,0 +1,61 @@
+replicaCount: 1
+
+image:
+  repository: your-docker-registry/your-nodejs-app # To be overridden by CI/CD
+  tag: "" # To be overridden by CI/CD with a specific version/commit SHA
+  pullPolicy: IfNotPresent
+
+containerPort: 3000 # The port your Node.js application listens on inside the container
+
+service:
+  type: ClusterIP
+  annotations: {}  # Will be populated by Jinja template
+  ports:
+    - name: http
+      port: 80
+      targetPort: 3000
+      protocol: TCP
+
+ingress:
+  enabled: true
+  className: "alb" # Default to ALB
+  hostname: "{{ app_name }}.bunnycloud.xyz"
+  path: "/"
+  pathType: "Prefix"
+  annotations:
+    kubernetes.io/ingress.class: "alb"
+    alb.ingress.kubernetes.io/scheme: internet-facing
+    alb.ingress.kubernetes.io/listen-ports: '[{"HTTPS":443}]' # Ensure no space if it causes issues
+    # alb.ingress.kubernetes.io/certificate-arn: "" # This will be overridden by ArgoCD
+    alb.ingress.kubernetes.io/target-type: ip
+    alb.ingress.kubernetes.io/backend-protocol: HTTP
+    external-dns.alpha.kubernetes.io/hostname: "{{ app_name }}.bunnycloud.xyz"
+    external-dns.alpha.kubernetes.io/ttl: "60"
+
+resources: {}
+  # We usually recommend not to specify default resources and to leave this as a conscious
+  # choice for the user. This also increases chances charts run on environments with
+  # constrained resources, such as Minikube. If you do want to specify resources, uncomment the
+  # following lines, adjust them as necessary, and remove the curly braces after 'resources:'.
+
+livenessProbe:
+  httpGet:
+    path: /status # Example path, adjust to your app's health check endpoint
+    port: 3000  # Use the actual port number instead of template expression
+  initialDelaySeconds: 15
+  periodSeconds: 20
+
+readinessProbe:
+  httpGet:
+    path: /status # Example path, adjust to your app's readiness endpoint
+    port: 3000  # Use the actual port number instead of template expression
+  initialDelaySeconds: 5
+  periodSeconds: 10
+
+
+aws_account_id: "123456789012"
+aws_region: "ap-southeast-2"
+ecr_repo_name: "github-actions-example"
+image_tag: "" # or set dynamically from CI
+
+acm_certificate_arn: ""  # Default, to be overridden by ArgoCD inline values or Helm CLI

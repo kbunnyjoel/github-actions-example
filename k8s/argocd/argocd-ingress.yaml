@@ -1,28 +1,17 @@
-# argocd-ingress.yaml
-apiVersion: networking.k8s.io/v1
-kind: Ingress
+apiVersion: v1
+kind: Service
 metadata:
-  name: argocd-server-ingress
+  name: argocd-server
   namespace: argocd
   annotations:
-    nginx.ingress.kubernetes.io/backend-protocol: "HTTPS"
-    nginx.ingress.kubernetes.io/ssl-passthrough: "false"
-    nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
+    service.beta.kubernetes.io/aws-load-balancer-ssl-cert: ${aws_acm_certificate.this.arn}
+    service.beta.kubernetes.io/aws-load-balancer-backend-protocol: http
+    service.beta.kubernetes.io/aws-load-balancer-ssl-ports: "443"
 spec:
-  ingressClassName: nginx
-  # TLS section
-  tls:
-  - hosts:
-    - argocd.bunnycloud.xyz
-    secretName: argocd-server-tls
-  rules:
-    - host: argocd.bunnycloud.xyz
-      http:
-        paths:
-          - path: /
-            pathType: Prefix
-            backend:
-              service:
-                name: argocd-server
-                port:
-                  number: 443  # Using HTTPS port for ArgoCD server
+  type: LoadBalancer
+  selector:
+    app.kubernetes.io/name: argocd-server
+  ports:
+    - name: https
+      port: 443
+      targetPort: 8080

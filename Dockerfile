@@ -1,6 +1,8 @@
 # Use an official Node.js runtime as a parent image
 # Using a specific LTS version like 20-alpine is good for smaller images and stability
-FROM node:20-alpine
+FROM node:22.16.0-alpine3.22
+
+
 
 # Set the working directory in the container
 WORKDIR /usr/src/app
@@ -11,10 +13,13 @@ WORKDIR /usr/src/app
 COPY package*.json ./
 
 # Install project dependencies
-RUN npm install
+# Use npm ci for cleaner, faster, and more reliable installs in CI/Docker
+RUN npm ci
+RUN rm -r /usr/local/lib/node_modules/npm/node_modules/cross-spawn/
 
 # Copy the rest of your application's code into the container
 COPY . .
+RUN rm -rf certs/
 
 EXPOSE 3000
 

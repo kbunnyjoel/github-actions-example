@@ -1,0 +1,49 @@
+{{- if .Values.ingress.enabled -}}
+{{- $fullName := include "gha.fullname" . -}}
+{{- $svcPortName := "" }}
+{{- /* Attempt to find a port named 'http', otherwise use the first port defined */}}
+{{- range .Values.service.ports }}
+  {{- if eq .name "http" }}
+    {{- $svcPortName = .name }}
+  {{- end }}
+{{- end }}
+{{- if not $svcPortName }}
+  {{- $svcPortName = (first .Values.service.ports).name }}
+{{- end }}
+{{- if and .Values.ingress.className (not (semverCompare ">=1.18-0" .Capabilities.KubeVersion.GitVersion)) }}
+  {{- if not (hasKey .Values.ingress.annotations "kubernetes.io/ingress.class") }}
+  {{- $_ := set .Values.ingress.annotations "kubernetes.io/ingress.class" .Values.ingress.className}}
+  {{- end }}
+{{- end }}
+{{- if semverCompare ">=1.19-0" .Capabilities.KubeVersion.GitVersion -}}
+apiVersion: networking.k8s.io/v1
+{{- else if semverCompare ">=1.14-0" .Capabilities.KubeVersion.GitVersion -}}
+apiVersion: networking.k8s.io/v1beta1
+{{- else -}}
+apiVersion: extensions/v1beta1
+{{- end }}
+kind: Ingress
+metadata:
+  name: {{ include "gha.fullname" . }}
+  labels:
+    {{- include "gha.labels" . | nindent 4 }}
+  annotations:
+    {{- toYaml .Values.ingress.annotations | nindent 4 }}
+spec:
+  ingressClassName: {{ .Values.ingress.className }}
+  rules:
+    - host: {{ .Values.ingress.hostname | quote }}
+      http:
+        paths:
+          - path: {{ .Values.ingress.path | default "/" }}
+            pathType: {{ .Values.ingress.pathType | default "ImplementationSpecific" }}
+            backend:
+              service:
+                name: {{ include "gha.fullname" . }}
+                port:
+                  {{- if $svcPortName }}
+                  name: {{ $svcPortName }}
+                  {{- else }}
+                  number: 3000
+                  {{- end }}
+{{- end }}

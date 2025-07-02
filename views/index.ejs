@@ -3,13 +3,14 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Simple Adder</title>
+    <title>Super Calculator</title>
+    <link rel="icon" href="/images/image2.ico" type="image/x-icon">
     <link rel="stylesheet" href="/css/style.css">
 </head>
 <body>
     <div class="container">
-        <h1>✨ The Amazing Adder ✨</h1>
-        <form action="/add" method="POST">
+        <h1>🚀 The Super Calculator 🚀</h1>
+        <form id="add-form">
             <input type="text" name="num1" placeholder="Enter first number" required>
             <span>+</span>
             <input type="text" name="num2" placeholder="Enter second number" required>
@@ -27,5 +28,53 @@
     <footer>
         <p><small>Powered by EJS & Express</small></p>
     </footer>
+    <script>
+        const API_KEY = '<%= process.env.API_KEY || "test123" %>'; // fallback if not defined
+
+        document.getElementById('add-form').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            const num1Input = document.querySelector('[name="num1"]');
+            const num2Input = document.querySelector('[name="num2"]');
+            const container = document.querySelector('.container');
+
+            const num1 = num1Input.value;
+            const num2 = num2Input.value;
+
+            try {
+                const res = await fetch('/add', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'x-api-key': API_KEY
+                    },
+                    body: JSON.stringify({ num1, num2 })
+                });
+
+                const data = await res.json();
+
+                const existingResult = document.querySelector('.result-output');
+                if (existingResult) {
+                    existingResult.remove();
+                }
+
+                const output = document.createElement('h2');
+                output.className = 'result-output';
+                if (data.result !== undefined) {
+                    output.textContent = `Result: ${data.result}`;
+                } else if (data.error) {
+                    output.classList.add('error');
+                    output.textContent = data.error;
+                }
+
+                container.appendChild(output);
+
+                num1Input.value = '';
+                num2Input.value = '';
+
+            } catch (err) {
+                console.error('Request failed', err);
+            }
+        });
+    </script>
 </body>
 </html>
