@@ -454,7 +454,6 @@ jobs:
           --namespace kube-system \
           --set args={--kubelet-insecure-tls} \
           --set hostNetwork=true \
-          --set metrics.enabled=true \
           --wait
 
           echo "Metrics Server installed and ready."
