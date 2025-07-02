@@ -460,9 +460,8 @@ jobs:
       - name: Cluster Name ENV
         run: |
           cd terraform
-          CLUSTER_NAME=$(terraform output -raw eks_cluster_name || echo "") >> $GITHUB_ENV
-          echo "Cluster name is: $CLUSTER_NAME"
-          echo "CLUSTER_NAME=${{ env.CLUSTER_NAME }}"
+          CLUSTER_NAME=$(terraform output -raw eks_cluster_name || echo "")
+          echo "CLUSTER_NAME=$CLUSTER_NAME" >> $GITHUB_ENV
 
       - name: Install Cluster Autoscaler
         run: |
