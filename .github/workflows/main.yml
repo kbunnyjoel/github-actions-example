@@ -1523,6 +1523,25 @@ jobs:
             sleep 10
           done
 
+      - name: Get app ingress hostname
+        id: get-app-hostname
+        run: |
+          APP_INGRESS_NAME="gha"  # Or use your variable if dynamic
+          APP_NAMESPACE="${{ env.APP_NAME }}"
+          
+          echo "Fetching ingress hostname for $APP_INGRESS_NAME in namespace $APP_NAMESPACE..."
+
+          INGRESS_HOSTNAME=$(kubectl get ingress -n "$APP_NAMESPACE" "$APP_INGRESS_NAME" -o jsonpath='{.status.loadBalancer.ingress[0].hostname}' || true)
+
+          if [ -z "$INGRESS_HOSTNAME" ]; then
+            echo "❌ Error: Failed to get ingress hostname for $APP_INGRESS_NAME in namespace $APP_NAMESPACE."
+            kubectl get ingress -n "$APP_NAMESPACE" "$APP_INGRESS_NAME" -o yaml || true
+            exit 1
+          fi
+
+          echo "✅ Ingress hostname: $INGRESS_HOSTNAME"
+          echo "APP_HOSTNAME=$INGRESS_HOSTNAME" >> $GITHUB_ENV
+
           echo "Waiting for Ingress '$APP_INGRESS_NAME' in namespace '${{ env.APP_NAME }}' to be created by ArgoCD..."
           for i in {1..60}; do # Wait up to 10 minutes (60 * 10s)
             if kubectl get ingress -n "${{ env.APP_NAME }}" "$APP_INGRESS_NAME" -o yaml > /dev/null 2>&1; then
@@ -1554,17 +1573,21 @@ jobs:
           echo "⏳ Sleeping 30 seconds before starting health checks..."
           sleep 30
 
+      - name: Check app status via ingress
+        run: |
+          APP_HOSTNAME="${{ env.APP_HOSTNAME }}"
+
           for i in {1..10}; do
-            echo "🔎 Checking app status inside container... Attempt $i"
-            response=$(docker exec live-app curl -ks -H "x-api-key: ${{ secrets.API_KEY }}" http://localhost:3000/status || true)
+            echo "🔎 Checking app status via https://$APP_HOSTNAME... Attempt $i"
+            response=$(curl -ks -H "x-api-key: ${{ secrets.API_KEY }}" "https://$APP_HOSTNAME/status" || true)
             echo "📝 Response: $response"
 
             if [[ "$response" == *'"status":"ok"'* ]]; then
-              echo "✅ App is healthy."
+              echo "✅ App is healthy and accessible over HTTPS."
               exit 0
             fi
 
-            echo "❌ Unexpected response. Retrying..."
+            echo "❌ Unexpected response, retrying in 10 seconds..."
             sleep 10
           done
 
