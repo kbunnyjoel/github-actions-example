@@ -803,6 +803,38 @@ jobs:
       - name: Patch ArgoCD resources with Helm ownership
         run: bash k8s/argocd/patch-argocd-helm-ownership.sh
 
+      - name: Verify ArgoCD DNS CNAME propagation
+        run: |
+          ARGOCD_HOSTNAME="argocd.bunnycloud.xyz"
+          echo "🔎 Verifying CNAME record for ArgoCD domain: $ARGOCD_HOSTNAME"
+          
+          echo "🔍 Looking up expected Load Balancer hostname..."
+          NGINX_LB_HOSTNAME=$(kubectl get svc -n ingress-nginx ingress-nginx-controller -o jsonpath='{.status.loadBalancer.ingress[0].hostname}' 2>/dev/null)
+      
+          if [ -z "$NGINX_LB_HOSTNAME" ]; then
+            echo "❌ Could not determine NGINX Ingress LoadBalancer hostname."
+            exit 1
+          fi
+          echo "✅ Expected CNAME target: $NGINX_LB_HOSTNAME"
+      
+          echo "⏳ Checking DNS resolution for $ARGOCD_HOSTNAME..."
+          for i in {1..10}; do
+            RESOLVED_CNAME=$(dig +short -t CNAME $ARGOCD_HOSTNAME @8.8.8.8 | sed 's/\.$//')
+      
+            if [ -n "$RESOLVED_CNAME" ] && [ "$RESOLVED_CNAME" = "$NGINX_LB_HOSTNAME" ]; then
+              echo "✅ DNS CNAME propagated: $ARGOCD_HOSTNAME -> $RESOLVED_CNAME"
+              exit 0
+            fi
+      
+            echo "Attempt $i/10: DNS not yet propagated. Resolved: '$RESOLVED_CNAME'. Retrying in 30s..."
+            sleep 30
+          done
+      
+          echo "❌ DNS CNAME did not propagate within the expected time."
+          echo "Final DNS lookup result:"
+          dig $ARGOCD_HOSTNAME +trace
+          exit 1
+
       # Get LoadBalancer Hostname for ArgoCD Ingress
       - name: Get LoadBalancer Hostname
         id: get_lb
