@@ -41,3 +41,8 @@ output "github_actions_example_certificate_arn" {
   description = "ARN of the ACM certificate for github-actions-example.bunnycloud.xyz"
   value       = aws_acm_certificate.github_actions_example_certificate_ap_southeast_2.arn
 }
+
+output "eks_cluster_name" {
+  description = "The name of the EKS cluster"
+  value       = module.eks.cluster_name.name
+}

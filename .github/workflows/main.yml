@@ -457,13 +457,20 @@ jobs:
           cd terraform 
           echo "CLUSTER_AUTOSCALER_ROLE_ARN=$(terraform output -raw cluster_autoscaler_role_arn)" >> $GITHUB_ENV
 
+      - name: Cluster Name ENV
+        run: |
+          cd terraform
+          CLUSTER_NAME=$(terraform output -raw eks_cluster_name || echo "")
+          echo "CLUSTER_NAME=${{ env.APP_NAME }}" >> $GITHUB_ENV
+          echo "CLUSTER_NAME=${{ env.APP_NAME }}" >> $GITHUB_OUTPUT
+
       - name: Install Cluster Autoscaler
         run: |
           helm upgrade --install cluster-autoscaler autoscaler/cluster-autoscaler \
             --namespace kube-system \
             --set cloudProvider=aws \
             --set awsRegion=${{ env.AWS_REGION }} \
-            --set autoDiscovery.clusterName=${{ env.APP_NAME }} \
+            --set autoDiscovery.clusterName=${{ env.CLUSTER_NAME }} \
             --set serviceAccount.create=true \
             --set serviceAccount.name=cluster-autoscaler \
             --set fullnameOverride=cluster-autoscaler \
@@ -480,7 +487,7 @@ jobs:
             echo "Attempt $i: Installing AWS Load Balancer Controller..."
             helm upgrade --install aws-load-balancer-controller eks/aws-load-balancer-controller \
               -n kube-system \
-              --set clusterName=${{ env.APP_NAME }} \
+              --set clusterName=${{ env.CLUSTER_NAME }} \
               --set serviceAccount.create=true \
               --set serviceAccount.name=aws-load-balancer-controller \
               --set serviceAccount.annotations."eks\.amazonaws\.com/role-arn"="${{ env.ALB_CONTROLLER_ROLE_ARN }}" \
