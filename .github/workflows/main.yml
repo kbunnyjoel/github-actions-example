@@ -803,6 +803,12 @@ jobs:
       - name: Patch ArgoCD resources with Helm ownership
         run: bash k8s/argocd/patch-argocd-helm-ownership.sh
 
+      - name: Debug ExternalDNS logs
+        run: |
+          echo "Fetching recent logs from ExternalDNS to help diagnose DNS issues..."
+          kubectl logs -n external-dns -l app.kubernetes.io/name=external-dns --tail=100
+          kubectl get deployment external-dns -n external-dns -o yaml
+
       - name: Verify ArgoCD DNS CNAME propagation
         run: |
           ARGOCD_HOSTNAME="argocd.bunnycloud.xyz"
@@ -818,7 +824,7 @@ jobs:
           echo "✅ Expected CNAME target: $NGINX_LB_HOSTNAME"
       
           echo "⏳ Checking DNS resolution for $ARGOCD_HOSTNAME..."
-          for i in {1..10}; do
+          for i in {1..20}; do
             RESOLVED_CNAME=$(dig +short -t CNAME $ARGOCD_HOSTNAME @8.8.8.8 | sed 's/\.$//')
       
             if [ -n "$RESOLVED_CNAME" ] && [ "$RESOLVED_CNAME" = "$NGINX_LB_HOSTNAME" ]; then
@@ -826,7 +832,7 @@ jobs:
               exit 0
             fi
       
-            echo "Attempt $i/10: DNS not yet propagated. Resolved: '$RESOLVED_CNAME'. Retrying in 30s..."
+            echo "Attempt $i/20: DNS not yet propagated. Resolved: '$RESOLVED_CNAME'. Retrying in 30s..."
             sleep 30
           done
       
