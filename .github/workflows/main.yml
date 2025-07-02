@@ -461,6 +461,7 @@ jobs:
         run: |
           cd terraform
           CLUSTER_NAME=$(terraform output -raw eks_cluster_name || echo "")
+          echo "Cluster name is: ${{ env.CLUSTER_NAME }}"
           echo "CLUSTER_NAME=${{ env.CLUSTER_NAME }}" >> $GITHUB_ENV
           echo "CLUSTER_NAME=${{ env.CLUSTER_NAME }}" >> $GITHUB_OUTPUT
 
