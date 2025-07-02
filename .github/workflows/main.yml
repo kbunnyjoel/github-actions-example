@@ -453,7 +453,6 @@ jobs:
           helm upgrade --install metrics-server metrics-server/metrics-server \
             --namespace kube-system \
             --set 'args[0]=--kubelet-insecure-tls' \
-            --set hostNetwork.enabled=true \
             --version 3.11.0 \
             --wait
 
