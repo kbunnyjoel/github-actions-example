@@ -1415,13 +1415,10 @@ jobs:
           git config --global user.name 'github-actions[bot]'
           git config --global user.email 'github-actions[bot]@users.noreply.github.com'
 
-          git fetch origin feature/improvements || echo "Branch feature/improvements does not exist remotely, will create it."
-          git checkout -B feature/improvements
-
           git add k8s/argocd/applications/
           git commit -m "chore: update ArgoCD app manifests" || echo "No changes to commit."
 
-          git push origin feature/improvements
+          git push origin HEAD:${GITHUB_REF_NAME}
 
   lint-and-deploy-helm:
     if: ${{ github.event.inputs.destroy_infra != 'true' }}
