@@ -1418,6 +1418,9 @@ jobs:
           git add k8s/argocd/applications/
           git commit -m "chore: update ArgoCD app manifests" || echo "No changes to commit."
 
+          # Always rebase onto the latest remote changes before pushing
+          git pull --rebase origin ${GITHUB_REF_NAME} || echo "Nothing to rebase"
+
           git push origin HEAD:${GITHUB_REF_NAME}
 
   lint-and-deploy-helm:
