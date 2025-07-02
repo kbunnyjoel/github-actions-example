@@ -210,9 +210,9 @@ module "eks" {
 
   eks_managed_node_groups = {
     spot-nodes = {
-      desired_size      = 1
+      desired_size      = 5
       min_size          = 1
-      max_size          = 3
+      max_size          = 5
       instance_types    = ["c6g.large", "c6g.xlarge"]
       ami_type          = "AL2_ARM_64"
       capacity_type     = "SPOT"
