@@ -1415,9 +1415,11 @@ jobs:
           git config --global user.name 'github-actions[bot]'
           git config --global user.email 'github-actions[bot]@users.noreply.github.com'
 
-          git pull --rebase --autostash origin feature/improvements || {
-            echo "⚠️ Git pull failed, possibly due to merge conflict or empty pull."
-          }
+          git fetch origin feature/improvements || echo "Branch feature/improvements does not exist remotely, will create it."
+          git checkout -B feature/improvements
+
+          git add k8s/argocd/applications/
+          git commit -m "chore: update ArgoCD app manifests" || echo "No changes to commit."
 
           git push origin feature/improvements
 
