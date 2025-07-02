@@ -21,6 +21,7 @@ A practical example project showcasing a **production-ready GitOps pipeline** us
 - **ExternalDNS** – Dynamic DNS in Route53
 - **AWS Route53** – DNS hosting
 - **Helm** – Kubernetes package manager
+- **AWS Cognito** – User authentication provider
 
 ## 📦 Setup & Deployment
 
@@ -29,6 +30,7 @@ A practical example project showcasing a **production-ready GitOps pipeline** us
 3. **Install ExternalDNS** with dynamic AWS ALB integration
 4. **Deploy your applications** through ArgoCD synced with GitHub Actions
 5. **Validate DNS & service availability** automatically in pipeline
+6. Configure AWS Cognito for application user authentication (optional)
 
 ## ✅ CI/CD Status
 
@@ -45,7 +47,60 @@ A practical example project showcasing a **production-ready GitOps pipeline** us
 - Health checks for application readiness
 - GitOps with ArgoCD ensures consistent state
 - Automated DNS updates minimize manual configuration
+- Integrates with AWS Cognito for secure user authentication
 
 ## 📄 License
 
 MIT © 2025 Bunny Kocharla
+
+## 🗺 Architecture Overview
+
+```
+[ GitHub Actions ]
+        │
+        ▼
+[ Terraform ]
+        │
+        ▼
+[ AWS EKS (Graviton Nodes) ]
+        │
+        ├── [ ArgoCD ] ←── GitOps sync from GitHub
+        │
+        ├── [ ExternalDNS ] ←── Updates Route53 records
+        │
+        └── [ AWS ALB Ingress Controller ]
+                │
+                ▼
+        [ Deployed Applications ]
+                └── [ AWS Cognito ] ←── User authentication
+```
+
+- GitHub Actions triggers both Terraform (for infra) and ArgoCD sync (for app deployment).
+- ExternalDNS automatically updates Route53 records with ALB-assigned hostnames.
+- ALB provides secure HTTPS ingress using ACM certificates.
+
+## 💻 Quick Usage Example
+
+```bash
+# 1️⃣ Clone the repo
+git clone https://github.com/bunnykocharla/github-actions-example.git
+cd github-actions-example
+
+# 2️⃣ Provision EKS infrastructure
+cd terraform
+terraform init
+terraform apply
+
+# 3️⃣ Deploy ArgoCD & ExternalDNS
+cd ../k8s
+helm install argocd argo/argo-cd -n argocd --create-namespace
+helm install externaldns bitnami/external-dns -n externaldns --create-namespace \
+  --set provider=aws --set aws.zoneType=public
+
+# 4️⃣ Deploy your app using ArgoCD by pushing manifests to the repo:
+git add .
+git commit -m "Deploy my awesome app 🚀"
+git push
+
+# 5️⃣ Watch GitHub Actions build & ArgoCD sync deploy your app automatically!
+```
