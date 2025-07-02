@@ -686,28 +686,28 @@ jobs:
       #     echo "Verifying NGINX Ingress Controller configuration..."
       #     kubectl get configmap -n ingress-nginx ingress-nginx-controller -o yaml
 
-      - name: Get NGINX Ingress Controller LB Hostname
-        id: get-nginx-hostname
-        run: |
-          echo "Fetching NGINX Ingress Controller ELB hostname..."
-          MAX_RETRIES=30
-          SLEEP_BETWEEN=10
-          for i in $(seq 1 $MAX_RETRIES); do
-            NGINX_LB_HOSTNAME=$(kubectl get svc -n ingress-nginx ingress-nginx-controller -o jsonpath='{.status.loadBalancer.ingress[0].hostname}' 2>/dev/null)
-            if [ -n "$NGINX_LB_HOSTNAME" ]; then
-              echo "✅ NGINX ELB hostname found: $NGINX_LB_HOSTNAME"
-              echo "NGINX_LB_HOSTNAME=$NGINX_LB_HOSTNAME" >> $GITHUB_ENV
-              echo "NGINX_LB_HOSTNAME=$NGINX_LB_HOSTNAME" >> $GITHUB_OUTPUT
-              break
-            fi
-            echo "⏳ Attempt $i/$MAX_RETRIES: Waiting for NGINX Ingress Controller LB hostname..."
-            sleep $SLEEP_BETWEEN
-            if [ $i -eq $MAX_RETRIES ]; then
-              echo "❌ Error: NGINX ELB hostname not found after waiting."
-              kubectl get svc -n ingress-nginx ingress-nginx-controller -o yaml || true
-              exit 1
-            fi
-          done
+      # - name: Get NGINX Ingress Controller LB Hostname
+      #   id: get-nginx-hostname
+      #   run: |
+      #     echo "Fetching NGINX Ingress Controller ELB hostname..."
+      #     MAX_RETRIES=30
+      #     SLEEP_BETWEEN=10
+      #     for i in $(seq 1 $MAX_RETRIES); do
+      #       NGINX_LB_HOSTNAME=$(kubectl get svc -n ingress-nginx ingress-nginx-controller -o jsonpath='{.status.loadBalancer.ingress[0].hostname}' 2>/dev/null)
+      #       if [ -n "$NGINX_LB_HOSTNAME" ]; then
+      #         echo "✅ NGINX ELB hostname found: $NGINX_LB_HOSTNAME"
+      #         echo "NGINX_LB_HOSTNAME=$NGINX_LB_HOSTNAME" >> $GITHUB_ENV
+      #         echo "NGINX_LB_HOSTNAME=$NGINX_LB_HOSTNAME" >> $GITHUB_OUTPUT
+      #         break
+      #       fi
+      #       echo "⏳ Attempt $i/$MAX_RETRIES: Waiting for NGINX Ingress Controller LB hostname..."
+      #       sleep $SLEEP_BETWEEN
+      #       if [ $i -eq $MAX_RETRIES ]; then
+      #         echo "❌ Error: NGINX ELB hostname not found after waiting."
+      #         kubectl get svc -n ingress-nginx ingress-nginx-controller -o yaml || true
+      #         exit 1
+      #       fi
+      #     done
       
       - name: Get ArgoCD Role ARN
         id: tf_output
@@ -841,26 +841,6 @@ jobs:
           dig $ARGOCD_HOSTNAME +trace
           exit 1
 
-      # Get LoadBalancer Hostname for ArgoCD Ingress
-      - name: Get LoadBalancer Hostname
-        id: get_lb
-        run: |
-          echo "Waiting for NGINX Ingress LoadBalancer hostname..."
-          for i in {1..30}; do
-            HOSTNAME=$(kubectl get svc -n ingress-nginx ingress-nginx-controller -o jsonpath='{.status.loadBalancer.ingress[0].hostname}' 2>/dev/null)
-            if [ -n "$HOSTNAME" ]; then
-              echo "✅ LoadBalancer hostname found: $HOSTNAME"
-              echo "lb_hostname=$HOSTNAME" >> $GITHUB_OUTPUT
-              break
-            fi
-            echo "⏳ Attempt $i: LoadBalancer hostname not yet available. Retrying in 5s..."
-            sleep 5
-          done
-
-          if [ -z "$HOSTNAME" ]; then
-            echo "❌ ERROR: LoadBalancer hostname still not available after retries."
-            exit 1
-          fi
       - name: Validate ArgoCD IAM role integration
         run: |
           echo "Validating ArgoCD IAM role integration..."
@@ -1226,7 +1206,7 @@ jobs:
 
       - name: Verify ArgoCD Installation and DNS
         run: |
-          echo "Checking ArgoCD installation status..."
+          echo "Checking ArgoCD pods..."
           kubectl get pods -n argocd
 
           echo "Checking ArgoCD service..."
@@ -1235,54 +1215,40 @@ jobs:
           echo "Checking ArgoCD ingress..."
           kubectl get ingress -n argocd
 
-          echo "Waiting for NGINX Ingress Controller LoadBalancer to get an address..."
-          NGINX_LB_HOSTNAME=""
-          RETRIES=15
+          echo "Fetching ArgoCD ALB hostname from Ingress..."
+          ARGOCD_LB_HOSTNAME=$(kubectl get ingress -n argocd argocd-server -o jsonpath="{.status.loadBalancer.ingress[0].hostname}" 2>/dev/null)
 
-          for i in $(seq 1 $RETRIES); do
-            NGINX_LB_HOSTNAME=$(kubectl get svc -n ingress-nginx ingress-nginx-controller -o jsonpath="{.status.loadBalancer.ingress[0].hostname}" 2>/dev/null)
-
-            if [ -n "$NGINX_LB_HOSTNAME" ]; then
-              echo "✅ NGINX LoadBalancer hostname found: $NGINX_LB_HOSTNAME"
-              break
-            fi
-
-            echo "⏳ Attempt $i/$RETRIES: Waiting for LoadBalancer hostname..."
-            sleep 20
-          done
-
-          if [ -z "$NGINX_LB_HOSTNAME" ]; then
-            echo "❌ Error: Could not find NGINX Ingress Controller LoadBalancer hostname after timeout."
+          if [ -z "$ARGOCD_LB_HOSTNAME" ]; then
+            echo "❌ Error: Could not determine ArgoCD ALB hostname from ingress."
             exit 1
           fi
+          echo "✅ ArgoCD ALB hostname: $ARGOCD_LB_HOSTNAME"
 
           ARGOCD_HOSTNAME="argocd.bunnycloud.xyz"
 
-          echo "🔍 Verifying DNS CNAME record for $ARGOCD_HOSTNAME (should point to $NGINX_LB_HOSTNAME)..."
+          echo "🔍 Verifying DNS CNAME record for $ARGOCD_HOSTNAME (should point to $ARGOCD_LB_HOSTNAME)..."
           echo "Waiting for DNS propagation (max 5 minutes)..."
+
           for i in {1..10}; do
-            # Query for CNAME records
             RESOLVED_CNAME=$(dig +short -t CNAME $ARGOCD_HOSTNAME @8.8.8.8 | sed 's/\.$//')
-            EXPECTED_CNAME=$(echo $NGINX_LB_HOSTNAME | sed 's/\.$//')
+            EXPECTED_CNAME=$(echo $ARGOCD_LB_HOSTNAME | sed 's/\.$//')
 
             if [ -n "$RESOLVED_CNAME" ] && [ "$RESOLVED_CNAME" = "$EXPECTED_CNAME" ]; then
-              echo "✅ DNS CNAME record for $ARGOCD_HOSTNAME propagated and correctly points to $EXPECTED_CNAME."
-              break
+              echo "✅ DNS CNAME record for $ARGOCD_HOSTNAME propagated correctly: $RESOLVED_CNAME"
+              exit 0
             fi
 
-            echo "⏳ Attempt $i/10: DNS CNAME record not ready or mismatch."
-            echo "   ArgoCD resolved CNAME: '$RESOLVED_CNAME'"
-            echo "   Expected CNAME: '$EXPECTED_CNAME'"
+            echo "⏳ Attempt $i/10: DNS CNAME not ready or mismatch."
+            echo "   Resolved: '$RESOLVED_CNAME'"
+            echo "   Expected: '$EXPECTED_CNAME'"
             sleep 30
-
-            if [ $i -eq 10 ]; then
-              echo "⚠️ Warning: DNS CNAME propagation for $ARGOCD_HOSTNAME timed out or CNAME mismatch."
-              echo "Final DNS CNAME record resolution for $ARGOCD_HOSTNAME:"
-              dig -t CNAME $ARGOCD_HOSTNAME @8.8.8.8
-              echo "Final CNAME expected: $EXPECTED_CNAME"
-              dig $ARGOCD_HOSTNAME +trace
-            fi
           done
+
+          echo "⚠️ DNS CNAME propagation for $ARGOCD_HOSTNAME timed out or mismatch."
+          echo "Final DNS resolution:"
+          dig -t CNAME $ARGOCD_HOSTNAME @8.8.8.8
+          dig $ARGOCD_HOSTNAME +trace
+          exit 1
           
       # Security group rules are now managed by Terraform in eks_sg_rules.tf
       - name: Verify EKS security group rules
