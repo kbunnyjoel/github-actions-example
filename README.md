@@ -148,3 +148,12 @@ git push
 npm install
 npm test
 ```
+
+ArgoCD login:
+<img width="1408" alt="image" src="https://github.com/user-attachments/assets/2cb07206-38b5-4b04-9b47-ffdab94e3f6f" />
+
+Nodejs Application:
+
+<img width="1060" alt="image" src="https://github.com/user-attachments/assets/2fee24d2-ac49-4189-84f3-c5bc971b4b81" />
+
+
