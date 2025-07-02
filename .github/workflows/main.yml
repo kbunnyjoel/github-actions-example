@@ -774,6 +774,23 @@ jobs:
           # Print the deployed ArgoCD Ingress for verification
           echo "Deployed ArgoCD Ingress (argocd-server) configuration:"
           kubectl -n argocd get ingress argocd-server -o yaml || echo "ArgoCD Ingress 'argocd-server' not found."
+
+      - name: Reset ArgoCD admin password secret with new password
+        run: |
+          echo "🔄 Deleting existing argocd-initial-admin-secret if it exists..."
+          kubectl delete secret argocd-initial-admin-secret -n argocd || true
+
+          echo "🔐 Recreating argocd-initial-admin-secret with new password..."
+          NEW_PASSWORD="admin" # Replace with a secure password or secret in production
+          kubectl -n argocd create secret generic argocd-initial-admin-secret \
+            --from-literal=password=$NEW_PASSWORD \
+            --from-literal=clearPassword=$NEW_PASSWORD
+
+          echo "🔁 Restarting ArgoCD server deployment to apply the new admin password..."
+          kubectl -n argocd rollout restart deployment argocd-server
+
+          echo "✅ ArgoCD admin password has been reset to: $NEW_PASSWORD"
+          
       - name: Patch ArgoCD resources with Helm ownership
         run: bash k8s/argocd/patch-argocd-helm-ownership.sh
 
@@ -799,52 +816,52 @@ jobs:
           fi
 
       # Patch ArgoCD Ingress and CNAME Record if mismatched
-      - name: Patch ArgoCD Ingress and CNAME Record
-        run: |
-          cd terraform
-          HOSTED_ZONE_ID="$( terraform output -raw route53_zone_id )"
-          EXPECTED_HOSTNAME="${{ steps.get_lb.outputs.lb_hostname }}"
-          echo "Expected LB Hostname: $EXPECTED_HOSTNAME"
+      # - name: Patch ArgoCD Ingress and CNAME Record
+      #   run: |
+      #     cd terraform
+      #     HOSTED_ZONE_ID="$( terraform output -raw route53_zone_id )"
+      #     EXPECTED_HOSTNAME="${{ steps.get_lb.outputs.lb_hostname }}"
+      #     echo "Expected LB Hostname: $EXPECTED_HOSTNAME"
 
-          # CURRENT_HOST=$(kubectl -n argocd get ingress argocd-server -o jsonpath='{.spec.loadBalancer.ingress[0].hostname}')
-          # if [[ "$CURRENT_HOST" != $EXPECTED_HOSTNAME ]]; then
-          #   echo "Patching ingress host..."
-          #   kubectl -n argocd patch ingress argocd-server --type='json' \
-          #     -p="[{'op': 'replace', 'path': '/spec/rules/0/host', 'value': 'argocd.bunnycloud.xyz'}]"
-          # fi
+      #     # CURRENT_HOST=$(kubectl -n argocd get ingress argocd-server -o jsonpath='{.spec.loadBalancer.ingress[0].hostname}')
+      #     # if [[ "$CURRENT_HOST" != $EXPECTED_HOSTNAME ]]; then
+      #     #   echo "Patching ingress host..."
+      #     #   kubectl -n argocd patch ingress argocd-server --type='json' \
+      #     #     -p="[{'op': 'replace', 'path': '/spec/rules/0/host', 'value': 'argocd.bunnycloud.xyz'}]"
+      #     # fi
 
-          # # Check for empty EXPECTED_HOSTNAME before DNS update
-          # if [ -z "$EXPECTED_HOSTNAME" ]; then
-          #   echo "❌ ERROR: NGINX Load Balancer hostname is empty. Skipping DNS update."
-          #   exit 1
-          # fi
-          # echo "Updating Route53 with CNAME pointing to: $EXPECTED_HOSTNAME"
+      #     # # Check for empty EXPECTED_HOSTNAME before DNS update
+      #     # if [ -z "$EXPECTED_HOSTNAME" ]; then
+      #     #   echo "❌ ERROR: NGINX Load Balancer hostname is empty. Skipping DNS update."
+      #     #   exit 1
+      #     # fi
+      #     # echo "Updating Route53 with CNAME pointing to: $EXPECTED_HOSTNAME"
 
-          echo "Updating Route53 CNAME if needed..."
-          cat > change-batch.json <<EOF
-          {
-            "Comment": "Update argocd.bunnycloud.xyz to point to LB",
-            "Changes": [
-              {
-                "Action": "UPSERT",
-                "ResourceRecordSet": {
-                  "Name": "argocd.bunnycloud.xyz",
-                  "Type": "CNAME",
-                  "TTL": 60,
-                  "ResourceRecords": [
-                    {
-                      "Value": "$EXPECTED_HOSTNAME"
-                    }
-                  ]
-                }
-              }
-            ]
-          }
-          EOF
+      #     echo "Updating Route53 CNAME if needed..."
+      #     cat > change-batch.json <<EOF
+      #     {
+      #       "Comment": "Update argocd.bunnycloud.xyz to point to LB",
+      #       "Changes": [
+      #         {
+      #           "Action": "UPSERT",
+      #           "ResourceRecordSet": {
+      #             "Name": "argocd.bunnycloud.xyz",
+      #             "Type": "CNAME",
+      #             "TTL": 60,
+      #             "ResourceRecords": [
+      #               {
+      #                 "Value": "$EXPECTED_HOSTNAME"
+      #               }
+      #             ]
+      #           }
+      #         }
+      #       ]
+      #     }
+      #     EOF
 
-          aws route53 change-resource-record-sets \
-            --hosted-zone-id $HOSTED_ZONE_ID \
-            --change-batch file://change-batch.json
+      #     aws route53 change-resource-record-sets \
+      #       --hosted-zone-id $HOSTED_ZONE_ID \
+      #       --change-batch file://change-batch.json
   
       - name: Validate ArgoCD IAM role integration
         run: |
@@ -1011,81 +1028,81 @@ jobs:
           echo "Using hosted zone ID: $HOSTED_ZONE_ID"
           echo "HOSTED_ZONE_ID=$HOSTED_ZONE_ID" >> $GITHUB_ENV
           
-      - name: Cleanup DNS conflicts before ExternalDNS install
-        run: |
-          sudo apt-get update && sudo apt-get install -y jq
-          HOSTED_ZONE_ID="${{ env.HOSTED_ZONE_ID }}"
+      # - name: Cleanup DNS conflicts before ExternalDNS install
+      #   run: |
+      #     sudo apt-get update && sudo apt-get install -y jq
+      #     HOSTED_ZONE_ID="${{ env.HOSTED_ZONE_ID }}"
           
-          # Define all base hostnames that ExternalDNS will manage
-          BASE_HOSTNAMES=(
-            "gha.bunnycloud.xyz"
-            "argocd.bunnycloud.xyz"
-          )
+      #     # Define all base hostnames that ExternalDNS will manage
+      #     BASE_HOSTNAMES=(
+      #       "gha.bunnycloud.xyz"
+      #       "argocd.bunnycloud.xyz"
+      #     )
 
-          RECORDS_TO_QUERY_AND_DELETE=()
+      #     RECORDS_TO_QUERY_AND_DELETE=()
 
-          for HOSTNAME_BASE in "${BASE_HOSTNAMES[@]}"; do
-            HOSTNAME_FQDN="${HOSTNAME_BASE}."
-            RECORDS_TO_QUERY_AND_DELETE+=(
-              "${HOSTNAME_FQDN}" # A or CNAME for the hostname itself
-              "externaldns-cname-${HOSTNAME_FQDN}" # ExternalDNS TXT record for CNAME ownership
-              "externaldns-${HOSTNAME_FQDN}"       # ExternalDNS TXT record for A record ownership (if applicable)
-            )
-          done
+      #     for HOSTNAME_BASE in "${BASE_HOSTNAMES[@]}"; do
+      #       HOSTNAME_FQDN="${HOSTNAME_BASE}."
+      #       RECORDS_TO_QUERY_AND_DELETE+=(
+      #         "${HOSTNAME_FQDN}" # A or CNAME for the hostname itself
+      #         "externaldns-cname-${HOSTNAME_FQDN}" # ExternalDNS TXT record for CNAME ownership
+      #         "externaldns-${HOSTNAME_FQDN}"       # ExternalDNS TXT record for A record ownership (if applicable)
+      #       )
+      #     done
           
-          echo "Will query and attempt to delete the following records if they exist:"
-          printf "%s\n" "${RECORDS_TO_QUERY_AND_DELETE[@]}"
+      #     echo "Will query and attempt to delete the following records if they exist:"
+      #     printf "%s\n" "${RECORDS_TO_QUERY_AND_DELETE[@]}"
 
-          CHANGES_JSON="[]"
+      #     CHANGES_JSON="[]"
 
-          for RECORD_NAME_TO_CLEAN in "${RECORDS_TO_QUERY_AND_DELETE[@]}"; do
-            echo "🔍 Checking for records in Route 53 for $RECORD_NAME_TO_CLEAN..."
-            # Ensure we only attempt to delete records that actually exist and have ResourceRecords
-            EXISTING_RECORDS_FOR_NAME=$(aws route53 list-resource-record-sets --hosted-zone-id "$HOSTED_ZONE_ID" \
-              --query "ResourceRecordSets[?Name == '$RECORD_NAME_TO_CLEAN']" --output json)
+      #     for RECORD_NAME_TO_CLEAN in "${RECORDS_TO_QUERY_AND_DELETE[@]}"; do
+      #       echo "🔍 Checking for records in Route 53 for $RECORD_NAME_TO_CLEAN..."
+      #       # Ensure we only attempt to delete records that actually exist and have ResourceRecords
+      #       EXISTING_RECORDS_FOR_NAME=$(aws route53 list-resource-record-sets --hosted-zone-id "$HOSTED_ZONE_ID" \
+      #         --query "ResourceRecordSets[?Name == '$RECORD_NAME_TO_CLEAN']" --output json)
 
-            if [ "$EXISTING_RECORDS_FOR_NAME" != "[]" ]; then
-              echo "⚠️ Records found for $RECORD_NAME_TO_CLEAN. Preparing deletion changes..."
-              # Filter for A, CNAME, TXT types and ensure ResourceRecords exist
-              # This jq query processes each record found for the given name
-              DELETION_CHANGES_FOR_NAME=$(echo "$EXISTING_RECORDS_FOR_NAME" | jq '[.[] | select((.Type == "A" or .Type == "CNAME" or .Type == "TXT") and .ResourceRecords and (.ResourceRecords | length > 0)) | {
-                Action: "DELETE",
-                ResourceRecordSet: {
-                  Name: .Name,
-                  Type: .Type,
-                  TTL: .TTL, # Use the actual TTL of the record to be deleted
-                  ResourceRecords: .ResourceRecords
-                }
-              }]')
+      #       if [ "$EXISTING_RECORDS_FOR_NAME" != "[]" ]; then
+      #         echo "⚠️ Records found for $RECORD_NAME_TO_CLEAN. Preparing deletion changes..."
+      #         # Filter for A, CNAME, TXT types and ensure ResourceRecords exist
+      #         # This jq query processes each record found for the given name
+      #         DELETION_CHANGES_FOR_NAME=$(echo "$EXISTING_RECORDS_FOR_NAME" | jq '[.[] | select((.Type == "A" or .Type == "CNAME" or .Type == "TXT") and .ResourceRecords and (.ResourceRecords | length > 0)) | {
+      #           Action: "DELETE",
+      #           ResourceRecordSet: {
+      #             Name: .Name,
+      #             Type: .Type,
+      #             TTL: .TTL, # Use the actual TTL of the record to be deleted
+      #             ResourceRecords: .ResourceRecords
+      #           }
+      #         }]')
               
-              if [ "$(echo "$DELETION_CHANGES_FOR_NAME" | jq 'length')" -gt 0 ]; then
-                  CHANGES_JSON=$(echo "$CHANGES_JSON $DELETION_CHANGES_FOR_NAME" | jq -s 'add')
-              fi
-            else
-              echo "✅ No records found for $RECORD_NAME_TO_CLEAN."
-            fi
-          done
+      #         if [ "$(echo "$DELETION_CHANGES_FOR_NAME" | jq 'length')" -gt 0 ]; then
+      #             CHANGES_JSON=$(echo "$CHANGES_JSON $DELETION_CHANGES_FOR_NAME" | jq -s 'add')
+      #         fi
+      #       else
+      #         echo "✅ No records found for $RECORD_NAME_TO_CLEAN."
+      #       fi
+      #     done
 
-          if [ "$(echo "$CHANGES_JSON" | jq 'length')" -eq 0 ]; then
-            echo "✅ No DNS records found that require cleanup."
-            exit 0
-          fi
+      #     if [ "$(echo "$CHANGES_JSON" | jq 'length')" -eq 0 ]; then
+      #       echo "✅ No DNS records found that require cleanup."
+      #       exit 0
+      #     fi
 
-          echo "📦 Combined deletion changes to be applied:"
-          echo "$CHANGES_JSON" | jq .
+      #     echo "📦 Combined deletion changes to be applied:"
+      #     echo "$CHANGES_JSON" | jq .
 
-          cat > delete-conflicts.json <<EOF
-          {
-            "Comment": "Deleting potentially conflicting DNS records for managed hostnames and their ExternalDNS TXT records",
-            "Changes": $CHANGES_JSON
-          }
-          EOF
+      #     cat > delete-conflicts.json <<EOF
+      #     {
+      #       "Comment": "Deleting potentially conflicting DNS records for managed hostnames and their ExternalDNS TXT records",
+      #       "Changes": $CHANGES_JSON
+      #     }
+      #     EOF
 
-          echo "🚨 Deleting records..."
-          aws route53 change-resource-record-sets --hosted-zone-id "$HOSTED_ZONE_ID" \
-            --change-batch file://delete-conflicts.json
+      #     echo "🚨 Deleting records..."
+      #     aws route53 change-resource-record-sets --hosted-zone-id "$HOSTED_ZONE_ID" \
+      #       --change-batch file://delete-conflicts.json
 
-          echo "✅ Records deletion request submitted."
+      #     echo "✅ Records deletion request submitted."
 
       - name: Install ExternalDNS
         run: |
@@ -1166,7 +1183,7 @@ jobs:
               --set txtPrefix=externaldns- \
               --set aws.batchChangeSize=1000 \
               --set logLevel=debug \
-              --set "zoneIdFilters[0]=${HOSTED_ZONE_ID}" \
+              --set "zoneIdFilters[0]=${{ env.HOSTED_ZONE_ID }}" \
               --version 1.14.5 \
               --timeout 10m \
               --wait \
