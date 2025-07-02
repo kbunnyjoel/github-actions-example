@@ -574,117 +574,117 @@ jobs:
       - name: Uninstall existing ArgoCD and ingress-nginx Helm releases
         run: |
           helm uninstall argocd -n argocd || true
-          helm uninstall ingress-nginx -n ingress-nginx || true
+          # helm uninstall ingress-nginx -n ingress-nginx || true
           echo "Waiting for NGINX Ingress Controller resources to be removed..."
           kubectl wait --for=delete pod -l app.kubernetes.io/name=ingress-nginx -n ingress-nginx --timeout=90s || true
 
-      - name: Install ingress-nginx Ingress Controller with SSL
-        run: |
-          # Ensure namespace exists before Helm tries to use it
-          kubectl get namespace ingress-nginx || kubectl create namespace ingress-nginx
+      # - name: Install ingress-nginx Ingress Controller with SSL
+      #   run: |
+      #     # Ensure namespace exists before Helm tries to use it
+      #     kubectl get namespace ingress-nginx || kubectl create namespace ingress-nginx
 
-          # Set release and chart names explicitly
-          RELEASE_NAME="ingress-nginx"
-          CHART_NAME="ingress-nginx/ingress-nginx"
+      #     # Set release and chart names explicitly
+      #     RELEASE_NAME="ingress-nginx"
+      #     CHART_NAME="ingress-nginx/ingress-nginx"
 
-          echo "Helm release: $RELEASE_NAME"
-          echo "Helm chart: $CHART_NAME"
+      #     echo "Helm release: $RELEASE_NAME"
+      #     echo "Helm chart: $CHART_NAME"
 
-          # --- Insert stuck release check/rollback logic BEFORE the retry loop ---
-          echo "🔍 Checking Helm release status before upgrade..."
-          helm_status=$(helm status ingress-nginx -n ingress-nginx --output json || echo "")
+      #     # --- Insert stuck release check/rollback logic BEFORE the retry loop ---
+      #     echo "🔍 Checking Helm release status before upgrade..."
+      #     helm_status=$(helm status ingress-nginx -n ingress-nginx --output json || echo "")
 
-          if echo "$helm_status" | grep -q '"status":"pending'; then
-            echo "⚠️ Helm release is stuck in a pending state. Attempting rollback..."
-            helm rollback ingress-nginx 0 -n ingress-nginx || echo "⚠️ Rollback failed or no revisions exist"
-          fi
-          # --- End stuck release check ---
+      #     if echo "$helm_status" | grep -q '"status":"pending'; then
+      #       echo "⚠️ Helm release is stuck in a pending state. Attempting rollback..."
+      #       helm rollback ingress-nginx 0 -n ingress-nginx || echo "⚠️ Rollback failed or no revisions exist"
+      #     fi
+      #     # --- End stuck release check ---
 
-          for i in {1..5}; do
-            echo "Attempt $i: helm upgrade $RELEASE_NAME $CHART_NAME"
-            helm upgrade ingress-nginx ingress-nginx/ingress-nginx --install \
-              --namespace ingress-nginx --create-namespace \
-              --set controller.service.annotations."service\.beta\.kubernetes\.io/aws-load-balancer-ssl-ports"="https" \
-              --set controller.service.annotations."service\.beta\.kubernetes\.io/aws-load-balancer-backend-protocol"="http" \
-              --set controller.service.targetPorts.https=http \
-              --set controller.service.ports.https=443 \
-              --set controller.service.ports.http=80 \
-              --set controller.config.use-forwarded-headers="true" \
-              --set controller.config.ssl-redirect="false" \
-              --set controller.config.compute-full-forwarded-for="true" \
-              --set controller.config.use-proxy-protocol="false" \
-              --set controller.config.enable-real-ip="false" \
-              --set controller.service.annotations."service\.beta\.kubernetes\.io/aws-load-balancer-scheme"=internet-facing \
-              --set controller.config.proxy-real-ip-cidr="0.0.0.0/0" \
-              --set controller.config.server-tokens="false" \
-              --set controller.replicaCount=1 \
-              --set controller.containerPort.http=80 \
-              --set controller.containerPort.https=443 \
-              --set controller.service.type=LoadBalancer \
-              --set controller.service.loadBalancerClass="service.k8s.aws/nlb" \
-              --set controller.terminationGracePeriodSeconds=300 \
-              --set controller.serviceAccount.create=true \
-              --set controller.serviceAccount.name=ingress-nginx \
-              --set serviceAccount.annotations."eks\.amazonaws\.com/role-arn"="${{ env.INGRESS_NGINX_ROLE_ARN }}" \
-               --set defaultBackend.enabled=true \
-              --set defaultBackend.image.repository=registry.k8s.io/defaultbackend-arm64 \
-              --set defaultBackend.image.tag=1.5 \
-              --version 4.10.1 \
-              --timeout 10m \
-              --wait \
-              && {
-                echo "✅ Helm upgrade succeeded. Inspecting release..."
-                helm get all "$RELEASE_NAME" -n ingress-nginx || echo "Helm release not found"
-                kubectl get all -n ingress-nginx
-                break
-              }
-            echo "Attempt $i failed. Retrying in 10 seconds..."
-            echo "🔍 Inspecting ingress-nginx pods and events..."
-            kubectl get pods -n ingress-nginx || true
-            kubectl get events -n ingress-nginx --sort-by=.lastTimestamp | tail -n 20 || true
-            kubectl get jobs -n ingress-nginx || true
-            sleep 10
-          done
+      #     for i in {1..5}; do
+      #       echo "Attempt $i: helm upgrade $RELEASE_NAME $CHART_NAME"
+      #       helm upgrade ingress-nginx ingress-nginx/ingress-nginx --install \
+      #         --namespace ingress-nginx --create-namespace \
+      #         --set controller.service.annotations."service\.beta\.kubernetes\.io/aws-load-balancer-ssl-ports"="https" \
+      #         --set controller.service.annotations."service\.beta\.kubernetes\.io/aws-load-balancer-backend-protocol"="http" \
+      #         --set controller.service.targetPorts.https=http \
+      #         --set controller.service.ports.https=443 \
+      #         --set controller.service.ports.http=80 \
+      #         --set controller.config.use-forwarded-headers="true" \
+      #         --set controller.config.ssl-redirect="false" \
+      #         --set controller.config.compute-full-forwarded-for="true" \
+      #         --set controller.config.use-proxy-protocol="false" \
+      #         --set controller.config.enable-real-ip="false" \
+      #         --set controller.service.annotations."service\.beta\.kubernetes\.io/aws-load-balancer-scheme"=internet-facing \
+      #         --set controller.config.proxy-real-ip-cidr="0.0.0.0/0" \
+      #         --set controller.config.server-tokens="false" \
+      #         --set controller.replicaCount=1 \
+      #         --set controller.containerPort.http=80 \
+      #         --set controller.containerPort.https=443 \
+      #         --set controller.service.type=LoadBalancer \
+      #         --set controller.service.loadBalancerClass="service.k8s.aws/nlb" \
+      #         --set controller.terminationGracePeriodSeconds=300 \
+      #         --set controller.serviceAccount.create=true \
+      #         --set controller.serviceAccount.name=ingress-nginx \
+      #         --set serviceAccount.annotations."eks\.amazonaws\.com/role-arn"="${{ env.INGRESS_NGINX_ROLE_ARN }}" \
+      #          --set defaultBackend.enabled=true \
+      #         --set defaultBackend.image.repository=registry.k8s.io/defaultbackend-arm64 \
+      #         --set defaultBackend.image.tag=1.5 \
+      #         --version 4.10.1 \
+      #         --timeout 10m \
+      #         --wait \
+      #         && {
+      #           echo "✅ Helm upgrade succeeded. Inspecting release..."
+      #           helm get all "$RELEASE_NAME" -n ingress-nginx || echo "Helm release not found"
+      #           kubectl get all -n ingress-nginx
+      #           break
+      #         }
+      #       echo "Attempt $i failed. Retrying in 10 seconds..."
+      #       echo "🔍 Inspecting ingress-nginx pods and events..."
+      #       kubectl get pods -n ingress-nginx || true
+      #       kubectl get events -n ingress-nginx --sort-by=.lastTimestamp | tail -n 20 || true
+      #       kubectl get jobs -n ingress-nginx || true
+      #       sleep 10
+      #     done
 
-          if [[ $i -eq 5 ]]; then
-            echo "❌ Helm install failed after 5 attempts."
-            echo "🚨 Helm upgrade failed after 5 attempts. Dumping debug info..."
-            kubectl describe pods -n ingress-nginx || true
-            kubectl get events -n ingress-nginx --sort-by=.lastTimestamp | tail -n 50 || true
-            kubectl get jobs -n ingress-nginx -o wide || true
-            exit 1
-          fi
+      #     if [[ $i -eq 5 ]]; then
+      #       echo "❌ Helm install failed after 5 attempts."
+      #       echo "🚨 Helm upgrade failed after 5 attempts. Dumping debug info..."
+      #       kubectl describe pods -n ingress-nginx || true
+      #       kubectl get events -n ingress-nginx --sort-by=.lastTimestamp | tail -n 50 || true
+      #       kubectl get jobs -n ingress-nginx -o wide || true
+      #       exit 1
+      #     fi
 
-          echo "Waiting for ingress-nginx controller rollout to complete..."
-          # kubectl rollout status deployment ingress-nginx-controller -n ingress-nginx --timeout=5m
+      #     echo "Waiting for ingress-nginx controller rollout to complete..."
+      #     # kubectl rollout status deployment ingress-nginx-controller -n ingress-nginx --timeout=5m
 
-          kubectl rollout restart deployment ingress-nginx-controller -n ingress-nginx
-          echo "Waiting for ingress-nginx controller pod to be ready..."
-          if ! kubectl rollout status deployment ingress-nginx-controller -n ingress-nginx --timeout=10m; then
-            echo "NGINX Ingress Controller rollout failed. Dumping debug info..."
-            kubectl get pods -n ingress-nginx -o wide
-            kubectl describe deployment ingress-nginx-controller -n ingress-nginx
-            for podname in $(kubectl get pods -n ingress-nginx -l app.kubernetes.io/name=ingress-nginx,app.kubernetes.io/component=controller -o jsonpath='{.items[*].metadata.name}'); do
-              echo "--- Logs for $podname ---"
-              kubectl logs $podname -n ingress-nginx --tail=100 || echo "Failed to get logs for $podname"
-              echo "--- Describe for $podname ---"
-              kubectl describe pod $podname -n ingress-nginx || echo "Failed to describe $podname"
-            done
-            exit 1
-          fi
+      #     kubectl rollout restart deployment ingress-nginx-controller -n ingress-nginx
+      #     echo "Waiting for ingress-nginx controller pod to be ready..."
+      #     if ! kubectl rollout status deployment ingress-nginx-controller -n ingress-nginx --timeout=10m; then
+      #       echo "NGINX Ingress Controller rollout failed. Dumping debug info..."
+      #       kubectl get pods -n ingress-nginx -o wide
+      #       kubectl describe deployment ingress-nginx-controller -n ingress-nginx
+      #       for podname in $(kubectl get pods -n ingress-nginx -l app.kubernetes.io/name=ingress-nginx,app.kubernetes.io/component=controller -o jsonpath='{.items[*].metadata.name}'); do
+      #         echo "--- Logs for $podname ---"
+      #         kubectl logs $podname -n ingress-nginx --tail=100 || echo "Failed to get logs for $podname"
+      #         echo "--- Describe for $podname ---"
+      #         kubectl describe pod $podname -n ingress-nginx || echo "Failed to describe $podname"
+      #       done
+      #       exit 1
+      #     fi
               
-          echo "Checking NGINX Ingress Controller pods..."
-          kubectl get pods -n ingress-nginx
+      #     echo "Checking NGINX Ingress Controller pods..."
+      #     kubectl get pods -n ingress-nginx
           
-          echo "Checking NGINX Ingress Controller services..."
-          kubectl get svc -n ingress-nginx
+      #     echo "Checking NGINX Ingress Controller services..."
+      #     kubectl get svc -n ingress-nginx
           
-          echo "Checking if PROXY protocol is enabled in NGINX configuration..."
-          (kubectl exec -n ingress-nginx deploy/ingress-nginx-controller -- cat /etc/nginx/nginx.conf > nginx.conf && \
-          grep -i "proxy_protocol" nginx.conf) || echo "No proxy_protocol found in configuration (this is expected as use-proxy-protocol=false), or failed to get nginx.conf."
+      #     echo "Checking if PROXY protocol is enabled in NGINX configuration..."
+      #     (kubectl exec -n ingress-nginx deploy/ingress-nginx-controller -- cat /etc/nginx/nginx.conf > nginx.conf && \
+      #     grep -i "proxy_protocol" nginx.conf) || echo "No proxy_protocol found in configuration (this is expected as use-proxy-protocol=false), or failed to get nginx.conf."
           
-          echo "Verifying NGINX Ingress Controller configuration..."
-          kubectl get configmap -n ingress-nginx ingress-nginx-controller -o yaml
+      #     echo "Verifying NGINX Ingress Controller configuration..."
+      #     kubectl get configmap -n ingress-nginx ingress-nginx-controller -o yaml
 
       - name: Get NGINX Ingress Controller LB Hostname
         id: get-nginx-hostname
@@ -867,55 +867,6 @@ jobs:
             echo "❌ ERROR: LoadBalancer hostname still not available after retries."
             exit 1
           fi
-
-      # Patch ArgoCD Ingress and CNAME Record if mismatched
-      # - name: Patch ArgoCD Ingress and CNAME Record
-      #   run: |
-      #     cd terraform
-      #     HOSTED_ZONE_ID="$( terraform output -raw route53_zone_id )"
-      #     EXPECTED_HOSTNAME="${{ steps.get_lb.outputs.lb_hostname }}"
-      #     echo "Expected LB Hostname: $EXPECTED_HOSTNAME"
-
-      #     # CURRENT_HOST=$(kubectl -n argocd get ingress argocd-server -o jsonpath='{.spec.loadBalancer.ingress[0].hostname}')
-      #     # if [[ "$CURRENT_HOST" != $EXPECTED_HOSTNAME ]]; then
-      #     #   echo "Patching ingress host..."
-      #     #   kubectl -n argocd patch ingress argocd-server --type='json' \
-      #     #     -p="[{'op': 'replace', 'path': '/spec/rules/0/host', 'value': 'argocd.bunnycloud.xyz'}]"
-      #     # fi
-
-      #     # # Check for empty EXPECTED_HOSTNAME before DNS update
-      #     # if [ -z "$EXPECTED_HOSTNAME" ]; then
-      #     #   echo "❌ ERROR: NGINX Load Balancer hostname is empty. Skipping DNS update."
-      #     #   exit 1
-      #     # fi
-      #     # echo "Updating Route53 with CNAME pointing to: $EXPECTED_HOSTNAME"
-
-      #     echo "Updating Route53 CNAME if needed..."
-      #     cat > change-batch.json <<EOF
-      #     {
-      #       "Comment": "Update argocd.bunnycloud.xyz to point to LB",
-      #       "Changes": [
-      #         {
-      #           "Action": "UPSERT",
-      #           "ResourceRecordSet": {
-      #             "Name": "argocd.bunnycloud.xyz",
-      #             "Type": "CNAME",
-      #             "TTL": 60,
-      #             "ResourceRecords": [
-      #               {
-      #                 "Value": "$EXPECTED_HOSTNAME"
-      #               }
-      #             ]
-      #           }
-      #         }
-      #       ]
-      #     }
-      #     EOF
-
-      #     aws route53 change-resource-record-sets \
-      #       --hosted-zone-id $HOSTED_ZONE_ID \
-      #       --change-batch file://change-batch.json
-  
       - name: Validate ArgoCD IAM role integration
         run: |
           echo "Validating ArgoCD IAM role integration..."
