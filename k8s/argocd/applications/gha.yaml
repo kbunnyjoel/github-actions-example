@@ -1,3 +1,4 @@
+#
 # Required variables for this template:
 #   aws_account_id: AWS Account number (string)
 #   aws_region: AWS Region (e.g., ap-southeast-2)
@@ -8,7 +9,7 @@
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
-  name: github-actions-example
+  name: gha
   namespace: argocd # Your ArgoCD installation namespace
   finalizers:
     - resources-finalizer.argocd.argoproj.io # Ensures Kubernetes resources are deleted when the ArgoCD Application is deleted
@@ -22,8 +23,8 @@ spec:
       values: |
         replicaCount: 1 # Default replica count, can be overridden
         image:
-          repository: docker.io/***/github-actions-example # Docker Hub image repository
-          tag: c0a2607db3c85fdd8cfd5e9266d5257f5b8d064e
+          repository: docker.io/1073286/github-actions-example # Docker Hub image repository
+          tag: 1a61386b6021fdca7e2873e917dd207b4e4dd58a
           pullPolicy: IfNotPresent
 
         containerPort: 3000 # The port your Node.js application listens on inside the container
@@ -40,19 +41,27 @@ spec:
         # SSL/TLS is terminated at the AWS NLB using ACM; do NOT enable TLS/SSL or redirects at the Ingress level.
         ingress:
           enabled: true
-          className: "alb"
-          hostname: "gha.bunnycloud.xyz"
+          className: "alb"  # Specify ALB Ingress Class
+          hostname: "gha.bunnycloud.xyz" # Your application's actual hostname
           path: "/"
           pathType: "Prefix"
+          port: 3000 # Ensure this matches the containerPort
           annotations:
-            kubernetes.io/ingress.class: "alb"
+            kubernetes.io/ingress.class: "alb" # Ensures ALB controller picks it up
             alb.ingress.kubernetes.io/scheme: internet-facing
-            alb.ingress.kubernetes.io/listen-ports: '[{"HTTPS": 443}]'
-            alb.ingress.kubernetes.io/certificate-arn: "arn:aws:acm:ap-southeast-2:806210429052:certificate/d877d8be-7c2c-447a-a397-99fff3ac0ef1"
-            alb.ingress.kubernetes.io/target-type: ip
-            alb.ingress.kubernetes.io/backend-protocol: HTTP
+            alb.ingress.kubernetes.io/redirect-http-to-https: "true" # Redirect HTTP to HTTPS
+            alb.ingress.kubernetes.io/listen-ports: '[{"HTTP": 80}, {"HTTPS": 443}]'
+            alb.ingress.kubernetes.io/certificate-arn: "arn:aws:acm:ap-southeast-2:806210429052:certificate/4790786b-6586-43ea-adc2-61d6199e1197" # Crucial for HTTPS on ALB
+            alb.ingress.kubernetes.io/target-type: ip # Good for EKS, especially Fargate
+            alb.ingress.kubernetes.io/healthcheck-path: "/status"
+            alb.ingress.kubernetes.io/healthcheck-headers: '[{"name":"x-api-key","value":"test123"}]'
+            alb.ingress.kubernetes.io/backend-protocol: HTTP # ALB terminates SSL, forwards HTTP
+            alb.ingress.kubernetes.io/group.name: gha
             external-dns.alpha.kubernetes.io/ttl: "60"
             external-dns.alpha.kubernetes.io/hostname: "gha.bunnycloud.xyz."
+            alb.ingress.kubernetes.io/load-balancer-attributes: deletion_protection.enabled=false
+            alb.ingress.kubernetes.io/force-update: "$(date +%s)"
+
         # Define resource requests and limits for your application pods
         resources: {} # Leave empty to use Helm chart defaults or override as needed
         #  limits:
@@ -86,3 +95,4 @@ spec:
       selfHeal: true # Automatically sync if the live state drifts from the desired state in Git
     syncOptions:
     - CreateNamespace=true # Automatically create the target namespace if it doesn't exist
+ 
