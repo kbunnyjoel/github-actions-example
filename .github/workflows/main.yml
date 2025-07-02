@@ -578,7 +578,7 @@ jobs:
       #     echo "Using ingress-nginx IAM role ARN: $INGRESS_NGINX_ROLE_ARN"
       #     echo "INGRESS_NGINX_ROLE_ARN=${INGRESS_NGINX_ROLE_ARN}" >> $GITHUB_ENV
 
-      - name: Uninstall existing ArgoCD and ingress-nginx Helm releases
+      - name: Uninstall existing ArgoCD Helm release
         run: |
           helm uninstall argocd -n argocd || true
           # helm uninstall ingress-nginx -n ingress-nginx || true
