@@ -63,6 +63,7 @@ This setup will store your Terraform state in S3, enabling collaboration and per
 6. Configure AWS Cognito for application user authentication and integrate with your application Ingress for OIDC/OAuth2-based access control (optional but recommended)
 7. Optionally configure Amazon EventBridge rules to automatically start and stop EKS node group instances on a schedule to optimize costs (e.g., stop dev clusters overnight).
 8. **Deploy your Node.js EJS application** with included example `addNumbers()` function and accompanying Jest test cases to validate your business logic.
+9. Optionally configure your GoDaddy DNS to point application domains (e.g., gha.yourdomain.com) to the AWS ALB ingress hostname by creating a CNAME record for each desired subdomain pointing to your ALB's DNS name. This enables easy custom domain access with your GoDaddy-managed domains.
 
 ## ✅ CI/CD Status
 
@@ -108,6 +109,7 @@ MIT © 2025 Bunny Kocharla
                 └── [ AWS Cognito ] ←── User authentication (OIDC/OAuth2 integration with Ingress)
                 └── [ Amazon EventBridge ] ←── Scheduled start/stop of EKS nodes
                 └── [ Node.js EJS App ] ←── Sample service with tested functions
+                └── [ GoDaddy DNS ] ←── Custom domain setup pointing to ALB for user-friendly URLs
 ```
 
 - GitHub Actions triggers both Terraform (for infra) and ArgoCD sync (for app deployment).
