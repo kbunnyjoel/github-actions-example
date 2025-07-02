@@ -1576,10 +1576,14 @@ jobs:
       - name: Check app status via ingress
         run: |
           APP_HOSTNAME="${{ env.APP_HOSTNAME }}"
+          
+          # Remove trailing dot if present
+          SANITIZED_HOSTNAME=$(echo "$APP_HOSTNAME" | sed 's/\.$//')
+          echo "Using sanitized hostname: $SANITIZED_HOSTNAME"
 
           for i in {1..10}; do
-            echo "🔎 Checking app status via https://$APP_HOSTNAME... Attempt $i"
-            response=$(curl -ks -H "x-api-key: ${{ secrets.API_KEY }}" "https://$APP_HOSTNAME/status" || true)
+            echo "🔎 Checking app status via https://$SANITIZED_HOSTNAME... Attempt $i"
+            response=$(curl -ks -H "x-api-key: ${{ secrets.API_KEY }}" "https://$SANITIZED_HOSTNAME/status" || true)
             echo "📝 Response: $response"
 
             if [[ "$response" == *'"status":"ok"'* ]]; then
