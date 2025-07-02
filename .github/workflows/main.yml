@@ -148,13 +148,6 @@ jobs:
       - name: Run Docker container in background
         run: docker run -d -p 3000:3000 --name live-app ${{ secrets.DOCKER_USERNAME }}/${{ env.APP_NAME }}:${{ github.sha }}
 
-      - name: Wait for app to be ready
-        run: |
-          for i in {1..20}; do
-            curl -k --fail -H "x-api-key: ${{ secrets.API_KEY }}" http://localhost:3000/status && exit 0
-            echo "Waiting for app to be ready ($i/20)..."
-            sleep 5
-          done
 
   terraform-eks:
     # Only run terraform-eks when destroy is not true
@@ -1504,98 +1497,55 @@ jobs:
             echo "No ArgoCD application manifests found in k8s/argocd/applications."
           fi
       
-      - name: Check Application Ingress Resource
+      - name: Get app domain from ingress spec.rules
+        id: get-app-domain
         run: |
-
-          APP_INGRESS_NAME="gha" # Assuming Ingress name matches app name
-
-          echo "Waiting for namespace '${{ env.APP_NAME }}' to be created by ArgoCD..."
-          for i in {1..30}; do # Wait up to 5 minutes (30 * 10s)
-            if kubectl get namespace "${{ env.APP_NAME }}" > /dev/null 2>&1; then
-              echo "Namespace '${{ env.APP_NAME }}' found."
-              break
-            fi
-            if [ $i -eq 30 ]; then
-              echo "Error: Namespace '${{ env.APP_NAME }}' not found after waiting."
-              exit 1
-            fi
-            echo "Namespace '${{ env.APP_NAME }}' not yet found, waiting... (Attempt $i/30)"
-            sleep 10
-          done
-
-      - name: Get app ingress hostname
-        id: get-app-hostname
-        run: |
-          APP_INGRESS_NAME="gha"  # Or use your variable if dynamic
           APP_NAMESPACE="${{ env.APP_NAME }}"
-          
-          echo "Fetching ingress hostname for $APP_INGRESS_NAME in namespace $APP_NAMESPACE..."
+          APP_INGRESS_NAME="gha"
 
-          INGRESS_HOSTNAME=$(kubectl get ingress -n "$APP_NAMESPACE" "$APP_INGRESS_NAME" -o jsonpath='{.status.loadBalancer.ingress[0].hostname}' || true)
+          echo "🔍 Waiting for Ingress '$APP_INGRESS_NAME' in namespace '$APP_NAMESPACE'..."
 
-          if [ -z "$INGRESS_HOSTNAME" ]; then
-            echo "❌ Error: Failed to get ingress hostname for $APP_INGRESS_NAME in namespace $APP_NAMESPACE."
-            kubectl get ingress -n "$APP_NAMESPACE" "$APP_INGRESS_NAME" -o yaml || true
-            exit 1
-          fi
+          for i in {1..60}; do
+            if kubectl get ingress -n "$APP_NAMESPACE" "$APP_INGRESS_NAME" &>/dev/null; then
+              echo "✅ Ingress '$APP_INGRESS_NAME' found."
 
-          echo "✅ Ingress hostname: $INGRESS_HOSTNAME"
-          echo "APP_HOSTNAME=$INGRESS_HOSTNAME" >> $GITHUB_ENV
+              # Fetch domain from ingress spec.rules[0].host directly
+              APP_DOMAIN=$(kubectl get ingress -n "$APP_NAMESPACE" "$APP_INGRESS_NAME" \
+                -o jsonpath='{.spec.rules[0].host}' 2>/dev/null)
 
-          echo "Waiting for Ingress '$APP_INGRESS_NAME' in namespace '${{ env.APP_NAME }}' to be created by ArgoCD..."
-          for i in {1..60}; do # Wait up to 10 minutes (60 * 10s)
-            if kubectl get ingress -n "${{ env.APP_NAME }}" "$APP_INGRESS_NAME" -o yaml > /dev/null 2>&1; then
-              echo "Ingress '$APP_INGRESS_NAME' found."
-              INGRESS_YAML=$(kubectl get ingress -n "${{ env.APP_NAME }}" "$APP_INGRESS_NAME" -o yaml)
-              echo "Ingress YAML:"
-              echo "$INGRESS_YAML"
-              
-              echo "Verifying ExternalDNS hostname annotation on Ingress..."
-              ANNOTATION_VALUE=$(kubectl get ingress -n "${{ env.APP_NAME }}" "$APP_INGRESS_NAME" -o jsonpath='{.metadata.annotations.external-dns\.alpha\.kubernetes\.io/hostname}' 2>/dev/null)
-              if [ -n "$ANNOTATION_VALUE" ]; then
-                echo "ExternalDNS hostname annotation found: $ANNOTATION_VALUE"
-                break # Success, Ingress and annotation found
-              else
-                echo "Warning: ExternalDNS hostname annotation not found on Ingress '$APP_INGRESS_NAME'. Will retry... (Attempt $i/60)"
+              if [ -n "$APP_DOMAIN" ]; then
+                echo "✅ Found app domain from ingress spec.rules: $APP_DOMAIN"
+                echo "APP_DOMAIN=$APP_DOMAIN" >> $GITHUB_ENV
+                exit 0
               fi
+
+              echo "⚠️ spec.rules[0].host not yet assigned. Attempt $i/60..."
+            else
+              echo "⏳ Waiting for Ingress resource... Attempt $i/60"
             fi
-            if [ $i -eq 60 ]; then
-              echo "Error: Ingress '$APP_INGRESS_NAME' or its ExternalDNS annotation not found after waiting."
-              kubectl get ingress -n "${{ env.APP_NAME }}" "$APP_INGRESS_NAME" -o yaml || echo "Ingress '$APP_INGRESS_NAME' still not found in namespace '${{ env.APP_NAME }}'."
-              exit 1
-            fi
-            echo "Ingress '$APP_INGRESS_NAME' not yet found or annotation missing in namespace '${{ env.APP_NAME }}', waiting... (Attempt $i/60)"
+
             sleep 10
           done
 
-      - name: Wait before checking app health
-        run: |
-          echo "⏳ Sleeping 30 seconds before starting health checks..."
-          sleep 30
+          echo "❌ Timed out waiting for ingress spec.rules[0].host. Exiting."
+          kubectl get ingress -n "$APP_NAMESPACE" "$APP_INGRESS_NAME" -o yaml || true
+          exit 1
 
-      - name: Check app status via ingress
+      - name: Final health check using app domain
         run: |
-          APP_HOSTNAME="${{ env.APP_HOSTNAME }}"
-          
-          # Remove trailing dot if present
-          SANITIZED_HOSTNAME=$(echo "$APP_HOSTNAME" | sed 's/\.$//')
-          echo "Using sanitized hostname: $SANITIZED_HOSTNAME"
-
+          echo "⏳ Verifying app health at https://${APP_DOMAIN}/status..."
           for i in {1..10}; do
-            echo "🔎 Checking app status via https://$SANITIZED_HOSTNAME... Attempt $i"
-            response=$(curl -ks -H "x-api-key: ${{ secrets.API_KEY }}" "https://$SANITIZED_HOSTNAME/status" || true)
-            echo "📝 Response: $response"
-
-            if [[ "$response" == *'"status":"ok"'* ]]; then
-              echo "✅ App is healthy and accessible over HTTPS."
+            RESPONSE=$(curl -ks --connect-timeout 5 "https://${APP_DOMAIN}/status" || true)
+            echo "Attempt $i: Response: $RESPONSE"
+            if echo "$RESPONSE" | grep -q '"status":"ok"'; then
+              echo "🎉 App is healthy at https://${APP_DOMAIN}!"
               exit 0
             fi
-
-            echo "❌ Unexpected response, retrying in 10 seconds..."
+            echo "❌ Unexpected response, retrying in 10s..."
             sleep 10
           done
 
-          echo "🚨 App did not respond with status=ok after retries."
+          echo "🚨 App failed to respond with status=ok after retries."
           exit 1
 
       - name: Ensure application is deployed
