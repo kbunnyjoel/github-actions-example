@@ -1497,56 +1497,6 @@ jobs:
             echo "No ArgoCD application manifests found in k8s/argocd/applications."
           fi
       
-      - name: Get app domain from ingress spec.rules
-        id: get-app-domain
-        run: |
-          APP_NAMESPACE="${{ env.APP_NAME }}"
-          APP_INGRESS_NAME="gha"
-
-          echo "🔍 Waiting for Ingress '$APP_INGRESS_NAME' in namespace '$APP_NAMESPACE'..."
-
-          for i in {1..60}; do
-            if kubectl get ingress -n "$APP_NAMESPACE" "$APP_INGRESS_NAME" &>/dev/null; then
-              echo "✅ Ingress '$APP_INGRESS_NAME' found."
-
-              # Fetch domain from ingress spec.rules[0].host directly
-              APP_DOMAIN=$(kubectl get ingress -n "$APP_NAMESPACE" "$APP_INGRESS_NAME" \
-                -o jsonpath='{.spec.rules[0].host}' 2>/dev/null)
-
-              if [ -n "$APP_DOMAIN" ]; then
-                echo "✅ Found app domain from ingress spec.rules: $APP_DOMAIN"
-                echo "APP_DOMAIN=$APP_DOMAIN" >> $GITHUB_ENV
-                exit 0
-              fi
-
-              echo "⚠️ spec.rules[0].host not yet assigned. Attempt $i/60..."
-            else
-              echo "⏳ Waiting for Ingress resource... Attempt $i/60"
-            fi
-
-            sleep 10
-          done
-
-          echo "❌ Timed out waiting for ingress spec.rules[0].host. Exiting."
-          kubectl get ingress -n "$APP_NAMESPACE" "$APP_INGRESS_NAME" -o yaml || true
-          exit 1
-
-      - name: Final health check using app domain
-        run: |
-          echo "⏳ Verifying app health at https://${APP_DOMAIN}/status..."
-          for i in {1..10}; do
-            RESPONSE=$(curl -ks --connect-timeout 5 "https://${APP_DOMAIN}/status" || true)
-            echo "Attempt $i: Response: $RESPONSE"
-            if echo "$RESPONSE" | grep -q '"status":"ok"'; then
-              echo "🎉 App is healthy at https://${APP_DOMAIN}!"
-              exit 0
-            fi
-            echo "❌ Unexpected response, retrying in 10s..."
-            sleep 10
-          done
-
-          echo "🚨 App failed to respond with status=ok after retries."
-          exit 1
 
       - name: Ensure application is deployed
         run: |
@@ -1593,32 +1543,25 @@ jobs:
             echo "$RECORDS" | jq
           fi
 
-      - name: Verify application accessibility
+      - name: Get application ingress host
+        id: get-app-host
         run: |
-          APP_HOSTNAME="gha.bunnycloud.xyz"
-          # Use the application's ALB hostname for direct testing
-          APP_ALB_HOSTNAME=$(kubectl get ingress gha -n gha -o jsonpath='{.status.loadBalancer.ingress[0].hostname}' 2>/dev/null)
+          APP_HOSTNAME=$(kubectl -n ${{ env.APP_NAME}} get ingress gha -o jsonpath='{.spec.rules[0].host}')
+          echo "APP_HOSTNAME=$APP_HOSTNAME" >> $GITHUB_ENV
+          echo "Detected app hostname: $APP_HOSTNAME"
 
-          if [ -z "$APP_ALB_HOSTNAME" ]; then
-            echo "Error: Could not find Application ALB hostname for direct connection test."
-            exit 1
-          fi
-
-          echo "Testing DNS resolution for $APP_HOSTNAME..."
-          nslookup $APP_HOSTNAME || { echo "DNS resolution failed for $APP_HOSTNAME"; exit 1; }
-          
-          echo "Testing direct connection to application ALB: $APP_ALB_HOSTNAME..."
-          curl -v --connect-timeout 10 -k "http://$APP_ALB_HOSTNAME" || { echo "Connection to application ALB failed"; exit 1; }
-          
-          # Wait longer for DNS and ingress to be fully configured
-          echo "Waiting for DNS and ingress to be fully configured..."
+      - name: Verify application HTTPS response
+        run: |
+          echo "🔍 Checking HTTPS response on https://${APP_HOSTNAME}/status..."
           for i in {1..12}; do
-            echo "Attempt $i/12: Testing connection to https://$APP_HOSTNAME..."
-            if curl -s --connect-timeout 10 -k "https://$APP_HOSTNAME" | grep -q "gha"; then
-              echo "✅ Application is accessible!"
-              break
+            HTTP_STATUS=$(curl -sk -o /dev/null -w "%{http_code}" "https://${APP_HOSTNAME}/status")
+            echo "Attempt $i/12: HTTP status $HTTP_STATUS"
+            if [[ "$HTTP_STATUS" == "200" ]]; then
+              echo "✅ Application HTTPS endpoint is healthy with HTTP 200!"
+              exit 0
             fi
-            echo "Application not yet accessible, waiting..."
+            echo "❌ Received HTTP status $HTTP_STATUS, retrying in 10 seconds..."
             sleep 10
           done
-        continue-on-error: true
+          echo "🚨 Application did not return HTTP 200 on HTTPS endpoint after retries."
+          exit 1
