@@ -62,8 +62,9 @@ This setup will store your Terraform state in S3, enabling collaboration and per
 5. **Validate DNS & service availability** automatically in pipeline
 6. Configure AWS Cognito for application user authentication and integrate with your application Ingress for OIDC/OAuth2-based access control (optional but recommended)
 7. Optionally configure Amazon EventBridge rules to automatically start and stop EKS node group instances on a schedule to optimize costs (e.g., stop dev clusters overnight).
-8. **Deploy your Node.js EJS application** with included example `addNumbers()` function and accompanying Jest test cases to validate your business logic.
-9. Optionally configure your GoDaddy DNS to point application domains (e.g., gha.yourdomain.com) to the AWS ALB ingress hostname by creating a CNAME record for each desired subdomain pointing to your ALB's DNS name. This enables easy custom domain access with your GoDaddy-managed domains.
+8. Configure the Kubernetes Cluster Autoscaler on your EKS cluster to dynamically scale spot instance node groups up and down based on pending pods and resource usage. This ensures you only pay for compute when needed and maximizes cost efficiency by using AWS Spot Instances, automatically adding nodes when workloads demand and removing them when idle.
+9. **Deploy your Node.js EJS application** with included example `addNumbers()` function and accompanying Jest test cases to validate your business logic.
+10. Optionally configure your GoDaddy DNS to point application domains (e.g., gha.yourdomain.com) to the AWS ALB ingress hostname by creating a CNAME record for each desired subdomain pointing to your ALB's DNS name. This enables easy custom domain access with your GoDaddy-managed domains.
 
 ## ✅ CI/CD Status
 
@@ -101,6 +102,8 @@ MIT © 2025 Bunny Kocharla
         ├── [ ArgoCD ] ←── GitOps sync from GitHub
         │
         ├── [ ExternalDNS ] ←── Updates Route53 records
+        │
+        ├── [ Cluster Autoscaler ] ←── Scales EKS spot instances based on workload demand
         │
         └── [ AWS ALB Ingress Controller ]
                 │
