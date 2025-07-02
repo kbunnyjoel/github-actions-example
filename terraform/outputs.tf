@@ -44,5 +44,5 @@ output "github_actions_example_certificate_arn" {
 
 output "eks_cluster_name" {
   description = "The name of the EKS cluster"
-  value       = module.eks.cluster_name.name
+  value       = module.eks.cluster_name
 }
