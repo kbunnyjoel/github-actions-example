@@ -1086,6 +1086,7 @@ jobs:
             --change-batch file://delete-conflicts.json
 
           echo "✅ Records deletion request submitted."
+
       - name: Install ExternalDNS
         run: |
           echo "🔧 Installing ExternalDNS..."
@@ -1128,6 +1129,7 @@ jobs:
             --set txtPrefix=externaldns- \
             --set aws.batchChangeSize=1000 \
             --set logLevel=debug \
+            --set "zoneIdFilters[0]=${{ env.HOSTED_ZONE_ID }}" \
             --version 1.14.5 \
             --timeout 10m \
             --wait 
@@ -1160,11 +1162,11 @@ jobs:
               --set serviceAccount.create=true \
               --set serviceAccount.name=external-dns \
               --set serviceAccount.annotations."eks\.amazonaws\.com/role-arn"="${{ env.EXTERNAL_DNS_ROLE_ARN }}" \
-              --set txtOwnerId=Z020604219Y32SRYV246B \
               --set provider=aws \
               --set txtPrefix=externaldns- \
               --set aws.batchChangeSize=1000 \
               --set logLevel=debug \
+              --set "zoneIdFilters[0]=${HOSTED_ZONE_ID}" \
               --version 1.14.5 \
               --timeout 10m \
               --wait \
@@ -1518,11 +1520,14 @@ jobs:
             sleep 10
           done
 
-      - name: Test /status endpoint with API key
+      - name: Wait before checking app health
         run: |
+          echo "⏳ Sleeping 30 seconds before starting health checks..."
+          sleep 30
+
           for i in {1..10}; do
             echo "🔎 Checking app status... Attempt $i"
-            response=$(curl -ks -H "x-api-key: ${{ secrets.API_KEY }}" https://gha.bunnycloud.xyz/status)
+            response=$(curl -ks -H "x-api-key: ${{ secrets.API_KEY }}" http://localhost:3000/status)
             echo "📝 Response: $response"
 
             if [[ "$response" == *'"status":"ok"'* ]]; then
