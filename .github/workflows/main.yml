@@ -376,20 +376,7 @@ jobs:
       - name: Configure kubectl for EKS
         run: |
           aws eks update-kubeconfig --region ap-southeast-2 --name github-actions-eks-example
-      - name: Install Metrics Server
-        run: |
-          echo "Installing Kubernetes Metrics Server..."
-          kubectl apply -f https://github.com/kubernetes-sigs/metrics-server/releases/latest/download/components.yaml
-
-          echo "Patching Metrics Server for EKS insecure TLS (self-signed certs)..."
-          kubectl patch deployment metrics-server -n kube-system \
-            --type=json \
-            -p='[{"op":"add","path":"/spec/template/spec/containers/0/args/-","value":"--kubelet-insecure-tls"}]'
-
-          echo "Waiting for Metrics Server deployment to become ready..."
-          kubectl rollout status deployment metrics-server -n kube-system --timeout=3m
-
-          echo "Metrics Server installed and ready."
+     
       - name: Wait for EKS API and nodes to be ready
         run: |
           echo "Waiting for Kubernetes API..."
@@ -454,9 +441,23 @@ jobs:
           helm repo add ingress-nginx https://kubernetes.github.io/ingress-nginx
           helm repo add argo https://argoproj.github.io/argo-helm
           helm repo add external-dns https://kubernetes-sigs.github.io/external-dns/
+          helm repo add metrics-server https://kubernetes-sigs.github.io/metrics-server/
           helm repo add eks https://aws.github.io/eks-charts
           helm repo add autoscaler https://kubernetes.github.io/autoscaler
           helm repo update
+
+      - name: Install Metrics Server
+        run: |
+          echo "Installing Kubernetes Metrics Server..."
+         
+          helm upgrade --install metrics-server metrics-server/metrics-server \
+          --namespace kube-system \
+          --set args={--kubelet-insecure-tls} \
+          --set hostNetwork=true \
+          --set metrics.enabled=true \
+          --wait
+
+          echo "Metrics Server installed and ready."
 
       - name: Get Cluster Autoscaler IAM Role ARN
         id: tf-output
